@@ -159,5 +159,13 @@
 - 来源：2026-05-09 用户需求 / `02_SYSTEM_SPEC.md` §1-2
 - 问题：文档要求按先攻顺序行动；本次需求同时要求玩家可以选中不同 player 进行控制。最终规则是严格只能控制当前先攻单位，还是玩家方可在本轮未行动角色之间自由切换？
 - 当前临时假设：**MVP 玩家-only 模拟允许在本轮未结束的玩家角色之间手动选择**；`CombatRoundManager` 仍用先攻排序决定默认选择和自动跳转顺序。
-- 决议：(空)
-- 影响：`Assets/Scripts/Combat/CombatRoundManager.cs`、`Assets/Scripts/Combat/MoveInputController.cs`、`Assets/Scripts/Combat/Debug/APDebugHUD.cs`
+- 决议：**连续玩家块内自由切换**。规则如下：
+  1. Turn order 中，将连续的玩家单位视为一个"可控块"。
+  2. 当可控块排在队首时（即下一个待行动的是玩家单位），玩家可以在该块内的任意未结束角色间自由切换。
+  3. 一旦队首出现敌方单位，则当前可控块必须全部结束行动，之后轮到敌方行动。
+  4. 示例：
+     - `P1 → P2 → P3`：可自由切换 P1/P2/P3。
+     - `P1 → Enemy → P2`：只能操作 P1；P1 结束后敌方行动；敌方结束后进入下一块 P2。
+     - `P1 → P2 → Enemy`：可自由切换 P1/P2；两者都结束后敌方行动。
+  5. 当前 MVP 没有敌方单位，因此所有角色都属于同一个可控块（规则退化为当前行为）。
+- 影响：`CombatRoundManager`（需增加可控块计算逻辑）、`02_SYSTEM_SPEC.md`（补充规则描述）
