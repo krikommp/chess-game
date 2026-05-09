@@ -45,6 +45,7 @@ Exploration ──(进入战斗触发)──▶ CombatStart
 
 公式：
 - **移动**：`canWalkDistance = CurrentAP × MoveSpeed`（实际走的距离按 NavMesh 路径长度算，不按直线）。
+- 移动 AP 扣除按本轮累计实际移动距离结算：单次或多次移动累计每达到 `MoveSpeed` 米扣除 1 AP；未满 1 AP 的距离暂存到本轮后续移动继续累计。
 - **攻击/技能**：消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。
 - **结束回合**：玩家可主动结束（剩余 AP 不保留 / 是否保留 → OPEN_QUESTIONS）。
 
@@ -68,7 +69,7 @@ public interface ICombatUnit {
 ## 5. 移动子系统
 
 - **寻路**：NavMesh（候选）。地图烘焙策略见 `06_MAP_SPEC.md`。
-- **预览**：玩家悬停时实时显示路径长度 + AP 消耗。
+- **预览**：玩家悬停时实时显示路径长度 + AP 消耗；超出 AP 预算时显示可达距离 / 总距离。角色移动过程中保留一条独立的当前移动目标路径线，同时允许鼠标 hover 预览继续更新。
 - **超出 AP 的目标**：如果目标路径存在但当前 AP 不足，预览拆成可达段 / 不可达段；点击后单位移动到可达段末端，并消耗当前可用 AP。
 - **打断**：移动过程中遇到 OpportunityAttack / 触发陷阱 → 是否打断？待定。
 
@@ -92,20 +93,25 @@ public interface ICombatUnit {
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
 - [ ] `MovementController`（NavMesh 包装，当前逻辑在 `MoveInputController` 内）
+- [ ] `SkillSystem`（`SkillDefinition` + `Effect` + AP/冷却/目标校验，见 `05_SKILL_SPEC.md`）
+- [x] `EnemyAISystem`（MVP：`EnemyTurnRunner` 最近玩家 → 移动进基础攻击范围 → 攻击一次；完整 Utility AI 见 `04_MONSTER_SPEC.md` §3）
 - [ ] `CombatTrigger`（探索 → 战斗）
 - [ ] `VictoryConditionEvaluator`
 
 ## 9. MVP 回合模拟（玩家 + 敌方单位）
 
-当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，无 AI、无胜负判定。
+当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。
 
 - `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
+- 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
-- 点击地面按 NavMesh 路径消耗 AP 移动。
+- 点击地面按 NavMesh 路径移动；移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
+- 移动 AP 不在下达指令时预扣，而是在角色实际移动距离累计达到 `MoveSpeedMetersPerAp` 时扣除；未满 1 AP 的累计距离会保留到本轮后续移动。
 - 点击敌方单位 = 攻击行为：寻路至攻击范围（默认 1.5m），消耗移动 AP + 1 AP，造成 20 伤害。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
-- 敌方单位回合自动跳过（无 AI）。
+- 敌方单位回合由 `EnemyTurnRunner` 执行最小基础 AI：选择最近存活玩家，若能在本回合移动到攻击范围并保留攻击 AP，则移动后攻击；若本回合无法攻击，则沿 NavMesh 路径向目标移动到本回合最大可达点。
+- 敌方 AI 选终点时使用软占位检查：避开其他存活玩家/敌人的当前位置；理想攻击点或追击点被占用时，在附近采样替代 NavMesh 点，避免多个 AI 抢同一个终点。
 - 当所有存活单位本轮结束后，自动进入下一轮。
 - 敌方 HP 归零时自动 `Destroy(gameObject)`。
 
