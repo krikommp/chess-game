@@ -87,10 +87,22 @@ public interface ICombatUnit {
 
 ## 8. 待办接口清单（占位，后续实现）
 
-- [ ] `CombatManager`（状态机 + turn order）
+- [x] `CombatRoundManager`（MVP 玩家-only 轮次 + initiative turn order）
 - [ ] `ICombatUnit` 接口与 `CombatUnitBase` 抽象类
-- [ ] `APSystem`
-- [ ] `InitiativeSystem`
+- [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
+- [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
 - [ ] `MovementController`（NavMesh 包装）
 - [ ] `CombatTrigger`（探索 → 战斗）
 - [ ] `VictoryConditionEvaluator`
+
+## 9. MVP 玩家-only 回合模拟
+
+当前实现范围：场景内最多 4 个 `Player1Controller`，无敌人 AI、无胜负判定。
+
+- `CombatRoundManager` 启动时收集玩家，按 `Initiative` 降序排序。
+- 一轮开始时，所有玩家 `CurrentAP = MaxAP`，并清除本轮结束标记。
+- 玩家可用数字键 `1-4` 或点击角色选择本轮尚未结束的角色。
+- 点击地面仍按 NavMesh 路径消耗 AP；可走距离仍为 `CurrentAP * MoveSpeed`。
+- 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
+- 当所有玩家都被标记为本轮结束后，自动进入下一轮并恢复全部 AP。
+- TODO(Q-0024)：该 MVP 暂允许玩家在本轮未结束角色之间手动选择；最终是否必须严格按先攻顺序行动待定。

@@ -13,6 +13,7 @@ namespace MiniChess.Combat
         [Header("Refs")]
         public Camera cam;
         public Player1Controller player;
+        public CombatRoundManager combatManager;
         public PathPreview preview;
 
         [Header("Raycast")]
@@ -41,14 +42,16 @@ namespace MiniChess.Combat
             _path = new NavMeshPath();
             _clickMovePath = new NavMeshPath();
             if (cam == null) cam = Camera.main;
+            if (combatManager == null) combatManager = FindObjectOfType<CombatRoundManager>();
         }
 
         private void Update()
         {
-            if (player == null || preview == null || cam == null) return;
+            Player1Controller activePlayer = GetActivePlayer();
+            if (activePlayer == null || preview == null || cam == null) return;
 
             // While moving: hide preview, ignore input.
-            if (player.IsMoving)
+            if (activePlayer.IsMoving || activePlayer.HasEndedRound)
             {
                 preview.Clear();
                 _hasValidTarget = false;
@@ -57,9 +60,17 @@ namespace MiniChess.Combat
 
             UpdatePreview();
 
-            if (Input.GetMouseButtonDown(0) && _hasValidTarget && _canMoveOnClick)
+            if (Input.GetMouseButtonDown(0))
             {
-                if (player.TryMove(_clickMovePath, _clickMoveApCost))
+                if (TrySelectPlayerUnderCursor())
+                {
+                    preview.Clear();
+                    _hasValidTarget = false;
+                    _canMoveOnClick = false;
+                    return;
+                }
+
+                if (_hasValidTarget && _canMoveOnClick && activePlayer.TryMove(_clickMovePath, _clickMoveApCost))
                 {
                     preview.Clear();
                     _hasValidTarget = false;
@@ -75,6 +86,8 @@ namespace MiniChess.Combat
             _previewApCost = 0;
             _canMoveOnClick = false;
             _clickMoveApCost = 0;
+            Player1Controller activePlayer = GetActivePlayer();
+            if (activePlayer == null) return;
 
             // 1. Mouse → world hit
             Ray ray = cam.ScreenPointToRay(Input.mousePosition);
@@ -117,10 +130,10 @@ namespace MiniChess.Combat
 
             // 4. Length + AP
             float length = PathCostCalculator.PathLength(_path.corners);
-            float maxRange = player.CurrentAP * player.MoveSpeedMetersPerAp;
-            int cost = PathCostCalculator.ApCost(length, player.MoveSpeedMetersPerAp);
+            float maxRange = activePlayer.CurrentAP * activePlayer.MoveSpeedMetersPerAp;
+            int cost = PathCostCalculator.ApCost(length, activePlayer.MoveSpeedMetersPerAp);
 
-            if (length <= maxRange && cost <= player.CurrentAP)
+            if (length <= maxRange && cost <= activePlayer.CurrentAP)
             {
                 preview.Show(_path.corners, System.Array.Empty<Vector3>());
                 _hasValidTarget = true;
@@ -139,10 +152,10 @@ namespace MiniChess.Combat
                 _reachable = false;
                 _previewApCost = cost;
 
-                if (player.CurrentAP > 0 && head != null && head.Length >= 2)
+                if (activePlayer.CurrentAP > 0 && head != null && head.Length >= 2)
                 {
                     Vector3 furthestReachable = head[head.Length - 1];
-                    _canMoveOnClick = CacheClickMovePath(furthestReachable, player.CurrentAP);
+                    _canMoveOnClick = CacheClickMovePath(furthestReachable, activePlayer.CurrentAP);
                 }
             }
         }
@@ -156,7 +169,9 @@ namespace MiniChess.Combat
 
         private bool CacheClickMovePath(Vector3 destination, int apCost)
         {
-            if (apCost <= 0 || apCost > player.CurrentAP) return false;
+            Player1Controller activePlayer = GetActivePlayer();
+            if (activePlayer == null) return false;
+            if (apCost <= 0 || apCost > activePlayer.CurrentAP) return false;
             if (!TryGetNavMeshOrigin(out Vector3 origin)) return false;
 
             bool foundPath = NavMesh.CalculatePath(
@@ -179,14 +194,44 @@ namespace MiniChess.Combat
 
         private bool TryGetNavMeshOrigin(out Vector3 origin)
         {
-            if (NavMesh.SamplePosition(player.transform.position, out NavMeshHit hit, originSnapRadius, NavMesh.AllAreas))
+            Player1Controller activePlayer = GetActivePlayer();
+            if (activePlayer != null && NavMesh.SamplePosition(activePlayer.transform.position, out NavMeshHit hit, originSnapRadius, NavMesh.AllAreas))
             {
                 origin = hit.position;
                 return true;
             }
 
-            origin = player.transform.position;
+            origin = activePlayer != null ? activePlayer.transform.position : Vector3.zero;
             return false;
+        }
+
+        public void SetPlayer(Player1Controller nextPlayer)
+        {
+            player = nextPlayer;
+            preview?.Clear();
+            _hasValidTarget = false;
+            _canMoveOnClick = false;
+        }
+
+        private Player1Controller GetActivePlayer()
+        {
+            return combatManager != null && combatManager.SelectedPlayer != null
+                ? combatManager.SelectedPlayer
+                : player;
+        }
+
+        private bool TrySelectPlayerUnderCursor()
+        {
+            if (combatManager == null) return false;
+
+            Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+            if (!Physics.Raycast(ray, out RaycastHit hit, 500f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                return false;
+            }
+
+            Player1Controller hitPlayer = hit.collider.GetComponentInParent<Player1Controller>();
+            return hitPlayer != null && combatManager.TrySelectPlayer(hitPlayer);
         }
 
         // Expose for HUD

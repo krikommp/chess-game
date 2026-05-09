@@ -154,3 +154,10 @@
 - 问题：`Assets/Data/{Characters,Monsters,Skills,Maps,Quests}/` 何时创建？
 - 当前临时假设：**等真正写第一个 ScriptableObject 时再创建**，避免空目录。
 - 决议：(空)
+
+### Q-0024 玩家-only 回合模拟是否严格锁定先攻顺序
+- 来源：2026-05-09 用户需求 / `02_SYSTEM_SPEC.md` §1-2
+- 问题：文档要求按先攻顺序行动；本次需求同时要求玩家可以选中不同 player 进行控制。最终规则是严格只能控制当前先攻单位，还是玩家方可在本轮未行动角色之间自由切换？
+- 当前临时假设：**MVP 玩家-only 模拟允许在本轮未结束的玩家角色之间手动选择**；`CombatRoundManager` 仍用先攻排序决定默认选择和自动跳转顺序。
+- 决议：(空)
+- 影响：`Assets/Scripts/Combat/CombatRoundManager.cs`、`Assets/Scripts/Combat/MoveInputController.cs`、`Assets/Scripts/Combat/Debug/APDebugHUD.cs`
