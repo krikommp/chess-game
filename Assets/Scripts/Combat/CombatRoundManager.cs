@@ -168,9 +168,9 @@ namespace MiniChess.Combat
         {
             RoundCount++;
 
-            // Clean up dead / destroyed units
-            _turnOrder.RemoveAll(u => u == null || !u.IsAlive);
-            _enemyUnits.RemoveAll(e => e == null);
+            // Rebuild turn order for the new round (old one was consumed)
+            CacheUnits();
+            BuildTurnOrder();
 
             foreach (var unit in _turnOrder)
             {
