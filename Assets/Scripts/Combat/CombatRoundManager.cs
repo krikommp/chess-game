@@ -6,8 +6,9 @@ using UnityEngine;
 namespace MiniChess.Combat
 {
     /// <summary>
-    /// Player-only MVP round loop: sort by initiative, let unfinished players act,
-    /// Space marks the selected player done, and a new round refills AP for everyone.
+    /// Round loop with initiative-based turn order.
+    /// Consecutive player units form a "controllable block" where the player
+    /// can freely switch. Enemy units block the front and auto-skip their turn.
     /// </summary>
     public class CombatRoundManager : MonoBehaviour
     {
@@ -17,25 +18,31 @@ namespace MiniChess.Combat
         [Header("Refs")]
         [SerializeField] private MoveInputController moveInput;
         [SerializeField] private CameraController cameraController;
-        [SerializeField] private List<Player1Controller> players = new List<Player1Controller>();
+        [SerializeField] private List<Player1Controller> playerUnits = new List<Player1Controller>();
 
         [Header("Controls")]
         [SerializeField] private KeyCode endTurnKey = KeyCode.Space;
 
-        [Header("MVP Limits")]
+        [Header("Combat")]
         [SerializeField, Range(1, 4)] private int maxPartySize = 4;
+        [SerializeField] private float attackRange = 1.5f;
 
-        private readonly List<Player1Controller> _turnOrder = new List<Player1Controller>();
+        private readonly List<ICombatUnit> _turnOrder = new List<ICombatUnit>();
+        private readonly List<EnemyController> _enemyUnits = new List<EnemyController>();
+        private readonly List<Player1Controller> _controllableBlock = new List<Player1Controller>();
 
-        public IReadOnlyList<Player1Controller> TurnOrder => _turnOrder;
-        public Player1Controller SelectedPlayer { get; private set; }
+        public IReadOnlyList<ICombatUnit> TurnOrder => _turnOrder;
+        public IReadOnlyList<Player1Controller> ControllableBlock => _controllableBlock;
+        public ICombatUnit SelectedUnit { get; private set; }
+        public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
+        public float AttackRange => attackRange;
         public int RoundCount { get; private set; }
 
         private void Awake()
         {
             if (moveInput == null) moveInput = FindObjectOfType<MoveInputController>();
             if (cameraController == null) cameraController = FindObjectOfType<CameraController>();
-            CachePlayersIfNeeded();
+            CacheUnits();
         }
 
         private void Start()
@@ -50,18 +57,18 @@ namespace MiniChess.Combat
                 TryEndSelectedPlayerRound();
             }
 
-            for (int i = 0; i < _turnOrder.Count && i < 4; i++)
+            for (int i = 0; i < _controllableBlock.Count && i < 4; i++)
             {
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i)))
                 {
-                    TrySelectPlayer(_turnOrder[i]);
+                    TrySelectPlayer(_controllableBlock[i]);
                 }
             }
         }
 
         public void StartCombat()
         {
-            CachePlayersIfNeeded();
+            CacheUnits();
             BuildTurnOrder();
             RoundCount = 0;
             StartNextRound();
@@ -69,7 +76,7 @@ namespace MiniChess.Combat
 
         public bool TrySelectPlayer(Player1Controller player)
         {
-            if (player == null || !_turnOrder.Contains(player) || player.HasEndedRound)
+            if (player == null || !_controllableBlock.Contains(player) || player.HasEndedRound)
             {
                 return false;
             }
@@ -79,8 +86,8 @@ namespace MiniChess.Combat
                 SelectedPlayer.SetVisualState(PlayerVisualState.Default);
             }
 
-            SelectedPlayer = player;
-            SelectedPlayer.SetVisualState(PlayerVisualState.Selected);
+            SelectedUnit = player;
+            player.SetVisualState(PlayerVisualState.Selected);
 
             if (moveInput != null)
             {
@@ -103,51 +110,145 @@ namespace MiniChess.Combat
                 return false;
             }
 
-            SelectNextAvailableOrStartNextRound();
+            AdvanceTurn();
             return true;
         }
 
-        private void CachePlayersIfNeeded()
+        public EnemyController GetEnemyUnderAttack(Player1Controller attacker)
         {
-            players.RemoveAll(player => player == null);
-            if (players.Count > 0) return;
+            // Find the nearest alive enemy
+            EnemyController best = null;
+            float bestDist = float.MaxValue;
+            foreach (var enemy in _enemyUnits)
+            {
+                if (enemy == null || !enemy.IsAlive) continue;
+                float dist = Vector3.Distance(attacker.transform.position, enemy.transform.position);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = enemy;
+                }
+            }
+            return best;
+        }
 
-            players.AddRange(FindObjectsOfType<Player1Controller>());
+        private void CacheUnits()
+        {
+            playerUnits.RemoveAll(p => p == null);
+            if (playerUnits.Count == 0)
+            {
+                playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
+            }
+
+            _enemyUnits.RemoveAll(e => e == null);
+            if (_enemyUnits.Count == 0)
+            {
+                _enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
+            }
         }
 
         private void BuildTurnOrder()
         {
             _turnOrder.Clear();
-            _turnOrder.AddRange(players
-                .Where(player => player != null && player.gameObject.activeInHierarchy)
-                .OrderByDescending(player => player.Initiative)
-                // TODO(Q-0003): replace party slot tie-breaker after initiative ties are resolved.
-                .ThenBy(player => player.PartySlot)
-                .Take(maxPartySize));
+
+            var allUnits = new List<ICombatUnit>();
+            allUnits.AddRange(playerUnits.Where(p => p != null && p.gameObject.activeInHierarchy).Take(maxPartySize));
+            allUnits.AddRange(_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy));
+
+            _turnOrder.AddRange(allUnits
+                .OrderByDescending(u => u.Initiative)
+                .ThenBy(u => u is Player1Controller p ? p.PartySlot : 99));
         }
 
         private void StartNextRound()
         {
             RoundCount++;
-            foreach (Player1Controller player in _turnOrder)
+
+            // Clean up dead / destroyed units
+            _turnOrder.RemoveAll(u => u == null || !u.IsAlive);
+            _enemyUnits.RemoveAll(e => e == null);
+
+            foreach (var unit in _turnOrder)
             {
-                player.BeginRound();
+                if (unit.IsAlive)
+                {
+                    unit.BeginRound();
+                }
             }
 
             RoundChanged?.Invoke();
-            SelectNextAvailableOrStartNextRound();
+            RefreshControllableBlock();
+            AdvanceTurn();
         }
 
-        private void SelectNextAvailableOrStartNextRound()
+        private void RefreshControllableBlock()
         {
-            Player1Controller next = _turnOrder.FirstOrDefault(player => !player.HasEndedRound);
-            if (next != null)
+            _controllableBlock.Clear();
+            foreach (var unit in _turnOrder)
             {
-                TrySelectPlayer(next);
+                if (unit == null || !unit.IsAlive) continue;
+                if (unit.HasEndedRound) continue;
+
+                if (unit is Player1Controller player)
+                {
+                    _controllableBlock.Add(player);
+                }
+                else
+                {
+                    break; // enemy blocks the front
+                }
+            }
+        }
+
+        private void AdvanceTurn()
+        {
+            // Skip finished/dead units at the front
+            while (_turnOrder.Count > 0)
+            {
+                var front = _turnOrder[0];
+                if (front == null || !front.IsAlive)
+                {
+                    _turnOrder.RemoveAt(0);
+                    continue;
+                }
+                if (front.HasEndedRound)
+                {
+                    _turnOrder.RemoveAt(0);
+                    continue;
+                }
+                break;
+            }
+
+            if (_turnOrder.Count == 0)
+            {
+                StartNextRound();
                 return;
             }
 
-            StartNextRound();
+            var next = _turnOrder[0];
+
+            if (next is Player1Controller player)
+            {
+                // Player unit → refresh block and select
+                RefreshControllableBlock();
+                if (!TrySelectPlayer(_controllableBlock.FirstOrDefault(p => !p.HasEndedRound)))
+                {
+                    // No selectable player in block → all ended, advance past them
+                    foreach (var p in _controllableBlock)
+                    {
+                        if (!p.HasEndedRound) p.TryEndRound();
+                    }
+                    _turnOrder.RemoveAll(u => u is Player1Controller pc && _controllableBlock.Contains(pc));
+                    AdvanceTurn();
+                }
+            }
+            else
+            {
+                // Enemy unit → auto-end and advance
+                next.TryEndRound();
+                _turnOrder.RemoveAt(0);
+                AdvanceTurn();
+            }
         }
     }
 }

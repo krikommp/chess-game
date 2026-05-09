@@ -34,6 +34,12 @@ namespace MiniChess.Combat
         // Hover tracking for player visual feedback.
         private Player1Controller _hoveredPlayer;
 
+        // Attack mode state (hovering over an enemy).
+        private bool _isAttackMode;
+        private EnemyController _targetEnemy;
+        private int _attackMoveApCost;
+        private Vector3 _attackDestination;
+
         // Last computed preview state (for click handling).
         private bool _hasValidTarget;
         private bool _reachable;
@@ -59,6 +65,7 @@ namespace MiniChess.Combat
             {
                 preview.Clear();
                 _hasValidTarget = false;
+                _isAttackMode = false;
                 return;
             }
 
@@ -71,10 +78,17 @@ namespace MiniChess.Combat
                     preview.Clear();
                     _hasValidTarget = false;
                     _canMoveOnClick = false;
+                    _isAttackMode = false;
                     return;
                 }
 
-                if (_hasValidTarget && _canMoveOnClick && activePlayer.TryMove(_clickMovePath, _clickMoveApCost))
+                if (_isAttackMode && _targetEnemy != null && _targetEnemy.IsAlive && activePlayer.CurrentAP >= _attackMoveApCost + 1)
+                {
+                    ExecuteAttack(activePlayer, _targetEnemy);
+                    return;
+                }
+
+                if (!_isAttackMode && _hasValidTarget && _canMoveOnClick && activePlayer.TryMove(_clickMovePath, _clickMoveApCost))
                 {
                     preview.Clear();
                     _hasValidTarget = false;
@@ -122,7 +136,19 @@ namespace MiniChess.Combat
 
             ClearHoveredPlayer();
 
-            // 3. Validate hit is on a ground layer
+            // 3. If hovering an enemy, show attack path preview
+            EnemyController hitEnemy = hit.collider.GetComponentInParent<EnemyController>();
+            if (hitEnemy != null && hitEnemy.IsAlive && combatManager != null)
+            {
+                preview.Clear();
+                ShowAttackPreview(activePlayer, hitEnemy);
+                return;
+            }
+
+            _isAttackMode = false;
+            _targetEnemy = null;
+
+            // 4. Validate hit is on a ground layer
             if (((1 << hit.collider.gameObject.layer) & groundMask) == 0)
             {
                 preview.Clear();
@@ -276,9 +302,142 @@ namespace MiniChess.Combat
             }
         }
 
+        private void ShowAttackPreview(Player1Controller player, EnemyController enemy)
+        {
+            float attackRange = combatManager != null ? combatManager.AttackRange : 1.5f;
+            if (!TryGetNavMeshOrigin(out Vector3 origin)) return;
+
+            NavMeshPath fullPath = new NavMeshPath();
+            if (!NavMesh.CalculatePath(origin, enemy.transform.position, NavMesh.AllAreas, fullPath)
+                || fullPath.status != NavMeshPathStatus.PathComplete
+                || fullPath.corners == null || fullPath.corners.Length < 2)
+            {
+                _hasValidTarget = false;
+                _isAttackMode = true;
+                _targetEnemy = enemy;
+                return;
+            }
+
+            Vector3[] corners = fullPath.corners;
+            Vector3 enemyPos = enemy.transform.position;
+
+            // Walk backward from enemy to find the first corner >= attackRange away
+            int stopIndex = -1;
+            for (int i = corners.Length - 1; i >= 0; i--)
+            {
+                if (Vector3.Distance(corners[i], enemyPos) >= attackRange)
+                {
+                    stopIndex = i;
+                    break;
+                }
+            }
+
+            if (stopIndex < 0)
+            {
+                // Already in range, no movement needed
+                _attackDestination = origin;
+                _attackMoveApCost = 0;
+                _isAttackMode = true;
+                _targetEnemy = enemy;
+                _hasValidTarget = true;
+                _reachable = true;
+                _previewApCost = 1; // just the attack cost
+                _canMoveOnClick = false; // no movement path needed
+                preview.Clear();
+                return;
+            }
+
+            Vector3 destination = corners[stopIndex];
+
+            // Calculate movement cost to that point
+            float moveLength = 0f;
+            for (int i = 0; i < stopIndex; i++)
+            {
+                moveLength += Vector3.Distance(corners[i], corners[i + 1]);
+            }
+            int moveApCost = PathCostCalculator.ApCost(moveLength, player.MoveSpeedMetersPerAp);
+
+            // Build sub-path for preview
+            Vector3[] subPath = new Vector3[stopIndex + 1];
+            System.Array.Copy(corners, subPath, stopIndex + 1);
+
+            float maxRange = player.CurrentAP * player.MoveSpeedMetersPerAp;
+            int totalCost = moveApCost + 1;
+
+            if (moveLength <= maxRange && totalCost <= player.CurrentAP)
+            {
+                preview.Show(subPath, System.Array.Empty<Vector3>());
+                _hasValidTarget = true;
+                _reachable = true;
+                _previewApCost = totalCost;
+            }
+            else
+            {
+                PathCostCalculator.Clip(corners, maxRange, out Vector3[] head, out Vector3[] tail);
+                preview.Show(head, tail);
+                _hasValidTarget = true;
+                _reachable = false;
+                _previewApCost = totalCost;
+            }
+
+            _isAttackMode = true;
+            _targetEnemy = enemy;
+            _attackMoveApCost = moveApCost;
+            _attackDestination = destination;
+        }
+
+        private void ExecuteAttack(Player1Controller player, EnemyController enemy)
+        {
+            int totalCost = _attackMoveApCost + 1; // movement + 1 AP for attack
+
+            if (_attackMoveApCost > 0)
+            {
+                if (!TryGetNavMeshOrigin(out Vector3 origin)) return;
+
+                NavMeshPath movePath = new NavMeshPath();
+                if (NavMesh.CalculatePath(origin, _attackDestination, NavMesh.AllAreas, movePath)
+                    && movePath.status == NavMeshPathStatus.PathComplete
+                    && movePath.corners != null && movePath.corners.Length >= 2)
+                {
+                    if (!player.TryMove(movePath, totalCost))
+                    {
+                        preview.Clear();
+                        _hasValidTarget = false;
+                        _isAttackMode = false;
+                        return;
+                    }
+                }
+                else
+                {
+                    preview.Clear();
+                    _hasValidTarget = false;
+                    _isAttackMode = false;
+                    return;
+                }
+            }
+            else
+            {
+                // Already in range, just spend 1 AP for the attack
+                if (!player.TrySpendAP(1))
+                {
+                    return;
+                }
+            }
+
+            enemy.TakeDamage(20);
+            Debug.Log($"[Combat] {player.DisplayName} attacks {enemy.DisplayName} for 20 damage ({enemy.CurrentHP}/{enemy.MaxHP} HP)");
+
+            preview.Clear();
+            _hasValidTarget = false;
+            _isAttackMode = false;
+            _targetEnemy = null;
+        }
+
         // Expose for HUD
         public bool HasPreview => _hasValidTarget;
         public bool PreviewReachable => _reachable;
         public int PreviewApCost => _previewApCost;
+        public bool IsAttackMode => _isAttackMode;
+        public string AttackTargetName => _targetEnemy != null ? _targetEnemy.DisplayName : "";
     }
 }

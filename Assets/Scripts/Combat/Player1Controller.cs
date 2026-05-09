@@ -11,11 +11,17 @@ namespace MiniChess.Combat
         Selected
     }
 
+    public enum Faction
+    {
+        Player,
+        Enemy
+    }
+
     /// <summary>
     /// MVP player combat unit. Owns initiative, AP, per-round done state, and NavMeshAgent movement.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
-    public class Player1Controller : MonoBehaviour
+    public class Player1Controller : MonoBehaviour, ICombatUnit
     {
         public event Action MovementStarted;
         public event Action StateChanged;
@@ -23,6 +29,11 @@ namespace MiniChess.Combat
         [Header("Identity")]
         public string displayName = "Player";
         public int partySlot = 1;
+        public Faction Faction { get; set; } = Faction.Player;
+
+        [Header("HP")]
+        public int maxHP = 100;
+        public int currentHP = 100;
 
         [Header("Initiative")]
         public int initiative = 10;
@@ -55,6 +66,9 @@ namespace MiniChess.Combat
         public float MoveSpeedMetersPerAp { get => moveSpeedMetersPerAp; set => moveSpeedMetersPerAp = Mathf.Max(0.01f, value); }
         public bool IsMoving { get; private set; }
         public bool HasEndedRound { get; private set; }
+        public bool IsAlive => currentHP > 0;
+        public int MaxHP => maxHP;
+        public int CurrentHP { get => currentHP; set => currentHP = Mathf.Clamp(value, 0, maxHP); }
 
         private NavMeshAgent _agent;
         private MeshRenderer _meshRenderer;
@@ -125,6 +139,22 @@ namespace MiniChess.Combat
             MovementStarted?.Invoke();
             StateChanged?.Invoke();
             return true;
+        }
+
+        /// <summary>Spend AP directly (e.g. for attack cost when already in range).</summary>
+        public bool TrySpendAP(int amount)
+        {
+            if (amount <= 0 || amount > CurrentAP) return false;
+            CurrentAP -= amount;
+            StateChanged?.Invoke();
+            return true;
+        }
+
+        public void TakeDamage(int damage)
+        {
+            if (!IsAlive) return;
+            currentHP = Mathf.Max(0, currentHP - damage);
+            StateChanged?.Invoke();
         }
 
         public void SetVisualState(PlayerVisualState state)

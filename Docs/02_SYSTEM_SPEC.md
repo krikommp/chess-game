@@ -87,26 +87,29 @@ public interface ICombatUnit {
 
 ## 8. 待办接口清单（占位，后续实现）
 
-- [x] `CombatRoundManager`（MVP 玩家-only 轮次 + initiative turn order）
-- [ ] `ICombatUnit` 接口与 `CombatUnitBase` 抽象类
+- [x] `CombatRoundManager`（MVP 轮次 + initiative turn order + 可控块 + 敌我回合）
+- [x] `ICombatUnit` 接口（`Player1Controller` + `EnemyController` 均实现）
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
-- [ ] `MovementController`（NavMesh 包装）
+- [ ] `MovementController`（NavMesh 包装，当前逻辑在 `MoveInputController` 内）
 - [ ] `CombatTrigger`（探索 → 战斗）
 - [ ] `VictoryConditionEvaluator`
 
-## 9. MVP 玩家-only 回合模拟
+## 9. MVP 回合模拟（玩家 + 敌方单位）
 
-当前实现范围：场景内最多 4 个 `Player1Controller`，无敌人 AI、无胜负判定。
+当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，无 AI、无胜负判定。
 
-- `CombatRoundManager` 启动时收集玩家，按 `Initiative` 降序排序。
-- 一轮开始时，所有玩家 `CurrentAP = MaxAP`，并清除本轮结束标记。
-- 玩家可用数字键 `1-4` 或点击角色选择本轮尚未结束的角色。
-- 点击地面仍按 NavMesh 路径消耗 AP；可走距离仍为 `CurrentAP * MoveSpeed`。
+- `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
+- 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
+- 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
+- 点击地面按 NavMesh 路径消耗 AP 移动。
+- 点击敌方单位 = 攻击行为：寻路至攻击范围（默认 1.5m），消耗移动 AP + 1 AP，造成 20 伤害。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
-- 当所有玩家都被标记为本轮结束后，自动进入下一轮并恢复全部 AP。
+- 敌方单位回合自动跳过（无 AI）。
+- 当所有存活单位本轮结束后，自动进入下一轮。
+- 敌方 HP 归零时自动 `Destroy(gameObject)`。
 
-## 10. 玩家可控块规则（Q-0024 已决议）
+## 10. 玩家可控块规则（Q-0024 已决议，已实现）
 
 回合处理时，将 turn order 中**连续的玩家单位**视为一个"可控块"：
 
@@ -117,4 +120,23 @@ public interface ICombatUnit {
    - `P1 → Enemy → P2`：只能操作 P1；P1 结束后敌方行动；敌方结束后才进入 P2。
    - `P1 → P2 → Enemy`：可自由切换 P1/P2；两者都结束后敌方行动。
 
-当前 MVP 无敌方单位，所有角色属于同一个可控块（规则退化为自由切换）。引入敌方后，`CombatRoundManager` 需增加可控块计算逻辑。
+已实现：`CombatRoundManager.RefreshControllableBlock()` 在每次轮到玩家单位时重新计算可控块；敌方自动跳过。`TrySelectPlayer` 仅允许选择当前块内的角色。
+
+## 11. 基础攻击（MVP 占位）
+
+| 参数 | 值 | 说明 |
+|---|---|---|
+| 攻击 AP 消耗 | 1 | 每次点击敌方单位消耗 |
+| 攻击伤害 | 20 | 固定伤害，无属性/防御计算 |
+| 攻击范围 | 1.5m | 玩家导航至距敌方此距离的点后执行攻击 |
+| 敌方 HP | 100 | `EnemyController.maxHP` 默认值 |
+| 玩家 HP | 100 | `Player1Controller.maxHP` 默认值 |
+| 死亡处理 | — | 敌方 `HP ≤ 0` 时 `Destroy(gameObject)`；玩家暂不销毁 |
+
+攻击流程：
+1. 玩家点击敌方单位。
+2. 计算从玩家到敌方的 NavMesh 全路径。
+3. 从路径末端（敌方位置）反向遍历，找到第一个距敌方 ≥ `attackRange` 的 corner 作为目标点。
+4. 若已在范围内 → 直接消耗 1 AP 造成伤害。
+5. 若需移动 → 消耗移动 AP + 1 AP，导航至目标点后造成伤害。
+6. 若 AP 不足以移动 + 攻击，则不执行。
