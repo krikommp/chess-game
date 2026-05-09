@@ -30,6 +30,7 @@ namespace MiniChess.Combat
         // cached, reused per frame to avoid GC
         private NavMeshPath _path;
         private NavMeshPath _clickMovePath;
+        private NavMeshPath _activeMovePath;
 
         // Hover tracking for player visual feedback.
         private Player1Controller _hoveredPlayer;
@@ -37,6 +38,7 @@ namespace MiniChess.Combat
         // Attack mode state (hovering over an enemy).
         private bool _isAttackMode;
         private EnemyController _targetEnemy;
+        private bool _attackRequiresMove;
         private int _attackMoveApCost;
         private Vector3 _attackDestination;
 
@@ -46,11 +48,14 @@ namespace MiniChess.Combat
         private int _previewApCost;
         private bool _canMoveOnClick;
         private int _clickMoveApCost;
+        private bool _hasActiveMoveTarget;
+        private Vector3 _activeMoveTarget;
 
         private void Awake()
         {
             _path = new NavMeshPath();
             _clickMovePath = new NavMeshPath();
+            _activeMovePath = new NavMeshPath();
             if (cam == null) cam = Camera.main;
             if (combatManager == null) combatManager = FindObjectOfType<CombatRoundManager>();
         }
@@ -63,21 +68,24 @@ namespace MiniChess.Combat
                 preview?.Clear();
                 _hasValidTarget = false;
                 _isAttackMode = false;
+                _attackRequiresMove = false;
+                ClearActiveMovementPath();
                 return;
             }
 
             Player1Controller activePlayer = GetActivePlayer();
             if (activePlayer == null || preview == null || cam == null) return;
 
-            // While moving: hide preview, ignore input.
-            if (activePlayer.IsMoving || activePlayer.HasEndedRound)
+            if (activePlayer.HasEndedRound)
             {
                 preview.Clear();
                 _hasValidTarget = false;
                 _isAttackMode = false;
+                ClearActiveMovementPath();
                 return;
             }
 
+            UpdateActiveMovementPath(activePlayer);
             UpdatePreview();
 
             if (Input.GetMouseButtonDown(0))
@@ -88,6 +96,7 @@ namespace MiniChess.Combat
                     _hasValidTarget = false;
                     _canMoveOnClick = false;
                     _isAttackMode = false;
+                    _attackRequiresMove = false;
                     return;
                 }
 
@@ -99,6 +108,7 @@ namespace MiniChess.Combat
 
                 if (!_isAttackMode && _hasValidTarget && _canMoveOnClick && activePlayer.TryMove(_clickMovePath, _clickMoveApCost))
                 {
+                    StartActiveMovementPath(_clickMovePath);
                     preview.Clear();
                     _hasValidTarget = false;
                     _canMoveOnClick = false;
@@ -156,6 +166,7 @@ namespace MiniChess.Combat
 
             _isAttackMode = false;
             _targetEnemy = null;
+            _attackRequiresMove = false;
 
             // 4. Validate hit is on a ground layer
             if (((1 << hit.collider.gameObject.layer) & groundMask) == 0)
@@ -197,10 +208,10 @@ namespace MiniChess.Combat
 
             // 4. Length + AP
             float length = PathCostCalculator.PathLength(_path.corners);
-            float maxRange = activePlayer.CurrentAP * activePlayer.MoveSpeedMetersPerAp;
-            int cost = PathCostCalculator.ApCost(length, activePlayer.MoveSpeedMetersPerAp);
+            float maxRange = activePlayer.RemainingMoveDistance;
+            int cost = activePlayer.PreviewMovementApCost(length);
 
-            if (length <= maxRange && cost <= activePlayer.CurrentAP)
+            if (length <= maxRange)
             {
                 preview.Show(_path.corners, System.Array.Empty<Vector3>());
                 _hasValidTarget = true;
@@ -219,10 +230,10 @@ namespace MiniChess.Combat
                 _reachable = false;
                 _previewApCost = cost;
 
-                if (activePlayer.CurrentAP > 0 && head != null && head.Length >= 2)
+                if (maxRange > 0f && head != null && head.Length >= 2)
                 {
                     Vector3 furthestReachable = head[head.Length - 1];
-                    _canMoveOnClick = CacheClickMovePath(furthestReachable, activePlayer.CurrentAP);
+                    _canMoveOnClick = CacheClickMovePath(furthestReachable, activePlayer.PreviewMovementApCost(maxRange));
                 }
             }
         }
@@ -238,7 +249,6 @@ namespace MiniChess.Combat
         {
             Player1Controller activePlayer = GetActivePlayer();
             if (activePlayer == null) return false;
-            if (apCost <= 0 || apCost > activePlayer.CurrentAP) return false;
             if (!TryGetNavMeshOrigin(out Vector3 origin)) return false;
 
             bool foundPath = NavMesh.CalculatePath(
@@ -251,6 +261,12 @@ namespace MiniChess.Combat
                 || _clickMovePath.status != NavMeshPathStatus.PathComplete
                 || _clickMovePath.corners == null
                 || _clickMovePath.corners.Length < 2)
+            {
+                return false;
+            }
+
+            float length = PathCostCalculator.PathLength(_clickMovePath.corners);
+            if (length <= 0.001f || length > activePlayer.RemainingMoveDistance + 0.001f)
             {
                 return false;
             }
@@ -276,6 +292,7 @@ namespace MiniChess.Combat
         {
             player = nextPlayer;
             preview?.Clear();
+            ClearActiveMovementPath();
             _hasValidTarget = false;
             _canMoveOnClick = false;
         }
@@ -324,6 +341,7 @@ namespace MiniChess.Combat
                 _hasValidTarget = false;
                 _isAttackMode = true;
                 _targetEnemy = enemy;
+                _attackRequiresMove = false;
                 return;
             }
 
@@ -345,6 +363,7 @@ namespace MiniChess.Combat
             {
                 // Already in range, no movement needed
                 _attackDestination = origin;
+                _attackRequiresMove = false;
                 _attackMoveApCost = 0;
                 _isAttackMode = true;
                 _targetEnemy = enemy;
@@ -364,13 +383,13 @@ namespace MiniChess.Combat
             {
                 moveLength += Vector3.Distance(corners[i], corners[i + 1]);
             }
-            int moveApCost = PathCostCalculator.ApCost(moveLength, player.MoveSpeedMetersPerAp);
+            int moveApCost = player.PreviewMovementApCost(moveLength);
 
             // Build sub-path for preview
             Vector3[] subPath = new Vector3[stopIndex + 1];
             System.Array.Copy(corners, subPath, stopIndex + 1);
 
-            float maxRange = player.CurrentAP * player.MoveSpeedMetersPerAp;
+            float maxRange = player.RemainingMoveDistance;
             int totalCost = moveApCost + 1;
 
             if (moveLength <= maxRange && totalCost <= player.CurrentAP)
@@ -391,6 +410,7 @@ namespace MiniChess.Combat
 
             _isAttackMode = true;
             _targetEnemy = enemy;
+            _attackRequiresMove = true;
             _attackMoveApCost = moveApCost;
             _attackDestination = destination;
         }
@@ -399,7 +419,7 @@ namespace MiniChess.Combat
         {
             int totalCost = _attackMoveApCost + 1; // movement + 1 AP for attack
 
-            if (_attackMoveApCost > 0)
+            if (_attackRequiresMove)
             {
                 if (!TryGetNavMeshOrigin(out Vector3 origin)) return;
 
@@ -413,6 +433,14 @@ namespace MiniChess.Combat
                         preview.Clear();
                         _hasValidTarget = false;
                         _isAttackMode = false;
+                        _attackRequiresMove = false;
+                        return;
+                    }
+
+                    StartActiveMovementPath(movePath);
+
+                    if (!player.TrySpendAP(1))
+                    {
                         return;
                     }
                 }
@@ -421,6 +449,7 @@ namespace MiniChess.Combat
                     preview.Clear();
                     _hasValidTarget = false;
                     _isAttackMode = false;
+                    _attackRequiresMove = false;
                     return;
                 }
             }
@@ -439,6 +468,7 @@ namespace MiniChess.Combat
             preview.Clear();
             _hasValidTarget = false;
             _isAttackMode = false;
+            _attackRequiresMove = false;
             _targetEnemy = null;
         }
 
@@ -448,5 +478,58 @@ namespace MiniChess.Combat
         public int PreviewApCost => _previewApCost;
         public bool IsAttackMode => _isAttackMode;
         public string AttackTargetName => _targetEnemy != null ? _targetEnemy.DisplayName : "";
+
+        private void StartActiveMovementPath(NavMeshPath path)
+        {
+            if (path == null || path.corners == null || path.corners.Length < 2)
+            {
+                ClearActiveMovementPath();
+                return;
+            }
+
+            _activeMoveTarget = path.corners[path.corners.Length - 1];
+            _hasActiveMoveTarget = true;
+            preview?.ShowActivePath(path.corners);
+        }
+
+        private void UpdateActiveMovementPath(Player1Controller activePlayer)
+        {
+            if (!_hasActiveMoveTarget) return;
+
+            if (activePlayer == null || !activePlayer.IsMoving)
+            {
+                ClearActiveMovementPath();
+                return;
+            }
+
+            if (!TryGetNavMeshOrigin(out Vector3 origin))
+            {
+                ClearActiveMovementPath();
+                return;
+            }
+
+            bool foundPath = NavMesh.CalculatePath(
+                origin,
+                _activeMoveTarget,
+                NavMesh.AllAreas,
+                _activeMovePath);
+
+            if (!foundPath
+                || _activeMovePath.status != NavMeshPathStatus.PathComplete
+                || _activeMovePath.corners == null
+                || _activeMovePath.corners.Length < 2)
+            {
+                preview?.ClearActivePath();
+                return;
+            }
+
+            preview?.ShowActivePath(_activeMovePath.corners);
+        }
+
+        private void ClearActiveMovementPath()
+        {
+            _hasActiveMoveTarget = false;
+            preview?.ClearActivePath();
+        }
     }
 }

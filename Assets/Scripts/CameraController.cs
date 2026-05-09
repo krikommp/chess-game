@@ -108,6 +108,15 @@ public class CameraController : MonoBehaviour
         CacheOffset();
     }
 
+    public void FocusOn(Transform focusTarget)
+    {
+        if (focusTarget == null) return;
+
+        target = focusTarget;
+        ActivateAutoFocus();
+        BindDefaultTargetIfNeeded();
+    }
+
     private void BindDefaultTargetIfNeeded()
     {
         if (target == null)
@@ -179,6 +188,11 @@ public class CameraController : MonoBehaviour
     }
 
     private void HandleTrackedPlayerMovementStarted()
+    {
+        ActivateAutoFocus();
+    }
+
+    private void ActivateAutoFocus()
     {
         _autoFocusActive = true;
         _manualPanVelocity = Vector3.zero;
