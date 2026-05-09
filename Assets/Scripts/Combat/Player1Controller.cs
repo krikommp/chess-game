@@ -69,10 +69,14 @@ namespace MiniChess.Combat
         public bool IsAlive => currentHP > 0;
         public int MaxHP => maxHP;
         public int CurrentHP { get => currentHP; set => currentHP = Mathf.Clamp(value, 0, maxHP); }
+        public float UnpaidMoveDistance => _unpaidMoveDistance;
+        public float RemainingMoveDistance => Mathf.Max(0f, CurrentAP * MoveSpeedMetersPerAp - _unpaidMoveDistance);
 
         private NavMeshAgent _agent;
         private MeshRenderer _meshRenderer;
         private Material _materialInstance;
+        private Vector3 _lastMovementPosition;
+        private float _unpaidMoveDistance;
 
         public NavMeshAgent Agent => _agent;
 
@@ -100,7 +104,11 @@ namespace MiniChess.Combat
                 Debug.Log($"[{DisplayName}] AP refilled to {CurrentAP}");
             }
 
-            if (IsMoving && !_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance)
+            if (!IsMoving) return;
+
+            AccountMovementDistance();
+
+            if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance)
             {
                 IsMoving = false;
                 StateChanged?.Invoke();
@@ -111,6 +119,7 @@ namespace MiniChess.Combat
         {
             CurrentAP = maxAP;
             HasEndedRound = false;
+            _unpaidMoveDistance = 0f;
             StateChanged?.Invoke();
         }
 
@@ -120,22 +129,22 @@ namespace MiniChess.Combat
 
             HasEndedRound = true;
             CurrentAP = 0;
+            _unpaidMoveDistance = 0f;
             StateChanged?.Invoke();
             return true;
         }
 
-        /// <summary>Try to consume AP and start moving along the given complete path.</summary>
+        /// <summary>Start or retarget movement. AP is spent as traveled distance crosses each AP threshold.</summary>
         /// <returns>true if move started.</returns>
         public bool TryMove(NavMeshPath path, int apCost)
         {
-            if (IsMoving) return false;
             if (HasEndedRound) return false;
             if (path == null || path.status != NavMeshPathStatus.PathComplete) return false;
-            if (apCost <= 0 || apCost > CurrentAP) return false;
+            if (!CanMoveAlong(path)) return false;
 
             _agent.SetPath(path);
-            CurrentAP -= apCost;
             IsMoving = true;
+            _lastMovementPosition = transform.position;
             MovementStarted?.Invoke();
             StateChanged?.Invoke();
             return true;
@@ -176,6 +185,48 @@ namespace MiniChess.Combat
         private void ApplyColor(Color color)
         {
             if (_materialInstance != null) _materialInstance.color = color;
+        }
+
+        public int PreviewMovementApCost(float pathLength)
+        {
+            if (pathLength <= 0f || MoveSpeedMetersPerAp <= 0f) return 0;
+
+            float projectedDistance = _unpaidMoveDistance + pathLength;
+            int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / MoveSpeedMetersPerAp);
+            return Mathf.Clamp(cost, 0, CurrentAP);
+        }
+
+        private bool CanMoveAlong(NavMeshPath path)
+        {
+            if (CurrentAP <= 0) return false;
+            if (path.corners == null || path.corners.Length < 2) return false;
+
+            float pathLength = PathCostCalculator.PathLength(path.corners);
+            return pathLength > 0.001f && pathLength <= RemainingMoveDistance + 0.001f;
+        }
+
+        private void AccountMovementDistance()
+        {
+            Vector3 currentPosition = transform.position;
+            float delta = Vector3.Distance(_lastMovementPosition, currentPosition);
+            _lastMovementPosition = currentPosition;
+
+            if (delta <= 0.0001f || MoveSpeedMetersPerAp <= 0f) return;
+
+            _unpaidMoveDistance += delta;
+
+            bool spentAp = false;
+            while (_unpaidMoveDistance + 0.0001f >= MoveSpeedMetersPerAp && CurrentAP > 0)
+            {
+                _unpaidMoveDistance -= MoveSpeedMetersPerAp;
+                CurrentAP--;
+                spentAp = true;
+            }
+
+            if (spentAp)
+            {
+                StateChanged?.Invoke();
+            }
         }
     }
 }
