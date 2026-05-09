@@ -11,6 +11,7 @@ namespace MiniChess.Combat.DebugUI
 
         private GUIStyle _style;
         private GUIStyle _smallStyle;
+        private GUIStyle _enemyStyle;
 
         private void Awake()
         {
@@ -36,6 +37,17 @@ namespace MiniChess.Combat.DebugUI
                     fontSize = 14,
                     normal = { textColor = Color.white }
                 };
+                _enemyStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 14,
+                    normal = { textColor = new Color(1f, 0.6f, 0.4f) }
+                };
+            }
+
+            string waitingLine = "";
+            if (combatManager != null && combatManager.IsWaiting && combatManager.SelectedUnit != null)
+            {
+                waitingLine = $" >>> {combatManager.SelectedUnit.DisplayName} acting... <<<";
             }
 
             string costLine = "Cost: -";
@@ -52,31 +64,40 @@ namespace MiniChess.Combat.DebugUI
                     : $"Cost: {input.PreviewApCost} AP (UNREACHABLE)";
             }
 
-            GUI.Box(new Rect(10, 10, 380, 200), GUIContent.none);
-            GUI.Label(new Rect(20, 14, 240, 24),
-                $"Round: {(combatManager != null ? combatManager.RoundCount : 1)}", _style);
-            GUI.Label(new Rect(20, 38, 360, 24), costLine, _style);
-            GUI.Label(new Rect(20, 62, 360, 24),
+            int turnCount = combatManager != null ? combatManager.TurnOrder.Count : 0;
+            float boxHeight = 112 + turnCount * 20 + 10;
+            GUI.Box(new Rect(10, 10, 400, boxHeight), GUIContent.none);
+
+            GUI.Label(new Rect(20, 14, 300, 24),
+                $"Round: {(combatManager != null ? combatManager.RoundCount : 1)}{waitingLine}", _style);
+            GUI.Label(new Rect(20, 38, 380, 24), costLine, _style);
+            GUI.Label(new Rect(20, 62, 380, 24),
                 activePlayer.IsMoving ? "Moving..." : "Space = end selected player", _smallStyle);
 
-            GUI.Label(new Rect(20, 88, 360, 22),
+            GUI.Label(new Rect(20, 88, 380, 22),
                 $"Selected: {activePlayer.DisplayName} | HP {activePlayer.CurrentHP}/{activePlayer.MaxHP} | AP {activePlayer.CurrentAP}/{activePlayer.MaxAP}",
                 _smallStyle);
 
             if (combatManager == null) return;
 
-            for (int i = 0; i < combatManager.TurnOrder.Count && i < 4; i++)
+            // Full turn order
+            GUI.Label(new Rect(20, 112, 380, 20), "-- Turn Order (by Initiative) --", _smallStyle);
+
+            for (int i = 0; i < turnCount && i < 8; i++)
             {
                 ICombatUnit unit = combatManager.TurnOrder[i];
                 if (unit == null || !unit.IsAlive) continue;
 
-                string marker = unit == activePlayer ? ">" : " ";
+                bool isActive = (unit == combatManager.SelectedUnit);
+                string marker = isActive ? ">" : " ";
                 string typeTag = unit.Faction == Faction.Enemy ? "[E]" : "[P]";
                 string state = unit.HasEndedRound ? "DONE" : $"{unit.CurrentAP}/{unit.MaxAP} AP";
                 string hpStr = $"HP {unit.CurrentHP}/{unit.MaxHP}";
-                GUI.Label(new Rect(20, 112 + i * 18, 360, 18),
-                    $"{marker} {i + 1}. {typeTag} {unit.DisplayName} {hpStr} {state}",
-                    _smallStyle);
+
+                GUIStyle rowStyle = unit.Faction == Faction.Enemy ? _enemyStyle : _smallStyle;
+                GUI.Label(new Rect(20, 132 + i * 20, 380, 20),
+                    $"{marker} {i + 1}. {typeTag} {unit.DisplayName}  Init:{unit.Initiative}  {hpStr}  {state}",
+                    rowStyle);
             }
         }
     }

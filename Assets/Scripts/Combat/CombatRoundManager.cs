@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -37,6 +38,7 @@ namespace MiniChess.Combat
         public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
         public float AttackRange => attackRange;
         public int RoundCount { get; private set; }
+        public bool IsWaiting { get; private set; }
 
         private void Awake()
         {
@@ -52,6 +54,8 @@ namespace MiniChess.Combat
 
         private void Update()
         {
+            if (IsWaiting) return;
+
             if (Input.GetKeyDown(endTurnKey))
             {
                 TryEndSelectedPlayerRound();
@@ -181,6 +185,22 @@ namespace MiniChess.Combat
             AdvanceTurn();
         }
 
+        private IEnumerator EnemyTurnCoroutine(EnemyController enemy)
+        {
+            IsWaiting = true;
+            SelectedUnit = enemy;
+            enemy.FlashTurn();
+
+            yield return new WaitForSeconds(1f);
+
+            enemy.TryEndRound();
+            _turnOrder.RemoveAt(0);
+            SelectedUnit = null;
+            IsWaiting = false;
+
+            AdvanceTurn();
+        }
+
         private void RefreshControllableBlock()
         {
             _controllableBlock.Clear();
@@ -242,12 +262,10 @@ namespace MiniChess.Combat
                     AdvanceTurn();
                 }
             }
-            else
+            else if (next is EnemyController enemy)
             {
-                // Enemy unit → auto-end and advance
-                next.TryEndRound();
-                _turnOrder.RemoveAt(0);
-                AdvanceTurn();
+                // Enemy unit → flash highlight then auto-end
+                StartCoroutine(EnemyTurnCoroutine(enemy));
             }
         }
     }

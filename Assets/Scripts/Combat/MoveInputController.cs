@@ -57,6 +57,15 @@ namespace MiniChess.Combat
 
         private void Update()
         {
+            // Block input during enemy turns
+            if (combatManager != null && combatManager.IsWaiting)
+            {
+                preview?.Clear();
+                _hasValidTarget = false;
+                _isAttackMode = false;
+                return;
+            }
+
             Player1Controller activePlayer = GetActivePlayer();
             if (activePlayer == null || preview == null || cam == null) return;
 
