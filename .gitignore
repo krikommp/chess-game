@@ -1,0 +1,52 @@
+# Unity generated folders
+/Library/
+/Temp/
+/Obj/
+/Build/
+/Builds/
+/Logs/
+/MemoryCaptures/
+/UserSettings/
+
+# Asset meta data from generated folders
+/Library.meta
+/Temp.meta
+/Obj.meta
+/Build.meta
+/Builds.meta
+/Logs.meta
+/MemoryCaptures.meta
+/UserSettings.meta
+
+# Visual Studio / Rider
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity cache and diagnostics
+sysinfo.txt
+*.stacktrace
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vs/
+.vscode/
+
+# Test and coverage artifacts
+*.coverage
+*.coveragexml
+
