@@ -85,9 +85,10 @@
 
 ### Q-0012 怪物 AI 实现方案
 - 来源：`04_MONSTER_SPEC.md` §3
-- 问题：Behavior Tree / GOAP / 硬编码？
-- 当前临时假设：**MVP 用硬编码 if-else**，后续视复杂度升级。
-- 决议：(空)
+- 问题：Behavior Tree / GOAP / 硬编码 / Utility AI？
+- 当前临时假设：**轻量 Utility AI + ScriptableObject 配置 + Scripted Tactic 覆盖**。暂不引入 Behavior Tree / GOAP 插件；第一阶段只实现最小可跑闭环。
+- 决议：**采用轻量 Utility AI + 脚本化战术覆盖**。原因：敌方技能数量较少，但需要策划配置开场行为、条件触发特殊决策，以及支援/治疗/进攻等不同倾向。GOAP 对当前范围过重；Behavior Tree / NodeCanvas / Behavior Designer 保留为后续可视化编辑需求出现后的升级路径。
+- 影响：`Docs/04_MONSTER_SPEC.md`、`Docs/05_SKILL_SPEC.md`、`EnemyController`、后续 `AIProfile` / `AIActionEvaluator` / `AIExecutor`
 
 ### Q-0013 战利品系统是否需要
 - 来源：`04_MONSTER_SPEC.md` §1
@@ -96,19 +97,19 @@
 - 决议：(空)
 
 ### Q-0014 是否需要"法力值"等第二资源
-- 来源：`05_SKILL_SPEC.md` §5
+- 来源：`05_SKILL_SPEC.md` §11
 - 问题：技能除 AP 外是否还消耗 MP / 怒气 / 充能？
 - 当前临时假设：**只消耗 AP**（用户原话："技能的消耗由技能自己决定"，理解为只消耗 AP）。
 - 决议：(空)
 
 ### Q-0015 命中是否需要检定
-- 来源：`05_SKILL_SPEC.md` §5
+- 来源：`05_SKILL_SPEC.md` §11
 - 问题：D&D 式 attack roll vs 100% 命中？
 - 当前临时假设：**100% 命中 + 闪避概率扣减**。
 - 决议：(空)
 
 ### Q-0016 暴击 / 闪避机制
-- 来源：`05_SKILL_SPEC.md` §5
+- 来源：`05_SKILL_SPEC.md` §11
 - 问题：是否引入？
 - 当前临时假设：**有暴击和闪避**（默认 5% / 5%），具体由属性派生公式 TBD。
 - 决议：(空)
@@ -169,3 +170,10 @@
      - `P1 → P2 → Enemy`：可自由切换 P1/P2；两者都结束后敌方行动。
   5. 当前 MVP 没有敌方单位，因此所有角色都属于同一个可控块（规则退化为当前行为）。
 - 影响：`CombatRoundManager`（需增加可控块计算逻辑）、`02_SYSTEM_SPEC.md`（补充规则描述）
+
+### Q-0025 第一阶段技能池是否确认
+- 来源：2026-05-09 用户需求 / `05_SKILL_SPEC.md` §7
+- 问题：MVP 第一阶段是否采用 `basic_attack`、`guarding_shout`、`minor_heal`、`power_strike`、`crippling_hex` 作为技能系统与敌方 AI 的验证技能池？
+- 当前临时假设：**采用这 5 个技能作为草案**，用于验证伤害、治疗、buff、debuff 与 AI 行为倾向；具体数值后续平衡。
+- 决议：(空)
+- 影响：`Docs/05_SKILL_SPEC.md`、后续 `SkillDefinition` / `AIProfile` / `EnemyAISystem`

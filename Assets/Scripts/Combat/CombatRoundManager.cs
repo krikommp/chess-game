@@ -19,6 +19,7 @@ namespace MiniChess.Combat
         [Header("Refs")]
         [SerializeField] private MoveInputController moveInput;
         [SerializeField] private CameraController cameraController;
+        [SerializeField] private EnemyTurnRunner enemyTurnRunner;
         [SerializeField] private List<Player1Controller> playerUnits = new List<Player1Controller>();
 
         [Header("Controls")]
@@ -27,6 +28,11 @@ namespace MiniChess.Combat
         [Header("Combat")]
         [SerializeField, Range(1, 4)] private int maxPartySize = 4;
         [SerializeField] private float attackRange = 1.5f;
+        [SerializeField] private int basicAttackCost = 1;
+        [SerializeField] private int basicAttackDamage = 20;
+
+        [Header("Debug")]
+        [SerializeField] private bool enemyFirstForDebug = true;
 
         private readonly List<ICombatUnit> _turnOrder = new List<ICombatUnit>();
         private readonly List<EnemyController> _enemyUnits = new List<EnemyController>();
@@ -44,6 +50,8 @@ namespace MiniChess.Combat
         {
             if (moveInput == null) moveInput = FindObjectOfType<MoveInputController>();
             if (cameraController == null) cameraController = FindObjectOfType<CameraController>();
+            if (enemyTurnRunner == null) enemyTurnRunner = GetComponent<EnemyTurnRunner>();
+            if (enemyTurnRunner == null) enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
             CacheUnits();
         }
 
@@ -98,10 +106,7 @@ namespace MiniChess.Combat
                 moveInput.SetPlayer(player);
             }
 
-            if (cameraController != null)
-            {
-                cameraController.target = player.transform;
-            }
+            FocusCameraOnUnit(player);
 
             SelectedPlayerChanged?.Invoke();
             return true;
@@ -160,7 +165,8 @@ namespace MiniChess.Combat
             allUnits.AddRange(_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy));
 
             _turnOrder.AddRange(allUnits
-                .OrderByDescending(u => u.Initiative)
+                .OrderBy(u => enemyFirstForDebug && u is EnemyController ? 0 : 1)
+                .ThenByDescending(u => u.Initiative)
                 .ThenBy(u => u is Player1Controller p ? p.PartySlot : 99));
         }
 
@@ -189,9 +195,11 @@ namespace MiniChess.Combat
         {
             IsWaiting = true;
             SelectedUnit = enemy;
+            FocusCameraOnUnit(enemy);
             enemy.FlashTurn();
+            Debug.Log($"[Combat] Enemy turn starts: {enemy.DisplayName}");
 
-            yield return new WaitForSeconds(1f);
+            yield return enemyTurnRunner.RunTurn(enemy, playerUnits, _enemyUnits, attackRange, basicAttackCost, basicAttackDamage);
 
             enemy.TryEndRound();
             _turnOrder.RemoveAt(0);
@@ -267,6 +275,14 @@ namespace MiniChess.Combat
                 // Enemy unit → flash highlight then auto-end
                 StartCoroutine(EnemyTurnCoroutine(enemy));
             }
+        }
+
+        private void FocusCameraOnUnit(ICombatUnit unit)
+        {
+            if (cameraController == null) return;
+            if (!(unit is Component component)) return;
+
+            cameraController.FocusOn(component.transform);
         }
     }
 }

@@ -1,6 +1,4 @@
 using UnityEngine;
-using UnityEngine.AI;
-
 namespace MiniChess.Combat
 {
     /// <summary>
@@ -44,12 +42,10 @@ namespace MiniChess.Combat
             enemy.maxHP = hp;
             enemy.defaultColor = enemyColor;
 
-            // NavMesh obstacle so enemies block pathing
-            NavMeshObstacle obstacle = go.AddComponent<NavMeshObstacle>();
-            obstacle.shape = NavMeshObstacleShape.Capsule;
-            obstacle.radius = 0.4f;
-            obstacle.height = 1.5f;
-            obstacle.carving = true;
+            // TODO(Docs/06_MAP_SPEC.md §2): Revisit dynamic unit blocking once
+            // enemy AI movement and obstacle carving share a proper movement layer.
+            // Do not add NavMeshObstacle in the MVP AI loop because it conflicts
+            // with the NavMeshAgent required by EnemyController.
         }
     }
 }
