@@ -74,7 +74,14 @@ namespace MiniChess.Combat
                 return false;
             }
 
+            if (SelectedPlayer != null && SelectedPlayer != player)
+            {
+                SelectedPlayer.SetVisualState(PlayerVisualState.Default);
+            }
+
             SelectedPlayer = player;
+            SelectedPlayer.SetVisualState(PlayerVisualState.Selected);
+
             if (moveInput != null)
             {
                 moveInput.SetPlayer(player);

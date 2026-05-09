@@ -4,6 +4,13 @@ using UnityEngine.AI;
 
 namespace MiniChess.Combat
 {
+    public enum PlayerVisualState
+    {
+        Default,
+        Hovered,
+        Selected
+    }
+
     /// <summary>
     /// MVP player combat unit. Owns initiative, AP, per-round done state, and NavMeshAgent movement.
     /// </summary>
@@ -35,6 +42,11 @@ namespace MiniChess.Combat
         public bool allowDebugRefill = true;
         public KeyCode refillKey = KeyCode.R;
 
+        [Header("Visuals")]
+        [SerializeField] private Color defaultColor = new Color(0.4f, 0.4f, 0.5f);
+        [SerializeField] private Color hoveredColor = new Color(0.9f, 0.8f, 0.3f);
+        [SerializeField] private Color selectedColor = new Color(0.3f, 0.8f, 0.4f);
+
         public int CurrentAP { get; private set; }
         public int Initiative { get => initiative; set => initiative = value; }
         public int MaxAP { get => maxAP; set => maxAP = Mathf.Max(0, value); }
@@ -45,6 +57,8 @@ namespace MiniChess.Combat
         public bool HasEndedRound { get; private set; }
 
         private NavMeshAgent _agent;
+        private MeshRenderer _meshRenderer;
+        private Material _materialInstance;
 
         public NavMeshAgent Agent => _agent;
 
@@ -55,6 +69,13 @@ namespace MiniChess.Combat
             _agent.stoppingDistance = 0.05f;
             _agent.autoBraking = true;
             CurrentAP = maxAP;
+
+            _meshRenderer = GetComponentInChildren<MeshRenderer>();
+            if (_meshRenderer != null)
+            {
+                _materialInstance = _meshRenderer.material;
+                ApplyColor(defaultColor);
+            }
         }
 
         private void Update()
@@ -104,6 +125,27 @@ namespace MiniChess.Combat
             MovementStarted?.Invoke();
             StateChanged?.Invoke();
             return true;
+        }
+
+        public void SetVisualState(PlayerVisualState state)
+        {
+            switch (state)
+            {
+                case PlayerVisualState.Default:
+                    ApplyColor(defaultColor);
+                    break;
+                case PlayerVisualState.Hovered:
+                    ApplyColor(hoveredColor);
+                    break;
+                case PlayerVisualState.Selected:
+                    ApplyColor(selectedColor);
+                    break;
+            }
+        }
+
+        private void ApplyColor(Color color)
+        {
+            if (_materialInstance != null) _materialInstance.color = color;
         }
     }
 }

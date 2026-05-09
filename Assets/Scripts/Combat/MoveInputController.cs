@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -29,6 +30,9 @@ namespace MiniChess.Combat
         // cached, reused per frame to avoid GC
         private NavMeshPath _path;
         private NavMeshPath _clickMovePath;
+
+        // Hover tracking for player visual feedback.
+        private Player1Controller _hoveredPlayer;
 
         // Last computed preview state (for click handling).
         private bool _hasValidTarget;
@@ -89,9 +93,37 @@ namespace MiniChess.Combat
             Player1Controller activePlayer = GetActivePlayer();
             if (activePlayer == null) return;
 
-            // 1. Mouse → world hit
+            // 1. Mouse → world hit (all layers to detect players)
             Ray ray = cam.ScreenPointToRay(Input.mousePosition);
-            if (!Physics.Raycast(ray, out RaycastHit hit, 500f, groundMask, QueryTriggerInteraction.Ignore))
+            if (!Physics.Raycast(ray, out RaycastHit hit, 500f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                preview.Clear();
+                ClearHoveredPlayer();
+                return;
+            }
+
+            // 2. If hovering a player, show hover color and skip path drawing
+            Player1Controller hitPlayer = hit.collider.GetComponentInParent<Player1Controller>();
+            if (hitPlayer != null && combatManager != null && combatManager.TurnOrder.Contains(hitPlayer))
+            {
+                preview.Clear();
+                if (_hoveredPlayer != null && _hoveredPlayer != hitPlayer)
+                {
+                    if (_hoveredPlayer != combatManager?.SelectedPlayer)
+                        _hoveredPlayer.SetVisualState(PlayerVisualState.Default);
+                }
+                _hoveredPlayer = hitPlayer;
+                if (hitPlayer != activePlayer)
+                {
+                    hitPlayer.SetVisualState(PlayerVisualState.Hovered);
+                }
+                return;
+            }
+
+            ClearHoveredPlayer();
+
+            // 3. Validate hit is on a ground layer
+            if (((1 << hit.collider.gameObject.layer) & groundMask) == 0)
             {
                 preview.Clear();
                 return;
@@ -232,6 +264,16 @@ namespace MiniChess.Combat
 
             Player1Controller hitPlayer = hit.collider.GetComponentInParent<Player1Controller>();
             return hitPlayer != null && combatManager.TrySelectPlayer(hitPlayer);
+        }
+
+        private void ClearHoveredPlayer()
+        {
+            if (_hoveredPlayer != null)
+            {
+                if (_hoveredPlayer != combatManager?.SelectedPlayer)
+                    _hoveredPlayer.SetVisualState(PlayerVisualState.Default);
+                _hoveredPlayer = null;
+            }
         }
 
         // Expose for HUD
