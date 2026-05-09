@@ -51,12 +51,17 @@
 |---|---|
 | `role` | `Aggressive` / `Support` / `Healer` / `Controller` / `Defender` 等倾向标签 |
 | `skillWeights` | 每个技能的基础权重或行为标签权重 |
+| `skillTagWeights` | 根据技能 `aiTags` 或 GameplayTag 加权 |
+| `targetTagWeights` | 根据目标身上的 GameplayTag 加权 |
+| `statusTagWeights` | 根据目标或友方身上的 Status Tag 加权 |
 | `targetPreference` | 优先最近、最低 HP、最高威胁、正在濒死、关键友军等 |
 | `healHpThreshold` | 低于多少生命比例时治疗行为加权 |
 | `buffOpeningTurns` | 前几轮更倾向于 buff / 站位准备 |
 | `protectImportantAllies` | 是否优先保护高威胁友军或 Boss |
 | `aggression` | 进攻倾向，影响伤害技能/靠近玩家的评分 |
 | `supportBias` | 支援倾向，影响 buff / 治疗 / 保护的评分 |
+
+`role` 只表示默认倾向，不应写成硬编码分支。AIProfile 必须保持数据驱动，通过权重与 GameplayTag 系统影响技能、目标、状态和战术条件的评分。
 
 ### 3.4 Scripted Tactic（脚本化战术）
 
@@ -86,6 +91,16 @@ AI 每次行动时生成候选 `AIActionCandidate`：
 - 移动到技能范围内。
 - 防御 / 结束回合（占位）。
 
+候选至少包含：
+- 技能。
+- 目标。
+- 是否需要移动。
+- 移动目标点。
+- 是否本回合可释放。
+- 评分。
+- 失败原因。
+- Debug reason。
+
 评分建议：
 
 ```text
@@ -107,6 +122,15 @@ score =
 - `Healer`：当友方低血量时，治疗评分显著高于进攻；没有治疗目标时退化为支援或攻击。
 - `Controller`：优先限制玩家关键角色或对聚集玩家使用范围/控制技能。
 
+第一阶段实现时，AI 决策应拆成：
+
+1. 生成候选：遍历敌人技能列表和挂载 `SkillExecutor` 的可选目标。
+2. 过滤候选：检查 AP、冷却、目标类型、阵营、Tag 免疫、范围和路径。
+3. 评分候选：读取 `SkillDefinition`、`AIProfile`、GameplayTag、Status Tag、HP、距离和 AP 效率。
+4. 选择候选：选择最高分；同分时使用稳定规则，例如更近目标或更低 HP 目标。
+5. 执行候选：交给敌人自身的 `SkillExecutor`，由执行器负责移动、扣 AP、应用 Effect 和记录冷却。
+6. Debug 输出：输出候选列表、失败原因、评分组成和最终选择原因。日志应尽量详细，方便后续 Agent 调试技能配置、Tag 权重、AIProfile、AP、冷却和 NavMesh 路径问题。
+
 ### 3.6 执行层边界
 
 AI 决策层只产出 `AICommand`，不直接移动或扣 AP。
@@ -124,7 +148,7 @@ AI 决策层只产出 `AICommand`，不直接移动或扣 AP。
 
 1. `EnemyController` 拥有 AP、MoveSpeed、NavMeshAgent，并能移动。（已实现）
 2. 敌方基础攻击复用玩家基础攻击规则：移动到范围内，消耗移动 AP + 攻击 AP，造成固定伤害；若本回合无法攻击，则向最近玩家移动到最大可达点，并通过软占位采样避免多个敌人选择同一终点。（MVP 已实现）
-3. `AIProfile` 支持 3 个角色倾向：`Aggressive` / `Support` / `Healer`。
+3. `AIProfile` 支持 3 个角色倾向：`Aggressive` / `Support` / `Healer`；倾向通过数据权重与 GameplayTag 评分实现，不写成硬编码分支。
 4. `ScriptedTactic` 先支持开场第 1 轮提高 buff/支援行为权重，不做复杂图形编辑器。
 5. Debug 输出本次 AI 选择原因。（MVP 已输出移动/攻击/失败原因）
 
