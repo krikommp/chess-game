@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -10,6 +11,8 @@ namespace MiniChess.Combat
     [RequireComponent(typeof(NavMeshAgent))]
     public class Player1Controller : MonoBehaviour
     {
+        public event Action MovementStarted;
+
         [Header("AP")]
         [Tooltip("Action Points granted per refill (and starting value).")]
         [SerializeField] private int maxAP = 5;
@@ -67,6 +70,7 @@ namespace MiniChess.Combat
             _agent.SetPath(path);
             CurrentAP -= apCost;
             IsMoving = true;
+            MovementStarted?.Invoke();
             return true;
         }
     }

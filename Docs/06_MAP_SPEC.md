@@ -6,6 +6,17 @@
 
 - 一张地图 = 一个 Unity Scene（候选方案；也可以用 Addressables 子场景，待定）。
 - 单一地图内允许多个战斗触发区。
+- 当前场景根节点约定：
+  - `Art`：纯美术与静态环境
+  - `Systems`：相机、输入、路径预览、NavMesh 等运行时系统对象
+  - `Managers`：后续 `CombatManager` / 场景级管理器预留
+  - `Gameplay`：角色、出生点、触发器等玩法对象
+  - `UIRoot`：场景级 UI / 调试 HUD
+  - `Lighting`：灯光与 Volume
+- `Gameplay` 子层级约定：
+  - `Actors`：玩家 / 敌人运行时单位
+  - `Spawns`：玩家与敌人出生点
+  - `Triggers`：战斗 / 剧情 / 交互触发器
 
 ## 2. 寻路
 
