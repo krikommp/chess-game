@@ -16,7 +16,9 @@ public static class CreateBasicAttackAssets
         // Add tag
         var tagsProp = fxSo.FindProperty("m_tags");
         tagsProp.arraySize = 1;
-        tagsProp.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = "Effect.Damage.BasicAttack";
+        var tag0 = tagsProp.GetArrayElementAtIndex(0);
+        tag0.FindPropertyRelative("m_value").stringValue = "Effect.Damage.BasicAttack";
+        tag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Effect.Damage.BasicAttack");
         fxSo.ApplyModifiedProperties();
 
         string fxPath = "Assets/Data/Effects/basic_attack_damage.asset";
@@ -38,11 +40,15 @@ public static class CreateBasicAttackAssets
         // Add skill tag
         var skillTagsProp = skillSo.FindProperty("m_skillTags");
         skillTagsProp.arraySize = 1;
-        skillTagsProp.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = "Skill.Attack.Melee";
+        var skillTag0 = skillTagsProp.GetArrayElementAtIndex(0);
+        skillTag0.FindPropertyRelative("m_value").stringValue = "Skill.Attack.Melee";
+        skillTag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Skill.Attack.Melee");
         // Add AI tag
         var aiTagsProp = skillSo.FindProperty("m_aiTags");
         aiTagsProp.arraySize = 1;
-        aiTagsProp.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = "AI.Skill.Damage";
+        var aiTag0 = aiTagsProp.GetArrayElementAtIndex(0);
+        aiTag0.FindPropertyRelative("m_value").stringValue = "AI.Skill.Damage";
+        aiTag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("AI.Skill.Damage");
         // Assign effect
         var effectsProp = skillSo.FindProperty("m_effects");
         effectsProp.arraySize = 1;

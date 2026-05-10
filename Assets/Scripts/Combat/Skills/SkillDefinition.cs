@@ -28,19 +28,19 @@ namespace MiniChess.Combat.Skills
 
         [Header("Tags")]
         [Tooltip("Gameplay semantics: e.g. Damage.Physical, Element.Fire")]
-        [SerializeField] private GameplayTagRef[] m_skillTags;
+        [SerializeField] private GameplayTag[] m_skillTags;
         [Tooltip("AI categorization: e.g. AI.Skill.Damage, AI.Skill.Heal")]
-        [SerializeField] private GameplayTagRef[] m_aiTags;
+        [SerializeField] private GameplayTag[] m_aiTags;
 
         [Header("Tag Conditions")]
         [Tooltip("Tags the caster must have to use this skill.")]
-        [SerializeField] private GameplayTagRef[] m_requiredCasterTags;
+        [SerializeField] private GameplayTag[] m_requiredCasterTags;
         [Tooltip("Tags that block the caster from using this skill.")]
-        [SerializeField] private GameplayTagRef[] m_blockedCasterTags;
+        [SerializeField] private GameplayTag[] m_blockedCasterTags;
         [Tooltip("Tags the target must have to be affected by this skill.")]
-        [SerializeField] private GameplayTagRef[] m_requiredTargetTags;
+        [SerializeField] private GameplayTag[] m_requiredTargetTags;
         [Tooltip("Tags that block the target from being affected by this skill.")]
-        [SerializeField] private GameplayTagRef[] m_blockedTargetTags;
+        [SerializeField] private GameplayTag[] m_blockedTargetTags;
 
         [Header("AI")]
         [Tooltip("Base weight for AI candidate scoring (higher = more likely to pick)")]
@@ -66,13 +66,13 @@ namespace MiniChess.Combat.Skills
             }
         }
         public EffectDefinition[] Effects => m_effects ?? System.Array.Empty<EffectDefinition>();
-        public GameplayTagRef[] SkillTags => m_skillTags ?? System.Array.Empty<GameplayTagRef>();
-        public GameplayTagRef[] AiTags => m_aiTags ?? System.Array.Empty<GameplayTagRef>();
+        public GameplayTag[] SkillTags => m_skillTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] AiTags => m_aiTags ?? System.Array.Empty<GameplayTag>();
         public float AiBaseWeight => m_aiBaseWeight;
-        public GameplayTagRef[] RequiredCasterTags => m_requiredCasterTags ?? System.Array.Empty<GameplayTagRef>();
-        public GameplayTagRef[] BlockedCasterTags => m_blockedCasterTags ?? System.Array.Empty<GameplayTagRef>();
-        public GameplayTagRef[] RequiredTargetTags => m_requiredTargetTags ?? System.Array.Empty<GameplayTagRef>();
-        public GameplayTagRef[] BlockedTargetTags => m_blockedTargetTags ?? System.Array.Empty<GameplayTagRef>();
+        public GameplayTag[] RequiredCasterTags => m_requiredCasterTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] BlockedCasterTags => m_blockedCasterTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] RequiredTargetTags => m_requiredTargetTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] BlockedTargetTags => m_blockedTargetTags ?? System.Array.Empty<GameplayTag>();
 
         public bool HasEffectTag(GameplayTag tag)
         {
@@ -82,7 +82,7 @@ namespace MiniChess.Combat.Skills
                 var tags = effects[i].Tags;
                 for (int j = 0; j < tags.Length; j++)
                 {
-                    if (tags[j].TryGetTag(out var t) && t == tag)
+                    if (tags[j] == tag)
                         return true;
                 }
             }

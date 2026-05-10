@@ -92,13 +92,19 @@ namespace MiniChess.EditorTools
             // skillTags: Action.Move, Movement.Ground
             var tagsProp = so.FindProperty("m_skillTags");
             tagsProp.arraySize = 2;
-            tagsProp.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = "Action.Move";
-            tagsProp.GetArrayElementAtIndex(1).FindPropertyRelative("m_value").stringValue = "Movement.Ground";
+            var tag0 = tagsProp.GetArrayElementAtIndex(0);
+            tag0.FindPropertyRelative("m_value").stringValue = "Action.Move";
+            tag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Action.Move");
+            var tag1 = tagsProp.GetArrayElementAtIndex(1);
+            tag1.FindPropertyRelative("m_value").stringValue = "Movement.Ground";
+            tag1.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Movement.Ground");
 
             // aiTags: AI.Skill.Mobility
             var aiTagsProp = so.FindProperty("m_aiTags");
             aiTagsProp.arraySize = 1;
-            aiTagsProp.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = "AI.Skill.Mobility";
+            var aiTag0 = aiTagsProp.GetArrayElementAtIndex(0);
+            aiTag0.FindPropertyRelative("m_value").stringValue = "AI.Skill.Mobility";
+            aiTag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("AI.Skill.Mobility");
 
             so.ApplyModifiedProperties();
         }

@@ -11,5 +11,109 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6c822c40b583d8345959618b0a1a55a6, type: 3}
   m_Name: GameplayTagRegistry
-  m_EditorClassIdentifier: 
-  _entries: []
+  m_EditorClassIdentifier:
+  m_entries:
+  - m_tag:
+      m_value: Action.Move
+    m_displayName: Move Action
+    m_description: Unit movement action
+  - m_tag:
+      m_value: AI.Skill.Buff
+    m_displayName: Buff Skill
+    m_description: AI skill that grants buffs
+  - m_tag:
+      m_value: AI.Skill.Control
+    m_displayName: Control Skill
+    m_description: AI skill that applies control effects
+  - m_tag:
+      m_value: AI.Skill.Damage
+    m_displayName: Damage Skill
+    m_description: AI skill that deals damage
+  - m_tag:
+      m_value: AI.Skill.Debuff
+    m_displayName: Debuff Skill
+    m_description: AI skill that applies debuffs
+  - m_tag:
+      m_value: AI.Skill.Heal
+    m_displayName: Heal Skill
+    m_description: AI skill that heals
+  - m_tag:
+      m_value: AI.Skill.Mobility
+    m_displayName: Mobility Skill
+    m_description: AI skill for movement
+  - m_tag:
+      m_value: AI.Skill.Protect
+    m_displayName: Protect Skill
+    m_description: AI skill that protects allies
+  - m_tag:
+      m_value: Attribute.AP
+    m_displayName: Action Points
+    m_description: Resource for performing actions
+  - m_tag:
+      m_value: Attribute.HP
+    m_displayName: Hit Points
+    m_description: Unit health
+  - m_tag:
+      m_value: Attribute.Initiative
+    m_displayName: Initiative
+    m_description: Turn order score
+  - m_tag:
+      m_value: Attribute.MoveSpeed
+    m_displayName: Move Speed
+    m_description: Base movement range in meters per AP
+  - m_tag:
+      m_value: Effect.Damage.BasicAttack
+    m_displayName: Basic Attack Damage
+    m_description: Damage from basic attack
+  - m_tag:
+      m_value: Faction.Ally
+    m_displayName: Ally Faction
+    m_description: Ally unit faction tag
+  - m_tag:
+      m_value: Faction.Enemy
+    m_displayName: Enemy Faction
+    m_description: Enemy unit faction tag
+  - m_tag:
+      m_value: Faction.Player
+    m_displayName: Player Faction
+    m_description: Player unit faction tag
+  - m_tag:
+      m_value: Input.Pointer.Hover
+    m_displayName: Pointer Hover
+    m_description: Mouse hover input signal
+  - m_tag:
+      m_value: Input.Pointer.PrimaryPressed
+    m_displayName: Primary Pressed
+    m_description: Primary button pressed input signal
+  - m_tag:
+      m_value: Input.Target.Ground
+    m_displayName: Target Ground
+    m_description: Ground position target
+  - m_tag:
+      m_value: Input.Target.Unit.Enemy
+    m_displayName: Target Enemy Unit
+    m_description: Enemy unit target
+  - m_tag:
+      m_value: Input.Target.Unit.Player
+    m_displayName: Target Player Unit
+    m_description: Player unit target
+  - m_tag:
+      m_value: Input.Target.Unknown
+    m_displayName: Target Unknown
+    m_description: Unidentified target
+  - m_tag:
+      m_value: Movement.Ground
+    m_displayName: Ground Movement
+    m_description: Ground-based movement
+  - m_tag:
+      m_value: Skill.Attack.Melee
+    m_displayName: Melee Attack
+    m_description: Melee attack skill
+  - m_tag:
+      m_value: State.Buffed
+    m_displayName: Buffed State
+    m_description: Unit has active buffs
+  - m_tag:
+      m_value: State.LowHP
+    m_displayName: Low HP State
+    m_description: Unit is at low health
