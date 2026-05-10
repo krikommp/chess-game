@@ -6,7 +6,7 @@ namespace MiniChess.Combat.DebugUI
     public class APDebugHUD : MonoBehaviour
     {
         [SerializeField] private Player1Controller m_player;
-        [SerializeField] private MoveInputController m_input;
+        [SerializeField] private InputController m_input;
         [SerializeField] private CombatRoundManager m_combatManager;
 
         private GUIStyle m_style;
@@ -50,19 +50,7 @@ namespace MiniChess.Combat.DebugUI
                 waitingLine = $" >>> {m_combatManager.SelectedUnit.DisplayName} acting... <<<";
             }
 
-            string costLine = "Cost: -";
-            if (m_input != null && m_input.IsAttackMode)
-            {
-                costLine = m_input.PreviewReachable
-                    ? $"Atk {m_input.AttackTargetName}: 20 dmg ({m_input.PreviewApCost} AP)"
-                    : $"Atk {m_input.AttackTargetName}: 20 dmg ({m_input.PreviewApCost} AP, UNREACHABLE)";
-            }
-            else if (m_input != null && m_input.HasPreview)
-            {
-                costLine = m_input.PreviewReachable
-                    ? $"Cost: {m_input.PreviewApCost} AP"
-                    : $"Cost: {m_input.PreviewApCost} AP (UNREACHABLE)";
-            }
+            string costLine = "Input: routed through active skill";
 
             int turnCount = m_combatManager != null ? m_combatManager.TurnOrder.Count : 0;
             float boxHeight = 112 + turnCount * 20 + 10;
@@ -102,7 +90,6 @@ namespace MiniChess.Combat.DebugUI
         }
     }
 }
-
 
 
 

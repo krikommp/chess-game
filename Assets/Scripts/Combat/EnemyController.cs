@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using MiniChess.Combat.AI;
 using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
@@ -10,6 +11,10 @@ namespace MiniChess.Combat
     {
         [Header("Identity")]
         [SerializeField] private string m_displayName = "Enemy";
+
+        [Header("AI")]
+        [Tooltip("AI behavior profile. If null, defaults to Aggressive.")]
+        [SerializeField] private AIProfile m_aiProfile;
 
         [Header("HP")]
         [SerializeField] private int m_maxHP = 100;
@@ -49,6 +54,7 @@ namespace MiniChess.Combat
         public float RemainingMoveDistance => Mathf.Max(0f, CurrentAP * MoveSpeedMetersPerAp - m_unpaidMoveDistance);
         public bool HasPath => m_agent != null && m_agent.enabled && m_agent.isOnNavMesh && m_agent.hasPath;
         public float RemainingPathDistance => m_agent != null && m_agent.enabled && m_agent.isOnNavMesh ? m_agent.remainingDistance : 0f;
+        public AIProfile AIProfile => m_aiProfile;
 
         private NavMeshAgent m_agent;
         private MeshRenderer m_meshRenderer;
@@ -61,8 +67,6 @@ namespace MiniChess.Combat
             m_currentHP = m_maxHP;
             CurrentAP = m_maxAP;
             m_agent = GetComponent<NavMeshAgent>();
-            if (GetComponent<SkillExecutor>() == null)
-                gameObject.AddComponent<SkillExecutor>();
             m_agent.speed = m_agentSpeed;
             m_agent.stoppingDistance = 0.05f;
             m_agent.autoBraking = true;
@@ -104,6 +108,7 @@ namespace MiniChess.Combat
             CurrentAP = m_maxAP;
             HasEndedRound = false;
             m_unpaidMoveDistance = 0f;
+            GetComponent<SkillExecutor>()?.AdvanceCooldowns();
         }
 
         public bool TryEndRound()
@@ -115,6 +120,8 @@ namespace MiniChess.Combat
             m_unpaidMoveDistance = 0f;
             return true;
         }
+
+        public NavMeshAgent Agent => m_agent;
 
         public bool TryMove(NavMeshPath path)
         {
@@ -128,6 +135,8 @@ namespace MiniChess.Combat
             m_lastMovementPosition = transform.position;
             return true;
         }
+
+        public bool TryStartMove(NavMeshPath path) => TryMove(path);
 
         public bool TrySpendAP(int amount)
         {
@@ -218,7 +227,6 @@ namespace MiniChess.Combat
         }
     }
 }
-
 
 
 

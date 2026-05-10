@@ -1,4 +1,5 @@
 using UnityEngine;
+using MiniChess.Combat.Skills;
 
 namespace MiniChess.Combat
 {
@@ -15,6 +16,10 @@ namespace MiniChess.Combat
 
         [Header("Visual")]
         [SerializeField] private Color m_enemyColor = new Color(0.7f, 0.2f, 0.2f);
+
+        [Header("Skills")]
+        [Tooltip("Skills assigned to the spawned enemy unit. MVP test scenes should assign basic_move here.")]
+        [SerializeField] private SkillDefinition[] m_defaultSkills;
 
         private void Awake()
         {
@@ -35,6 +40,9 @@ namespace MiniChess.Combat
             {
                 renderer.material.color = m_enemyColor;
             }
+
+            SkillExecutor skillExecutor = go.AddComponent<SkillExecutor>();
+            skillExecutor.SetSkills(m_defaultSkills);
 
             // Enemy controller
             EnemyController enemy = go.AddComponent<EnemyController>();

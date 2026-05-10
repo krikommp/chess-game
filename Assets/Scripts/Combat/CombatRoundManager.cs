@@ -18,7 +18,7 @@ namespace MiniChess.Combat
         public event Action RoundChanged;
 
         [Header("Refs")]
-        [SerializeField] private MoveInputController m_moveInput;
+        [SerializeField] private InputController m_inputController;
         [SerializeField] private CameraController m_cameraController;
         [SerializeField] private EnemyTurnRunner m_enemyTurnRunner;
         [SerializeField] private List<Player1Controller> m_playerUnits = new List<Player1Controller>();
@@ -31,6 +31,7 @@ namespace MiniChess.Combat
         [Header("Skills")]
         [Tooltip("Optional: assign basic_attack skill. If null, auto-loaded from Assets/Data/Skills/.")]
         public SkillDefinition basicAttackSkillOverride;
+        public SkillDefinition basicMoveSkillOverride;
 
         [Header("Debug")]
         [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative. Intended only for AI testing — does not represent formal first-strike rules.")]
@@ -46,17 +47,25 @@ namespace MiniChess.Combat
         public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
         public float AttackRange => BasicAttackSkill != null ? BasicAttackSkill.Range : 1.5f;
         public SkillDefinition BasicAttackSkill { get; private set; }
+        public SkillDefinition BasicMoveSkill { get; private set; }
         public int RoundCount { get; private set; }
         public bool IsWaiting { get; private set; }
 
         private void Awake()
         {
-            if (m_moveInput == null) m_moveInput = FindObjectOfType<MoveInputController>();
+            if (m_inputController == null) m_inputController = FindObjectOfType<InputController>();
             if (m_cameraController == null) m_cameraController = FindObjectOfType<CameraController>();
             if (m_enemyTurnRunner == null) m_enemyTurnRunner = GetComponent<EnemyTurnRunner>();
             if (m_enemyTurnRunner == null) m_enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
+            if (m_inputController != null) m_inputController.InputReceived += HandleInputReceived;
             CacheUnits();
             ResolveBasicAttackSkill();
+            ResolveBasicMoveSkill();
+        }
+
+        private void OnDestroy()
+        {
+            if (m_inputController != null) m_inputController.InputReceived -= HandleInputReceived;
         }
 
         private void ResolveBasicAttackSkill()
@@ -87,6 +96,31 @@ namespace MiniChess.Combat
                 Debug.LogWarning("[CombatRoundManager] basic_attack skill not found. Attacks will not work.");
         }
 
+        private void ResolveBasicMoveSkill()
+        {
+            if (basicMoveSkillOverride != null)
+            {
+                BasicMoveSkill = basicMoveSkillOverride;
+                return;
+            }
+
+#if UNITY_EDITOR
+            BasicMoveSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>(
+                "Assets/Data/Skills/basic_move.asset");
+            if (BasicMoveSkill != null)
+            {
+                Debug.Log("[CombatRoundManager] Loaded basic_move.asset from project.");
+                return;
+            }
+#endif
+            BasicMoveSkill = Resources.Load<SkillDefinition>("Skills/basic_move");
+            if (BasicMoveSkill == null)
+                BasicMoveSkill = Resources.Load<SkillDefinition>("basic_move");
+
+            if (BasicMoveSkill == null)
+                Debug.LogWarning("[CombatRoundManager] basic_move skill not found. Units must configure their own movement skill assets.");
+        }
+
         private void Start()
         {
             StartCombat();
@@ -113,32 +147,38 @@ namespace MiniChess.Combat
         public void StartCombat()
         {
             CacheUnits();
-            DistributeDefaultSkills();
+            ValidateUnitSkillComponents();
             BuildTurnOrder();
             RoundCount = 0;
             StartNextRound();
         }
 
-        private void DistributeDefaultSkills()
+        private void ValidateUnitSkillComponents()
         {
-            if (BasicAttackSkill == null) return;
-
-            var defaultSkills = new SkillDefinition[] { BasicAttackSkill };
-
             foreach (var unit in m_playerUnits)
             {
                 if (unit == null) continue;
                 var executor = unit.GetComponent<SkillExecutor>();
-                if (executor != null && executor.AvailableSkills.Length == 0)
-                    executor.SetSkills(defaultSkills);
+                if (executor == null)
+                {
+                    Debug.LogWarning($"[CombatRoundManager] {unit.DisplayName} has no SkillExecutor and cannot use skills.");
+                    continue;
+                }
+
+                if (executor.FindSkill("basic_move") == null)
+                {
+                    Debug.LogWarning($"[CombatRoundManager] {unit.DisplayName} has no configured basic_move skill.");
+                }
             }
 
             foreach (var enemy in m_enemyUnits)
             {
                 if (enemy == null) continue;
                 var executor = enemy.GetComponent<SkillExecutor>();
-                if (executor != null && executor.AvailableSkills.Length == 0)
-                    executor.SetSkills(defaultSkills);
+                if (executor == null)
+                {
+                    Debug.LogWarning($"[CombatRoundManager] {enemy.DisplayName} has no SkillExecutor and cannot use skills.");
+                }
             }
         }
 
@@ -157,15 +197,45 @@ namespace MiniChess.Combat
             SelectedUnit = player;
             player.SetVisualState(EPlayerVisualState.Selected);
 
-            if (m_moveInput != null)
+            if (m_inputController != null)
             {
-                m_moveInput.SetPlayer(player);
+                var executor = player.GetComponent<SkillExecutor>();
+                var moveSkill = executor != null ? executor.FindSkill("basic_move") : null;
+                if (moveSkill == null)
+                {
+                    Debug.LogWarning($"[CombatRoundManager] {player.DisplayName} has no basic_move skill; selected unit cannot move.");
+                    executor?.ClearActiveSkill();
+                }
+                else
+                {
+                    executor.ActivateSkill(moveSkill, m_inputController.CreateSkillInputServices());
+                }
             }
 
             FocusCameraOnUnit(player);
 
             SelectedPlayerChanged?.Invoke();
             return true;
+        }
+
+        private void HandleInputReceived(SkillInputRequest request)
+        {
+            if (IsWaiting) return;
+
+            if (request.IsSignal(SkillInputTag.k_PrimaryPressed)
+                && request.IsTarget(SkillInputTag.k_TargetPlayer)
+                && request.TargetObject != null)
+            {
+                var player = request.TargetObject.GetComponent<Player1Controller>();
+                if (player != null && TrySelectPlayer(player))
+                    return;
+            }
+
+            var selectedPlayer = SelectedPlayer;
+            if (selectedPlayer == null || selectedPlayer.HasEndedRound) return;
+
+            var executor = selectedPlayer.GetComponent<SkillExecutor>();
+            executor?.HandleInput(request);
         }
 
         public bool TryEndSelectedPlayerRound()

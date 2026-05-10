@@ -104,7 +104,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
 - [ ] `GameplayTagSystem`（Tag First 基础设施：`GameplayTag` + `GameplayTagSet` + 匹配 + 来源追踪，见 `09_GAMEPLAY_TAG_SPEC.md`）
-- [ ] `MovementController`（NavMesh 包装，当前逻辑在 `MoveInputController` 内）
+- [ ] `MovementController`（NavMesh 包装；玩家输入已由 `InputController` 纯输入路由，移动解释逻辑临时在 `GroundMoveAbility` 内）
 - [ ] `SkillSystem`（`SkillDefinition` + `Effect` + `SkillExecutor` + AP/冷却/目标校验；挂载 `SkillExecutor` 的对象即可成为技能系统目标，见 `05_SKILL_SPEC.md`）
 - [x] `EnemyAISystem`（MVP：`EnemyTurnRunner` 最近玩家 → 移动进基础攻击范围 → 攻击一次；完整 Utility AI 见 `04_MONSTER_SPEC.md` §3）
 - [ ] `CombatTrigger`（探索 → 战斗）
@@ -119,7 +119,11 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
-- 点击地面按 NavMesh 路径移动；移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
+- 选中玩家角色后，系统自动激活该角色自身 `SkillExecutor` 上配置的 `basic_move` 技能作为当前默认行为。若该角色没有配置 `basic_move`，该角色不能执行地面移动，并输出明确警告。
+- `InputController` 是纯输入接收器，只把鼠标 hover / 主键点击翻译成 `SkillInputRequest`，其中包含输入信号 Tag、目标语义 Tag、命中对象和世界坐标参数。
+- 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 `SkillExecutor` 统一执行。输入层不能直接调用 `Player1Controller.TryMove` 绕过技能系统。
+- 角色必须通过自身 `SkillExecutor.availableSkills` 配置可用技能资产。`CombatRoundManager` 只做缺失技能的警告，不再启动时向角色自动注入 `basic_move` 或其他默认技能；运行时生成敌人由 `EnemySpawner.m_defaultSkills` 写入生成对象的 `SkillExecutor`。
+- 移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
 - 移动 AP 不在下达指令时预扣，而是在角色实际移动距离累计达到 `MoveSpeedMetersPerAp` 时扣除；未满 1 AP 的累计距离会保留到本轮后续移动。
 - 点击敌方单位 = 请求释放当前角色的 `basic_attack`：若能用剩余 AP 移动到 `basic_attack.range` 内并支付 `basic_attack.apCost`，则移动后攻击；若不能进入攻击距离，则只用剩余可移动 AP 向目标靠近。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。

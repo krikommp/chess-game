@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.AI;
 
 namespace MiniChess.Combat
 {
@@ -15,10 +16,12 @@ namespace MiniChess.Combat
         bool IsMoving { get; }
         bool HasEndedRound { get; }
         float MoveSpeedMetersPerAp { get; }
+        float RemainingMoveDistance { get; }
 
         void BeginRound();
         bool TryEndRound();
         bool TrySpendAP(int amount);
+        bool TryStartMove(NavMeshPath path);
         void TakeDamage(int damage);
         void Heal(int amount);
         void SetVisualState(EPlayerVisualState state);

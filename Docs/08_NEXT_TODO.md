@@ -28,11 +28,192 @@
 - 本轮成果能在当前战斗测试场景中验证至少一个完整敌方行动回合。
 - 验证重点是玩家/敌方能通过同一套技能执行入口完成行动，而不是战斗如何开始或如何结束。
 
+## 0.6 代码审查问题清单（后续 Agent 必须解决）
+
+来源：2026-05-10 代码审查
+
+执行要求：
+- 后续 Agent 在继续 Tag、Skill、Effect、SkillExecutor、AIProfile、AI 候选评分或 AI debug 工作前，必须先检查本节问题是否仍然存在。
+- 如果本节问题影响当前实现范围，必须在同一工作会话内修复；不要只新增功能而保留这些结构性问题。
+- 修复后需要同步更新本节状态，并在最终报告中说明对应问题的处理结果。
+
+复审移除：
+- `CR-0001` 已由 `MoveInputController.FinishAttackAfterMove` 修复，统一施放入口的剩余设计收口并入 `CR-0002`。
+- `CR-0003` 已由 `SkillExecutor.CanCast`、Effect `TargetExecutor` 检查和 `CanCast_Fails_WhenTargetHasNoSkillExecutor` 测试修复。
+- `CR-0004` 已由玩家/敌人 `BeginRound` 推进自身 `SkillExecutor` 冷却修复。
+- `CR-0006` 已由 `CombatMovementResolver` 统一计入本回合未结算移动距离修复。
+- `CR-0007` 已复用同一作用域内的 `targetUnit`，重复局部变量编译错误已移除。
+- `CR-0008` 已由 `SkillExecutor.ResolveTarget` 统一目标解析修复；Self 技能不再绕过 Effect 能力、Tag 条件和冷却/AP 校验。
+- `CR-0009` Phase 1 已完成：`SkillDefinition` 新增 Tag 条件字段，`SkillExecutor.EvaluateTagConditions` 检查施法者/目标 Tag；阵营 Tag 自动同步。
+
+### CR-0002 SkillExecutor 必须成为技能合法性与执行的统一入口
+
+严重级别：P1
+
+状态：Phase 1 已完成（2026-05-10）；Phase 2 与 Section 7 合并
+
+已完成：
+- `SkillExecutor.CanCast` 已包含 AP、冷却、目标存活、目标能力、阵营与射程校验。
+- `SkillExecutor.ExecuteAfterMove` 已统一玩家和 AI 的”移动完成后重检目标/范围并执行”入口。
+- `MoveInputController.FinishAttackAfterMove` 与 `EnemyTurnRunner.RunTurn` 已通过 `ExecuteAfterMove` 执行移动后的技能释放。
+- `CombatMovementResolver.Resolve` 已统一双方定位计算（进入范围点、AP 预估、fallback）。
+
+问题：
+- 当前移动仍是玩家输入层和敌方 AI 层的特殊操作，而不是技能系统中的一类行动。
+- 这会导致移动无法自然受到 GameplayTag / Status / SkillRule 影响。例如后续出现“定身”“沉默移动”“禁用地面移动”“只能攻击不能移动”等效果时，可能需要改 `MoveInputController`、`EnemyTurnRunner` 或底层移动逻辑。
+- 敌方 AI 仍容易退回“攻击不到就硬编码追最近玩家”的逻辑，而不是统一基于技能候选做评分和决策。
+
+设计方向：
+- 将移动建模为技能或行动定义，例如 `basic_move` / `move_to_point`，目标类型为 `GroundPoint` 或等价目标。
+- `basic_move` 应拥有自己的 Tag，例如 `Action.Move`、`Movement.Ground`，并通过技能系统进行 AP、Tag、状态与目标合法性校验。
+- 玩家点击地面，本质上是请求当前角色释放 `basic_move` 到目标点。
+- 玩家点击敌人攻击时，可以生成复合计划：先用 `basic_move` 移动到可攻击点，再释放 `basic_attack`；如果无法进入攻击距离，则只生成 `basic_move` 靠近目标。
+- `SkillExecutor` 不必直接拥有 `NavMeshAgent` 细节，但必须成为“能否执行移动技能、移动消耗是否合法、移动是否被 Tag/状态禁止”的统一入口。
+- 实际路径计算、占位规避和移动播放可以由移动组件或 resolver 完成，但它们应服务于移动技能，而不是绕过技能系统。
+
+敌方 AI 使用移动技能的要求：
+- AI 决策时不再把“移动”写成攻击失败后的独立硬编码分支，而是把 `basic_move` 作为候选技能参与枚举。
+- 对每个攻击/治疗/支援技能候选，AI 应计算：
+  - 当前是否可直接释放。
+  - 如果不能直接释放，是否可以先释放 `basic_move` 到有效释放位置，再释放目标技能。
+  - 如果本回合不能释放目标技能，是否值得释放 `basic_move` 靠近、撤离、占位或进入支援距离。
+- AI 候选结构建议至少包含：
+  - `primarySkill`：最终想释放的技能，例如 `basic_attack` / `minor_heal`。
+  - `movementSkill`：为达成目标需要先释放的移动技能，例如 `basic_move`。
+  - `target` / `groundPoint`。
+  - `moveDestination`、`moveApCost`、`primaryApCost`、`totalApCost`。
+  - `canExecutePrimaryThisTurn`。
+  - `failureReason` 和评分明细。
+- 如果目标技能本回合可通过移动后释放，AI 执行顺序应是 `basic_move` -> 等待移动完成 -> 重检 -> `primarySkill`。
+- 如果目标技能本回合不可释放，但靠近目标有战术价值，AI 可以只执行 `basic_move`，并把原因记录为 fallback 候选。
+- 如果单位被状态禁止 `Action.Move`，AI 不应生成任何移动候选，也不应通过底层 `TryMove` 绕过限制。
+- 如果单位被状态禁止 `Action.Attack` 但仍允许移动，AI 可以选择 `basic_move` reposition，而不是直接结束回合。
+- 如果地面移动被禁止但后续存在传送、冲刺、跳跃等技能，AI 应按各自 Skill Tag 分别判断，不要把它们混成底层移动。
+
+第一阶段实现建议：
+1. 新增 `basic_move` SkillDefinition，目标类型为 `GroundPoint`，Tag 至少包含 `Action.Move` / `Movement.Ground`。
+2. 为移动新增 Effect 或执行步骤，例如 `MoveEffectDefinition` / `SkillMovementStep`，只负责请求单位移动组件执行 NavMesh 移动。
+3. 玩家点击地面改为走 `basic_move`，不再直接调用 `Player1Controller.TryMove`。
+4. 玩家点击敌人时生成“移动技能 + 攻击技能”的计划；预览仍由 UI 层负责，但预览基于该计划。
+5. 敌方 AI 枚举 `basic_move` 候选，并用同一套候选评分处理靠近、撤离、占位和移动后攻击。
+6. 保留 `CombatMovementResolver` 作为路径和定位计算工具，但调用结果应写入技能候选/技能计划，而不是作为绕过技能系统的执行分支。
+
+验证：
+- 玩家点击地面会通过 `basic_move` 消耗 AP 并移动。
+- 给单位添加禁止 `Action.Move` 的临时状态后，玩家和 AI 都不能移动，但仍可执行不带移动 Tag 的合法技能。
+- 敌人攻击距离外的玩家时，会优先评估“`basic_move` 后是否能 `basic_attack`”；能打则移动后攻击，不能打则按评分决定是否只移动靠近。
+- 敌人没有可用攻击技能但允许移动时，可以选择 `basic_move` 进行 reposition。
+- 后续加入 `minor_heal` 后，治疗型 AI 能用 `basic_move` 进入治疗范围，而不是只追最近玩家。
+
+Phase 1 完成内容（2026-05-10）：
+- `ICombatUnit` 新增 `TryStartMove(NavMeshPath)` + `RemainingMoveDistance`，Player1Controller/EnemyController/TestCombatUnit 实现。
+- `ETargetCapability` 新增 `Movable`。
+- `EffectContext` 新增 `Vector3? TargetPosition`。
+- `MoveEffectDefinition` — 轻量标记 Effect。
+- `SkillExecutor.CanCastGroundPoint(skill, position, path)` — 校验冷却、caster 存活、Tag 条件、TargetType=GroundPoint、路径合法性、RemainingMoveDistance。
+- `SkillExecutor.ExecuteGroundPoint(skill, position, path)` — 扣除 skill.ApCost、调用 TryStartMove、记录冷却。
+- `SkillPlan` 结构体 — 组合 skill+movement 计划（供 AI Phase 2 使用）。
+- `MoveInputController` — 地面点击走 `ExecuteGroundPoint(basic_move)`，攻击移动也走 `ExecuteGroundPoint(basic_move)`，保留 fallback。
+- `CombatRoundManager` — 加载并分发 `basic_move` 技能。
+- `Assets/Data/Skills/basic_move.asset` — Editor 菜单 `MiniChess/Create basic_move Skill` 创建。
+- 10 个 EditMode 测试覆盖 CanCastGroundPoint/ExecuteGroundPoint 校验链。
+
+Phase 2 完成内容（2026-05-10）：
+- 新增 `SkillAbility`，让具体技能行为从 `SkillExecutor` 下沉到技能自己的 Ability。
+- 新增 `SkillExecutionContext`，统一承载目标对象、地面点、NavMeshPath、施法者执行器与技能定义。
+- 新增 `GroundMoveAbility`，负责 `basic_move` 的 GroundPoint 校验、路径合法性、剩余移动距离和请求单位移动。
+- `SkillDefinition` 新增 `ability` 字段；迁移阶段 `GroundPoint` 技能可临时使用运行时默认 `GroundMoveAbility`，后续需通过 Unity Editor 把 Ability 资产显式配置到 `basic_move.asset`。
+- `SkillExecutor` 保留统一入口，但不再直接实现 GroundPoint 移动细节；旧 `CanCastGroundPoint` / `ExecuteGroundPoint` 仅作为兼容壳转调 `CanExecute` / `Execute`。
+- `MoveInputController` 地面点击与攻击前移动改为构造 `SkillExecutionContext` 并调用 `SkillExecutor.Execute(context)`；缺少 `basic_move` 时不再 fallback 到直接 `TryMove`。
+- `CombatRoundManager.TrySelectPlayer` 选中角色后激活角色自己的 `basic_move` 输入行为；没有该技能则给出 warning。
+
+Phase 3 完成内容（2026-05-10）：
+- `MoveInputController` 重命名为 `InputController`，并收敛为纯输入接收器。
+- 新增 `SkillInputRequest` / `SkillInputTag`，输入只输出信号 Tag、目标语义 Tag、命中对象和世界坐标参数。
+- 新增 `SkillInputServices`，用于把预览器和输入侧射线配置作为服务传给当前激活技能；输入层不再解释移动规则。
+- `SkillExecutor` 新增当前激活技能状态：`ActivateSkill` / `ClearActiveSkill` / `HandleInput`。选中角色后由 `CombatRoundManager` 激活角色自身的 `basic_move`。
+- `GroundMoveAbility.HandleInput` 接管地面 hover 预览、点击路径计算、超出 AP 时裁剪到可达点，以及最终通过 `SkillExecutor.Execute` 执行移动。
+- `CombatRoundManager` 订阅 `InputController.InputReceived`：点击玩家时执行选中逻辑，其余输入转发给当前选中角色的 `SkillExecutor`。
+- `APDebugHUD` 不再读取输入层的技能预览状态；预览状态后续应从技能/执行器侧暴露。
+- `CombatRoundManager` 不再启动时向单位自动注入默认技能；角色必须通过自身 `SkillExecutor.availableSkills` 配置 `basic_move` 等技能资产，管理器只输出缺失配置 warning。
+- `SampleScene` 中 3 个玩家对象已显式挂载 `SkillExecutor`，并在 `availableSkills` 中配置 `Assets/Data/Skills/basic_move.asset`。
+- `EnemySpawner` 新增 `m_defaultSkills`，当前 3 个敌人生成点已配置 `basic_move`，生成敌人时把技能列表写入新敌人的 `SkillExecutor`。
+- `Assets/Data/Skills/GroundMoveAbility.asset` 已创建，并显式挂到 `basic_move.asset` 的 `Ability` 字段。
+
+Phase 3 后续清理：
+- 将 `Docs/08_NEXT_TODO.md` 中旧的 `MoveInputController` 历史条目归档或改名，避免后续 Agent 误读。
+- 为 `SkillInputRequest` 增加测试：玩家点击、地面点击、敌方点击应产生正确 Tag 与参数。
+- 后续 UI 技能栏接入时，只切换 `SkillExecutor.ActiveSkill`，不改变 `InputController`。
+
+Phase 2 后续清理：
+- 删除旧 `CanCastGroundPoint` / `ExecuteGroundPoint` 兼容 API，并同步更新测试命名。
+- 将 AI 移动候选也改为直接构造 `SkillExecutionContext` 执行 `basic_move`，不再通过底层移动 API。
+
+### CR-0005 点击敌人必须明确选择 basic_attack，而不是技能列表第一个
+
+严重级别：P2
+
+状态：已修复（2026-05-10）
+
+修复内容：
+- `MoveInputController.GetBasicAttackSkill` 改为通过 `executor.FindSkill(“basic_attack”)` 查找，不再返回技能列表第一个非空技能。
+- 移除了对 `CombatRoundManager.BasicAttackSkill` 的全局回退：单位缺少 `basic_attack` 时返回 `null`。
+- `ShowAttackPreview`：技能为 `null` 时提前退出，不显示攻击预览。
+- 点击攻击时技能为 `null` 则输出 `Debug.LogWarning` 说明该单位没有 `basic_attack`。
+- 全局 `BasicAttackSkill` 仍保留，仅用于 `CombatRoundManager.DistributeDefaultSkills` 初始化/补齐单位技能配置，不参与施放时查找。
+
+影响：
+- `Assets/Scripts/Combat/MoveInputController.cs`
+
+验证：
+- 单位技能列表中 `basic_attack` 不在第一个时，点击敌人仍释放 `basic_attack`。
+- 单位缺少 `basic_attack` 时，点击敌人不释放其他技能，预览也不进入攻击模式，并输出 Warning 说明原因。
+
+### CR-0008 Self 技能必须解析为施法者自身并继续走 Tag / 能力校验
+
+严重级别：P2
+
+状态：已修复（2026-05-10）
+
+修复内容：
+- `SkillExecutor` 新增 `ResolveTarget` 方法，Self 技能统一解析目标为施法者自身 `gameObject`，`TargetExecutor` 为 `this`。
+- `CanCast` 对 Self 技能不再提前 `return Success()`，而是继续执行 Effect 能力校验、GameplayTag 条件校验和冷却/AP 校验（跳过阵营和距离校验）。
+- `Execute` 通过 `ResolveTarget` 统一目标解析，`EffectContext.Target` 对 Self 技能不再为 `null`。
+- 新增测试：Self 技能目标解析、Self 技能能力校验失败、Self 技能治疗自身、Self 技能 AP 不足失败、Self 技能 Tag 条件校验。
+- 修复了 SetUp 中目标阵营默认为 `Enemy`（修复旧测试因阵营检查失败的问题），治疗类测试改为 `SingleAlly` 目标类型。
+
+影响：
+- `Assets/Scripts/Combat/Skills/SkillExecutor.cs`
+- `Assets/Tests/Editor/Combat/SkillExecutorTests.cs`
+
+验证：
+- Self 技能传 `null` 可以成功作用到施法者自身。
+- Self 技能仍会因为 AP 不足、冷却、能力不匹配或 Tag 条件不满足而失败。
+
+### CR-0009 技能目标语义必须 GameplayTag 化，不能依赖 ICombatUnit 阵营作为唯一判断
+
+严重级别：P1
+
+状态：已实现 Phase 1（2026-05-10）
+
+Phase 1 完成内容：
+- `SkillDefinition` 新增四个 Tag 条件字段：`requiredCasterTags`、`blockedCasterTags`、`requiredTargetTags`、`blockedTargetTags`。
+- `SkillExecutor.CanCast` 新增 `EvaluateTagConditions` 方法，在 AP/冷却/目标解析/能力/阵营/范围之后检查施法者和目标的 Tag 条件。
+- `SkillExecutor.CollectTags` 从 `GameplayTagComponent` + `ICombatUnit.Faction`（过渡期）收集运行时 Tag，使 Tag 条件可以引用 `Faction.Player` / `Faction.Enemy`。
+- 新增 `ESkillCastFailure.TagConditionFailed` 失败原因。
+- 新增测试：施法者缺少必需 Tag、施法者被禁止 Tag 阻止、目标缺少必需 Tag、目标被禁止 Tag 阻止、Tag 条件全部满足、阵营 Tag 自动同步、Self 技能 Tag 条件校验。
+- 现有的 `ICombatUnit.Faction` 阵营校验保留，与 Tag 条件并存；长期方向仍是迁移到纯 Tag 语义。
+
+待后续 Phase：
+- `SingleEnemy` / `SingleAlly` 的阵营语义完全迁移为 Tag 条件（`Faction.Enemy` / `Faction.Ally`）。
+- 环境对象通过 Tag 表达语义，不再需要实现 `ICombatUnit` 才能被技能影响。
+- `GameplayTagQuery` 升级，支持更复杂的目标条件表达式。
+
 ## 1. 确认当前 AI 调试状态
 
 决议状态：已确认
 
-实现状态：未完成
+实现状态：已完成（2026-05-10）
 
 目标：
 - 明确 `enemyFirstForDebug` 是否继续作为调试开关保留。
@@ -129,7 +310,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 让玩家和敌方都通过同一套技能流程执行基础攻击。
@@ -164,7 +345,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 技能不直接写死效果，而是通过 Effect 列表执行。
@@ -203,7 +384,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 统一处理技能释放流程，避免玩家和 AI 重复实现 AP、范围、目标、冷却校验。
@@ -244,7 +425,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 玩家点击敌人攻击、敌方 AI 追击、`SkillExecutor` 自动移动进范围，必须复用同一套 NavMesh 解析逻辑。
@@ -277,7 +458,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - `SkillDefinition` 与 `EffectDefinition` 只保存静态配置，不能保存单位运行时状态。
@@ -360,7 +541,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 让敌方按职业/定位产生不同倾向，而不是所有敌人都只追最近玩家。
@@ -542,7 +723,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 让后续 Agent 新增技能或 Effect 后，能通过明确校验发现配置遗漏，而不是在运行时猜错。

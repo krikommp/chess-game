@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cf07a52f7b841f984f4c2787e989655, type: 3}
+  m_Name: healer
+  m_EditorClassIdentifier:
+  m_role: 2
+  m_skillTagWeights:
+  - m_tag:
+      m_value: AI.Skill.Heal
+    m_weight: 2
+  m_targetTagWeights: []
+  m_statusTagWeights:
+  - m_tag:
+      m_value: State.LowHP
+    m_weight: 2
+  m_healHpThreshold: 0.8
+  m_healUrgencyBonus: 3

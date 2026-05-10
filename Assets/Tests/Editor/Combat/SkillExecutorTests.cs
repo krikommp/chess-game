@@ -1,8 +1,10 @@
 using MiniChess.Combat;
 using MiniChess.Combat.Skills;
+using MiniChess.GameplayTags;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.AI;
 
 [TestFixture]
 public class SkillExecutorTests
@@ -26,6 +28,7 @@ public class SkillExecutorTests
         m_casterUnit.SetAlive(true);
         m_targetUnit.SetAlive(true);
         m_casterUnit.SetCurrentAP(6);
+        m_targetUnit.SetFaction(EFaction.Enemy); // default: most tests target enemies
 
         m_casterExecutor = m_casterObj.AddComponent<SkillExecutor>();
         m_targetExecutor = m_targetObj.AddComponent<SkillExecutor>();
@@ -130,9 +133,9 @@ public class SkillExecutorTests
     }
 
     [Test]
-    public void CanCast_Succeeds_WhenTargetHasNoSkillExecutor()
+    public void CanCast_Fails_WhenTargetHasNoSkillExecutor()
     {
-        // Target without SkillExecutor should pass capability check
+        // Non-Self targets MUST have SkillExecutor (CR-0003).
         var objNoExecutor = new GameObject("NoExecutorTarget");
         objNoExecutor.AddComponent<TestCombatUnit>().SetAlive(true);
 
@@ -142,7 +145,8 @@ public class SkillExecutorTests
         SetEffectsOnSkill(skill, fx);
 
         var result = m_casterExecutor.CanCast(skill, objNoExecutor);
-        Assert.IsTrue(result.IsSuccess);
+        Assert.IsFalse(result.IsSuccess, "Non-Self target without SkillExecutor should fail.");
+        Assert.AreEqual(ESkillCastFailure.TargetCapabilityBlocked, result.Failure);
 
         Object.DestroyImmediate(skill);
         Object.DestroyImmediate(fx);
@@ -182,13 +186,14 @@ public class SkillExecutorTests
     [Test]
     public void Execute_AppliesHealEffect()
     {
+        m_targetUnit.SetFaction(EFaction.Player); // heal targets are allies
         m_targetUnit.SetMaxHP(100);
         m_targetUnit.SetCurrentHP(50);
         m_targetExecutor.SetCapabilities(ETargetCapability.Healable);
 
         var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
         SetEffectAmount(fx, 20);
-        var skill = CreateSkill("test_skill", apCost: 1);
+        var skill = CreateSkill("test_skill", apCost: 1, targetType: ESkillTargetType.SingleAlly);
         SetEffectsOnSkill(skill, fx);
 
         m_casterExecutor.Execute(skill, m_targetObj);
@@ -201,13 +206,14 @@ public class SkillExecutorTests
     [Test]
     public void Execute_HealDoesNotExceedMaxHP()
     {
+        m_targetUnit.SetFaction(EFaction.Player); // heal targets are allies
         m_targetUnit.SetMaxHP(100);
         m_targetUnit.SetCurrentHP(95);
         m_targetExecutor.SetCapabilities(ETargetCapability.Healable);
 
         var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
         SetEffectAmount(fx, 20);
-        var skill = CreateSkill("test_skill", apCost: 1);
+        var skill = CreateSkill("test_skill", apCost: 1, targetType: ESkillTargetType.SingleAlly);
         SetEffectsOnSkill(skill, fx);
 
         m_casterExecutor.Execute(skill, m_targetObj);
@@ -364,6 +370,330 @@ public class SkillExecutorTests
         Assert.AreEqual(0, m_casterExecutor.GetCooldownRemaining("any_skill"));
     }
 
+    // ── CR-0008: Self target resolution ────────────────────────────
+
+    [Test]
+    public void CanCast_Self_ResolvesTargetToCaster_WithNullTarget()
+    {
+        // Self skills must resolve target to caster, not bail early
+        m_casterExecutor.SetCapabilities(ETargetCapability.Damageable | ETargetCapability.Healable);
+        var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
+        SetEffectAmount(fx, 10);
+        var skill = CreateSkill("self_heal", targetType: ESkillTargetType.Self);
+        SetEffectsOnSkill(skill, fx);
+
+        var result = m_casterExecutor.CanCast(skill, null);
+        Assert.IsTrue(result.IsSuccess,
+            "Self skill with null target should resolve to caster and pass capability check.");
+
+        Object.DestroyImmediate(skill);
+        Object.DestroyImmediate(fx);
+    }
+
+    [Test]
+    public void CanCast_Self_Fails_WhenCasterLacksCapability()
+    {
+        // Caster has only Damageable; HealEffect requires Healable
+        var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
+        SetEffectAmount(fx, 10);
+        var skill = CreateSkill("self_heal", targetType: ESkillTargetType.Self);
+        SetEffectsOnSkill(skill, fx);
+
+        var result = m_casterExecutor.CanCast(skill, null);
+        Assert.IsFalse(result.IsSuccess,
+            "Self skill should fail when caster lacks required capability for its effects.");
+        Assert.AreEqual(ESkillCastFailure.TargetCapabilityBlocked, result.Failure);
+
+        Object.DestroyImmediate(skill);
+        Object.DestroyImmediate(fx);
+    }
+
+    [Test]
+    public void Execute_Self_AppliesHealToCaster()
+    {
+        m_casterUnit.SetMaxHP(100);
+        m_casterUnit.SetCurrentHP(40);
+        m_casterExecutor.SetCapabilities(ETargetCapability.Damageable | ETargetCapability.Healable);
+
+        var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
+        SetEffectAmount(fx, 15);
+        var skill = CreateSkill("self_heal", apCost: 1, targetType: ESkillTargetType.Self);
+        SetEffectsOnSkill(skill, fx);
+
+        var result = m_casterExecutor.Execute(skill, null);
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(55, m_casterUnit.CurrentHP,
+            "Self heal should apply to caster when target is null.");
+
+        Object.DestroyImmediate(skill);
+        Object.DestroyImmediate(fx);
+    }
+
+    [Test]
+    public void Execute_Self_Fails_WhenApInsufficient()
+    {
+        m_casterUnit.SetCurrentAP(0);
+        m_casterExecutor.SetCapabilities(ETargetCapability.Damageable | ETargetCapability.Healable);
+
+        var skill = CreateSkill("self_buff", apCost: 2, targetType: ESkillTargetType.Self);
+        var result = m_casterExecutor.Execute(skill, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.InsufficientAp, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    // ── CR-0009: Tag conditions ────────────────────────────────────
+
+    [Test]
+    public void CanCast_Fails_WhenCasterLacksRequiredTag()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy); // pass faction check
+        var skill = CreateSkill("tagged_skill");
+        SetSkillTagConditions(skill,
+            requiredCaster: new[] { "Element.Fire" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_Fails_WhenCasterHasBlockedTag()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy); // pass faction check
+        var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
+        tagComp.AddTag("State.Silenced");
+
+        var skill = CreateSkill("tagged_skill");
+        SetSkillTagConditions(skill,
+            blockedCaster: new[] { "State.Silenced" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_Fails_WhenTargetLacksRequiredTag()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy); // pass faction check
+        var skill = CreateSkill("tagged_skill");
+        SetSkillTagConditions(skill,
+            requiredTarget: new[] { "Target.Unit" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_Fails_WhenTargetHasBlockedTag()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy); // pass faction check
+        var tagComp = m_targetObj.AddComponent<GameplayTagComponent>();
+        tagComp.AddTag("State.Immune.Physical");
+
+        var skill = CreateSkill("tagged_skill");
+        SetSkillTagConditions(skill,
+            blockedTarget: new[] { "State.Immune.Physical" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_Succeeds_WhenTagConditionsMet()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy); // pass faction check
+        var casterTagComp = m_casterObj.AddComponent<GameplayTagComponent>();
+        casterTagComp.AddTag("Element.Fire");
+        var targetTagComp = m_targetObj.AddComponent<GameplayTagComponent>();
+        targetTagComp.AddTag("Target.Unit");
+
+        var skill = CreateSkill("tagged_skill");
+        SetSkillTagConditions(skill,
+            requiredCaster: new[] { "Element.Fire" },
+            requiredTarget: new[] { "Target.Unit" },
+            blockedTarget: new[] { "State.Immune.Physical" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsTrue(result.IsSuccess);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_FactionTagAutoSync_AllowsFactionBasedTargeting()
+    {
+        m_targetUnit.SetFaction(EFaction.Enemy);
+
+        // Skill requires target to have Faction.Enemy tag
+        var skill = CreateSkill("faction_attack", targetType: ESkillTargetType.SingleEnemy);
+        SetSkillTagConditions(skill,
+            requiredTarget: new[] { "Faction.Enemy" });
+
+        var result = m_casterExecutor.CanCast(skill, m_targetObj);
+        Assert.IsTrue(result.IsSuccess,
+            "Faction.Enemy tag should be auto-synced from ICombatUnit.Faction for Tag checks.");
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCast_Self_RespectsCasterTagConditions()
+    {
+        m_casterExecutor.SetCapabilities(ETargetCapability.Damageable | ETargetCapability.Healable);
+        var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
+        tagComp.AddTag("State.Silenced");
+
+        var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
+        SetEffectAmount(fx, 10);
+        var skill = CreateSkill("self_heal", targetType: ESkillTargetType.Self);
+        SetEffectsOnSkill(skill, fx);
+        SetSkillTagConditions(skill,
+            blockedCaster: new[] { "State.Silenced" });
+
+        var result = m_casterExecutor.CanCast(skill, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+        Object.DestroyImmediate(fx);
+    }
+
+    // ── CR-0002: GroundPoint skills (movement as skill) ────────────
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenSkillIsNull()
+    {
+        var result = m_casterExecutor.CanCastGroundPoint(null, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenCasterDead()
+    {
+        m_casterUnit.SetAlive(false);
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.CasterDead, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenOnCooldown()
+    {
+        // Use a regular skill to set cooldown on "move_skill" id, then test CanCastGroundPoint
+        var regularSkill = CreateSkill("move_skill", cooldown: 2, apCost: 0);
+        m_casterExecutor.Execute(regularSkill, m_targetObj); // succeeds → sets cooldown
+        Object.DestroyImmediate(regularSkill);
+
+        var gpSkill = CreateSkill("move_skill", cooldown: 2, targetType: ESkillTargetType.GroundPoint);
+        var result = m_casterExecutor.CanCastGroundPoint(gpSkill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.OnCooldown, result.Failure);
+        Object.DestroyImmediate(gpSkill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenCasterTagBlocked()
+    {
+        var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
+        tagComp.AddTag("State.Rooted");
+
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        SetSkillTagConditions(skill,
+            blockedCaster: new[] { "State.Rooted" });
+
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
+
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenNotGroundPointType()
+    {
+        var skill = CreateSkill("not_move", targetType: ESkillTargetType.Self);
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenPathIsNull()
+    {
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenPathStatusInvalid()
+    {
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        // Create a NavMeshPath — in EditMode, it will have PathInvalid status
+        var path = new NavMeshPath();
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, path);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_Fails_WhenInsufficientAp_ForSkillCost()
+    {
+        m_casterUnit.SetCurrentAP(0);
+        var skill = CreateSkill("move_skill", apCost: 2, targetType: ESkillTargetType.GroundPoint);
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.InsufficientAp, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void ExecuteGroundPoint_Fails_WhenCanCastFails()
+    {
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        var result = m_casterExecutor.ExecuteGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void CanCastGroundPoint_CasterRequiresTag_Works()
+    {
+        var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
+        tagComp.AddTag("Element.Wind");
+
+        var skill = CreateSkill("dash_skill", targetType: ESkillTargetType.GroundPoint);
+        SetSkillTagConditions(skill,
+            requiredCaster: new[] { "Element.Wind" });
+
+        // Will fail at path validation (null path), but tag check passes
+        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure); // path check, not tag check
+        Object.DestroyImmediate(skill);
+    }
+
     // ── Effect Apply ─────────────────────────────────────────────
 
     [Test]
@@ -393,6 +723,7 @@ public class SkillExecutorTests
     {
         m_targetUnit.SetMaxHP(100);
         m_targetUnit.SetCurrentHP(40);
+        m_targetExecutor.SetCapabilities(ETargetCapability.Healable);
 
         var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
         SetEffectAmount(fx, 15);
@@ -472,6 +803,36 @@ public class SkillExecutorTests
         so.ApplyModifiedProperties();
     }
 
+    private static void SetSkillTagConditions(
+        SkillDefinition skill,
+        string[] requiredCaster = null,
+        string[] blockedCaster = null,
+        string[] requiredTarget = null,
+        string[] blockedTarget = null)
+    {
+        var so = new SerializedObject(skill);
+        SetTagRefArray(so, "m_requiredCasterTags", requiredCaster);
+        SetTagRefArray(so, "m_blockedCasterTags", blockedCaster);
+        SetTagRefArray(so, "m_requiredTargetTags", requiredTarget);
+        SetTagRefArray(so, "m_blockedTargetTags", blockedTarget);
+        so.ApplyModifiedProperties();
+    }
+
+    private static void SetTagRefArray(SerializedObject so, string propertyName, string[] values)
+    {
+        if (values == null) return;
+        var prop = so.FindProperty(propertyName);
+        if (prop == null) return;
+        prop.arraySize = values.Length;
+        for (int i = 0; i < values.Length; i++)
+        {
+            var elem = prop.GetArrayElementAtIndex(i);
+            var valueProp = elem.FindPropertyRelative("m_value");
+            if (valueProp != null)
+                valueProp.stringValue = values[i];
+        }
+    }
+
     private static void SetEffectAmount(EffectDefinition fx, int amount)
     {
         var so = new SerializedObject(fx);
@@ -492,7 +853,7 @@ public class SkillExecutorTests
         private bool m_isAlive = true;
         private int m_currentAP = 6;
 
-        public EFaction Faction => EFaction.Player;
+        public EFaction Faction { get; private set; } = EFaction.Player;
         public string DisplayName => "TestUnit";
         public int Initiative => 10;
         public int MaxAP => 6;
@@ -503,14 +864,17 @@ public class SkillExecutorTests
         public bool IsMoving => false;
         public bool HasEndedRound => false;
         public float MoveSpeedMetersPerAp => 2f;
+        public float RemainingMoveDistance => Mathf.Max(0f, m_currentAP * MoveSpeedMetersPerAp);
 
         public void SetAlive(bool alive) => m_isAlive = alive;
         public void SetCurrentAP(int ap) => m_currentAP = ap;
         public void SetMaxHP(int hp) => m_maxHP = hp;
         public void SetCurrentHP(int hp) => m_currentHP = hp;
+        public void SetFaction(EFaction faction) => Faction = faction;
 
         public void BeginRound() => m_currentAP = 6;
         public bool TryEndRound() => true;
+        public bool TryStartMove(NavMeshPath path) => false; // no NavMesh in EditMode tests
         public bool TrySpendAP(int amount)
         {
             if (amount <= 0 || amount > m_currentAP) return false;

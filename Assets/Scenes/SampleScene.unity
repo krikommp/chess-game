@@ -2215,8 +2215,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_cam: {fileID: 0}
-  m_player: {fileID: 0}
-  m_combatManager: {fileID: 0}
   m_preview: {fileID: 0}
   m_groundMask:
     serializedVersion: 2
@@ -4873,6 +4871,8 @@ MonoBehaviour:
   m_initiative: 5
   m_hp: 100
   m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_defaultSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
 --- !u!1 &710093768
 GameObject:
   m_ObjectHideFlags: 0
@@ -7992,6 +7992,7 @@ GameObject:
   - component: {fileID: 1235925683}
   - component: {fileID: 1235925682}
   - component: {fileID: 1235925681}
+  - component: {fileID: 1235925686}
   m_Layer: 0
   m_Name: player2
   m_TagString: Untagged
@@ -8135,6 +8136,21 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1235925679}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1235925686
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235925679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  availableSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
+  m_capabilities: 1
 --- !u!1 &1280178462
 GameObject:
   m_ObjectHideFlags: 0
@@ -8846,6 +8862,8 @@ MonoBehaviour:
   m_initiative: 5
   m_hp: 100
   m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_defaultSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
 --- !u!1 &1339531489
 GameObject:
   m_ObjectHideFlags: 0
@@ -8946,15 +8964,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a9291e36951d8734281ac8c732ff0d6b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_moveInput: {fileID: 0}
+  m_inputController: {fileID: 0}
   m_cameraController: {fileID: 0}
   m_enemyTurnRunner: {fileID: 0}
   m_playerUnits: []
   m_endTurnKey: 32
   m_maxPartySize: 4
-  m_attackRange: 1.5
-  m_basicAttackCost: 1
-  m_basicAttackDamage: 20
+  basicAttackSkillOverride: {fileID: 0}
+  basicMoveSkillOverride: {fileID: 0}
   m_enemyFirstForDebug: 0
 --- !u!43 &1417810919
 Mesh:
@@ -10128,6 +10145,8 @@ MonoBehaviour:
   m_initiative: 5
   m_hp: 100
   m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_defaultSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
 --- !u!43 &1570277651
 Mesh:
   m_ObjectHideFlags: 0
@@ -12705,6 +12724,7 @@ GameObject:
   - component: {fileID: 2067804690}
   - component: {fileID: 2067804695}
   - component: {fileID: 2067804694}
+  - component: {fileID: 2067804696}
   m_Layer: 0
   m_Name: player1
   m_TagString: Untagged
@@ -12848,6 +12868,21 @@ NavMeshAgent:
   m_BaseOffset: 1
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
+--- !u!114 &2067804696
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2067804689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  availableSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
+  m_capabilities: 1
 --- !u!1 &2090583868
 GameObject:
   m_ObjectHideFlags: 0
@@ -13357,6 +13392,7 @@ GameObject:
   - component: {fileID: 2145461752}
   - component: {fileID: 2145461751}
   - component: {fileID: 2145461750}
+  - component: {fileID: 2145461755}
   m_Layer: 0
   m_Name: player3
   m_TagString: Untagged
@@ -13500,6 +13536,21 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2145461748}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &2145461755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145461748}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  availableSkills:
+  - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
+  m_capabilities: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -11,5 +11,6 @@ namespace MiniChess.Combat.Skills
         Statusable = 1 << 2,
         Interactable = 1 << 3,
         Destructible = 1 << 4,
+        Movable = 1 << 5,
     }
 }

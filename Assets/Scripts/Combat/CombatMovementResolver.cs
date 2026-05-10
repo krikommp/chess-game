@@ -252,10 +252,11 @@ namespace MiniChess.Combat
         /// Estimate movement AP cost. Uses the same formula as unit controllers
         /// (FloorToInt of projected distance / speed) but without unpaid-distance carryover.
         /// </summary>
-        public static int EstimateMoveApCost(float pathLength, float moveSpeedMetersPerAp, int currentAp)
+        public static int EstimateMoveApCost(float pathLength, float moveSpeedMetersPerAp, int currentAp, float unpaidMoveDistance = 0f)
         {
             if (pathLength <= 0f || moveSpeedMetersPerAp <= 0f) return 0;
-            int cost = Mathf.FloorToInt((pathLength + 0.0001f) / moveSpeedMetersPerAp);
+            float projectedDistance = unpaidMoveDistance + pathLength;
+            int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / moveSpeedMetersPerAp);
             return Mathf.Clamp(cost, 0, currentAp);
         }
 
@@ -296,6 +297,10 @@ namespace MiniChess.Combat
                 return SkillPositioningResult.Fail(EPositioningFailure.NavMeshOriginFailed);
             }
 
+            // Compute unpaid distance for accurate AP estimation
+            float maxPossibleDistance = currentAp * moveSpeedMetersPerAp;
+            float unpaidDistance = Mathf.Max(0f, maxPossibleDistance - remainingMoveDistance);
+
             // 3. Full path to target
             if (!TryBuildCompletePath(origin, targetPosition, out NavMeshPath fullPath))
             {
@@ -318,7 +323,7 @@ namespace MiniChess.Combat
 
             // 6. Calculate costs
             float moveLength = PathCostCalculator.PathLength(movePath.corners);
-            int moveApCost = EstimateMoveApCost(moveLength, moveSpeedMetersPerAp, currentAp);
+            int moveApCost = EstimateMoveApCost(moveLength, moveSpeedMetersPerAp, currentAp, unpaidDistance);
             int totalCost = moveApCost + skillApCost;
 
             // 7. Affordability check
@@ -360,8 +365,10 @@ namespace MiniChess.Combat
                 return SkillPositioningResult.Fail(EPositioningFailure.NoFallbackPossible);
             }
 
+            float maxPossibleDist = currentAp * moveSpeedMetersPerAp;
+            float unpaidDist = Mathf.Max(0f, maxPossibleDist - remainingMoveDistance);
             float fallbackLength = PathCostCalculator.PathLength(fallbackPath.corners);
-            int fallbackApCost = EstimateMoveApCost(fallbackLength, moveSpeedMetersPerAp, currentAp);
+            int fallbackApCost = EstimateMoveApCost(fallbackLength, moveSpeedMetersPerAp, currentAp, unpaidDist);
 
             return new SkillPositioningResult
             {

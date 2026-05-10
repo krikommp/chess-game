@@ -66,23 +66,15 @@ namespace MiniChess.Combat
                 }
             }
 
-            // 2. Execute skill if in range
-            if (target.IsAlive
-                && CombatMovementResolver.IsInRange(enemy.transform.position, targetPos, skill.Range))
+            // 2. Execute skill via shared post-move entry (handles target + range re-check).
+            var result = skillExecutor.ExecuteAfterMove(skill, target.gameObject);
+            if (result.IsSuccess)
             {
-                var result = skillExecutor.Execute(skill, target.gameObject);
-                if (result.IsSuccess)
-                {
-                    Debug.Log($"[EnemyAI] {enemy.DisplayName} casts '{skill.DisplayName}' on {target.DisplayName}.");
-                }
-                else
-                {
-                    Debug.Log($"[EnemyAI] {enemy.DisplayName} failed to cast '{skill.DisplayName}': {result.FailureMessage}");
-                }
+                Debug.Log($"[EnemyAI] {enemy.DisplayName} casts '{skill.DisplayName}' on {target.DisplayName}.");
             }
             else
             {
-                Debug.Log($"[EnemyAI] {enemy.DisplayName} cannot reach {target.DisplayName} for '{skill.DisplayName}'; AP {enemy.CurrentAP}/{enemy.MaxAP}.");
+                Debug.Log($"[EnemyAI] {enemy.DisplayName} failed to cast '{skill.DisplayName}': {result.FailureMessage}");
             }
 
             yield return new WaitForSeconds(m_afterActionDelay);

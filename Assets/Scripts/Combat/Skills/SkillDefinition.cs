@@ -19,6 +19,10 @@ namespace MiniChess.Combat.Skills
         [Header("Targeting")]
         [SerializeField] private ESkillTargetType m_targetType = ESkillTargetType.SingleEnemy;
 
+        [Header("Ability")]
+        [Tooltip("Skill-specific behavior. Use GroundMoveAbility for basic_move. Leave empty for pure effect skills.")]
+        [SerializeField] private SkillAbility m_ability;
+
         [Header("Effects")]
         [SerializeField] private EffectDefinition[] m_effects;
 
@@ -27,6 +31,16 @@ namespace MiniChess.Combat.Skills
         [SerializeField] private GameplayTagRef[] m_skillTags;
         [Tooltip("AI categorization: e.g. AI.Skill.Damage, AI.Skill.Heal")]
         [SerializeField] private GameplayTagRef[] m_aiTags;
+
+        [Header("Tag Conditions")]
+        [Tooltip("Tags the caster must have to use this skill.")]
+        [SerializeField] private GameplayTagRef[] m_requiredCasterTags;
+        [Tooltip("Tags that block the caster from using this skill.")]
+        [SerializeField] private GameplayTagRef[] m_blockedCasterTags;
+        [Tooltip("Tags the target must have to be affected by this skill.")]
+        [SerializeField] private GameplayTagRef[] m_requiredTargetTags;
+        [Tooltip("Tags that block the target from being affected by this skill.")]
+        [SerializeField] private GameplayTagRef[] m_blockedTargetTags;
 
         [Header("AI")]
         [Tooltip("Base weight for AI candidate scoring (higher = more likely to pick)")]
@@ -39,10 +53,26 @@ namespace MiniChess.Combat.Skills
         public int Cooldown => m_cooldown;
         public float Range => m_range;
         public ESkillTargetType TargetType => m_targetType;
+        public SkillAbility Ability
+        {
+            get
+            {
+                if (m_ability != null)
+                    return m_ability;
+
+                // TODO(CR-0002 / Docs/05_SKILL_SPEC.md §5.1): assign the concrete ability asset
+                // on basic_move once scene/prefab asset migration is handled through Unity Editor.
+                return m_targetType == ESkillTargetType.GroundPoint ? GroundMoveAbility.DefaultInstance : null;
+            }
+        }
         public EffectDefinition[] Effects => m_effects ?? System.Array.Empty<EffectDefinition>();
         public GameplayTagRef[] SkillTags => m_skillTags ?? System.Array.Empty<GameplayTagRef>();
         public GameplayTagRef[] AiTags => m_aiTags ?? System.Array.Empty<GameplayTagRef>();
         public float AiBaseWeight => m_aiBaseWeight;
+        public GameplayTagRef[] RequiredCasterTags => m_requiredCasterTags ?? System.Array.Empty<GameplayTagRef>();
+        public GameplayTagRef[] BlockedCasterTags => m_blockedCasterTags ?? System.Array.Empty<GameplayTagRef>();
+        public GameplayTagRef[] RequiredTargetTags => m_requiredTargetTags ?? System.Array.Empty<GameplayTagRef>();
+        public GameplayTagRef[] BlockedTargetTags => m_blockedTargetTags ?? System.Array.Empty<GameplayTagRef>();
 
         public bool HasEffectTag(GameplayTag tag)
         {

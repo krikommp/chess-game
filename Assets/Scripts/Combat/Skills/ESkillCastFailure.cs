@@ -10,6 +10,7 @@ namespace MiniChess.Combat.Skills
         OnCooldown,
         OutOfRange,
         TargetCapabilityBlocked,
+        TagConditionFailed,
         EffectApplicationFailed,
     }
 }

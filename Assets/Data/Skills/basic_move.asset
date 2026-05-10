@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28b39adf99b6add49847d63e84e1ac0e, type: 3}
+  m_Name: basic_move
+  m_EditorClassIdentifier: 
+  m_id: basic_move
+  m_displayName: Basic Move
+  m_description: Move to a target position.
+  m_apCost: 0
+  m_cooldown: 0
+  m_range: 0
+  m_targetType: 3
+  m_ability: {fileID: 11400000, guid: 8f2bb460bab5db249bd37431384922db, type: 2}
+  m_effects: []
+  m_skillTags:
+  - m_value: Action.Move
+  - m_value: Movement.Ground
+  m_aiTags:
+  - m_value: AI.Skill.Mobility
+  m_requiredCasterTags: []
+  m_blockedCasterTags: []
+  m_requiredTargetTags: []
+  m_blockedTargetTags: []
+  m_aiBaseWeight: 10

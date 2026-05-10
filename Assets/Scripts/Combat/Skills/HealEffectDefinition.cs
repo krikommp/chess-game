@@ -14,7 +14,8 @@ namespace MiniChess.Combat.Skills
 
         public override void Apply(EffectContext context)
         {
-            if (context.Target == null) return;
+            if (context.Target == null || context.TargetExecutor == null) return;
+            if ((context.TargetExecutor.Capabilities & RequiredCapability) == 0) return;
             var unit = context.Target.GetComponent<ICombatUnit>();
             if (unit != null && unit.IsAlive)
             {

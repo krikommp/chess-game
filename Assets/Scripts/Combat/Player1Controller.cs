@@ -84,9 +84,6 @@ namespace MiniChess.Combat
 
         private void Awake()
         {
-            if (GetComponent<SkillExecutor>() == null)
-                gameObject.AddComponent<SkillExecutor>();
-
             m_agent = GetComponent<NavMeshAgent>();
             m_agent.speed = m_agentSpeed;
             m_agent.stoppingDistance = 0.05f;
@@ -125,6 +122,7 @@ namespace MiniChess.Combat
             CurrentAP = m_maxAP;
             HasEndedRound = false;
             m_unpaidMoveDistance = 0f;
+            GetComponent<SkillExecutor>()?.AdvanceCooldowns();
             StateChanged?.Invoke();
         }
 
@@ -154,6 +152,8 @@ namespace MiniChess.Combat
             StateChanged?.Invoke();
             return true;
         }
+
+        public bool TryStartMove(NavMeshPath path) => TryMove(path, 0);
 
         /// <summary>Spend AP directly (e.g. for attack cost when already in range).</summary>
         public bool TrySpendAP(int amount)
@@ -242,7 +242,6 @@ namespace MiniChess.Combat
         }
     }
 }
-
 
 
 
