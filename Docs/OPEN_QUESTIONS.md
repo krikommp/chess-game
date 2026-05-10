@@ -181,8 +181,8 @@
 ### Q-0026 GameplayTag 命名空间与校验来源
 - 来源：2026-05-10 用户需求 / `05_SKILL_SPEC.md` §4.5 / `09_GAMEPLAY_TAG_SPEC.md`
 - 问题：GameplayTag 是先采用自由字符串 + 集中匹配工具，还是马上建立全局 TagRegistry / TagDatabase 来统一命名空间、自动补全和非法 Tag 校验？
-- 当前临时假设：**MVP 先用字符串 Tag + 集中匹配工具 + 配置校验**；等第一批技能和 AIProfile 跑通后，再补 `TagRegistry` / `TagDatabase` 编辑器支持。
-- 决议：(空)
+- 当前临时假设：**第一阶段就建立 `GameplayTagRegistry.asset` 与 Combat Config 的 Tags / Validation 入口**；底层序列化可以暂时使用字符串，但配置必须通过 TagRegistry 和集中校验访问。
+- 决议：**Tag 系统优先完成，并包含编辑器第一版**。先实现运行时 Tag 闭环，再实现 TagRegistry 与 Combat Config 的 Tags / Validation 页，之后再进入 SkillDefinition / Effect / SkillExecutor。
 - 影响：`GameplayTag` / `GameplayTagSet` / `SkillDefinition` / `EffectDefinition` / `Status` / `AIProfile` / Combat Config 编辑器
 
 ### Q-0027 GameplayTag 运行时注册规则

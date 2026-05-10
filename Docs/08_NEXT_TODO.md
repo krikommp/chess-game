@@ -306,7 +306,19 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
+
+	已完成内容：
+	- GameplayTag readonly struct：IsValid(string) 校验（空值/前后点/双点/空白符）、大小写不敏感等值比较、==/!= 运算符、string->tag 隐式转换、Matches(TagMatchMode Exact/Prefix)
+	- GameplayTagRef 可序列化包装：IsValid / TryGetTag / ToTag、string->ref 和 ref->tag 隐式转换
+	- GameplayTagSet 运行时容器：Add(source追踪) / Remove(按source或全删) / RemoveAllFromSource / Clear、Has/HasAny/HasAll(Exact/Prefix)
+	- TagQuery 条件查询：RequiredAll / RequiredAny / BlockedAny + TagMatchMode
+	- TagRegistry ScriptableObject + TagEntry：全局 Tag 注册与查询
+	- GameplayTagComponent MonoBehaviour：挂载 GameObject 提供运行时 TagSet
+	- CombatConfigWindow EditorWindow：统一配置入口（Tags/Skills/Effects/Statuses/AIProfiles/Validation 标签页）
+	- TagMatchMode enum（Exact/Prefix）、TagSourceType enum
+	- 52 个 EditMode 单元测试全部通过（Assets/Tests/Editor/GameplayTags/GameplayTagTests.cs）
+
 
 目标：
 - 建立贯穿整个游戏的通用 Tag 机制，服务技能、Effect、Status、AI、关卡脚本和条件判断。
@@ -327,18 +339,18 @@
 - 第一阶段可以用字符串表达 Tag，但必须集中封装匹配逻辑，避免散落的字符串匹配。
 
 产出：
-- `GameplayTag` 或等价轻量结构。
-- `GameplayTagSet` 或等价运行时容器。
-- Exact / Prefix 匹配工具。
-- `SkillExecutor` 或单位运行时组件上的当前 Tag 查询入口。
-- 事件/debug 输出中携带 Tag 的约定。
+- [x] GameplayTag 或等价轻量结构。
+- [x] GameplayTagSet 或等价运行时容器。
+- [x] Exact / Prefix 匹配工具。
+- [ ] SkillExecutor 或单位运行时组件上的当前 Tag 查询入口。
+- [ ] 事件/debug 输出中携带 Tag 的约定。
 
 验证：
-- 能给单位添加、移除、查询 Tag。
-- 能用 `Element.Fire` 匹配 `Element.Fire.Burning`。
-- 能用完整匹配区分 `Element.Fire.Burning` 与 `Element.Fire.Resistance`。
-- Status 结束时能移除它带来的 Tag。
-- 一个技能/状态/AI 条件/事件都能通过 Tag 表达至少一层语义。
+- [x] 能给单位添加、移除、查询 Tag。
+- [x] 能用 Element.Fire 匹配 `Element.Fire.Burning`。
+- [x] 能用完整匹配区分 `Element.Fire.Burning` 与 `Element.Fire.Resistance`。
+- [ ] Status 结束时能移除它带来的 Tag。
+- [ ] 一个技能/状态/AI 条件/事件都能通过 Tag 表达至少一层语义。
 
 关联问题：
 - `Q-0012` 怪物 AI 实现方案。
@@ -643,50 +655,56 @@
 1. 收口当前 AI 调试开关。
    - `enemyFirstForDebug` 默认值改为 `false`。
    - Inspector 注释说明它只用于调试，不影响正式 Initiative 规则。
-2. 完成 GameplayTag 最小闭环。
+2. 完成 GameplayTag 运行时闭环。
    - `GameplayTag`
    - `GameplayTagSet`
    - Exact / Prefix 匹配
    - Tag 来源追踪
    - 基础配置校验
-3. 建立 Tag First 代码使用约定。
+3. 完成 TagRegistry 与编辑器第一版。
+   - 创建 `GameplayTagRegistry.asset`。
+   - 支持 Tag 创建、搜索、分组浏览。
+   - 支持未注册 Tag 检查。
+   - 支持 Effect 缺失 Tag 检查。
+   - 在 Combat Config 中提供 Tags / Validation 入口。
+4. 建立 Tag First 代码使用约定。
    - 事件/debug 输出携带 Tag / TagSet。
    - 新增条件判断前先检查能否使用 Tag。
    - 禁止散落字符串前缀判断。
-4. 实现 `SkillDefinition` 与独立 Effect 资产的最小结构。
+5. 实现 `SkillDefinition` 与独立 Effect 资产的最小结构。
    - 技能字段必须支持 Tag / aiTags / effects。
    - Effect 使用独立 ScriptableObject 资产，可被多个技能复用。
    - `SkillDefinition.effects[]` 引用独立 Effect 资产。
-5. 实现配置校验的最小入口。
+6. 实现配置校验的最小入口。
    - 检查技能 id、AP、range、Effect 引用、Effect Tag、`basic_attack` 是否存在。
-   - 先用菜单命令或轻量编辑器工具，不做完整 Combat Config 编辑器。
-6. 抽出共享移动与范围解析。
+   - 校验入口挂到 Combat Config 的 Validation 页。
+7. 抽出共享移动与范围解析。
    - 玩家攻击与 AI 攻击复用同一套 NavMesh 进入范围、AP 预估和 fallback 靠近逻辑。
-7. 实现 `DamageEffect` 与 `SkillExecutor` 的最小路径。
+8. 实现 `DamageEffect` 与 `SkillExecutor` 的最小路径。
    - `SkillExecutor` 使用 Tag 判断目标语义。
    - `SkillCastResult` / debug 带 Tag。
    - 技能冷却状态保存在单位运行时，不写回 `SkillDefinition`。
-8. 将基础攻击迁移为 `basic_attack`。
+9. 将基础攻击迁移为 `basic_attack`。
    - `basic_attack` 和 `DamageEffect` 都必须带 Tag。
    - 玩家点击攻击与敌方普攻都调用 `SkillExecutor`。
-9. 实现 `AIProfile`。
+10. 实现 `AIProfile`。
    - `skillTagWeights`
    - `targetTagWeights`
    - `statusTagWeights`
-10. 让 `EnemyTurnRunner` 枚举技能候选。
+11. 让 `EnemyTurnRunner` 枚举技能候选。
    - 候选生成、过滤、评分、debug 都读取 Tag。
-11. 增加 AI 调试输出。
+12. 增加 AI 调试输出。
    - 日志优先服务 Tag / 配置 / 路径问题定位。
-12. 增加 `minor_heal` 与 `guarding_shout`。
+13. 增加 `minor_heal` 与 `guarding_shout`。
     - 验证治疗、Status、Tag、支援型 AI。
-13. 根据测试结果再决定是否实现 `power_strike` 与 `crippling_hex`。
+14. 根据测试结果再决定是否实现 `power_strike` 与 `crippling_hex`。
 
 ## 暂不进入下一阶段的内容
 
 - 战斗触发方式与正式 `CombatTrigger`。
 - 胜负判定、战斗结束流程与 `VictoryConditionEvaluator`。
 - 战斗奖励、掉落、任务推进、剧情对话。
-- 完整 Combat Config 编辑器第一版。
+- Skill / AIProfile 的完整编辑器页。
 - 技能树。
 - 装备提供技能。
 - 大量 VFX / 动画表现。

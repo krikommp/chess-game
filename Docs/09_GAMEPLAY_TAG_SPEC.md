@@ -172,11 +172,11 @@ public struct GameplayTagRef {
 }
 ```
 
-第一阶段可以使用字符串，但必须集中校验。
+第一阶段允许底层序列化仍使用字符串，但必须通过 `GameplayTagRef` / `TagRegistry` / 集中校验入口访问，不允许配置界面直接散落裸字符串。
 
 ## 6. 编辑器工具
 
-后续 Combat Config 编辑器应包含 Tag 管理页。
+第一阶段 Combat Config 编辑器就应包含 Tag 管理页。Tag 是后续技能、AI、Effect 和事件设计的前置系统，不能长期依赖手写字符串。
 
 功能：
 
@@ -314,15 +314,20 @@ Target.Environment.Cover
 
 ## 11. 第一阶段实现范围
 
-第一阶段必须优先实现 Tag 最小闭环。后续 `SkillDefinition`、`Effect`、`SkillExecutor`、`AIProfile`、AI 候选评分和事件 debug 都应建立在这个闭环之上。
+第一阶段必须优先实现 Tag 运行时闭环与编辑器闭环。后续 `SkillDefinition`、`Effect`、`SkillExecutor`、`AIProfile`、AI 候选评分和事件 debug 都应建立在这个闭环之上。
 
 1. `GameplayTag`。
 2. `GameplayTagSet`。
 3. Exact / Prefix 匹配。
 4. Tag 来源追踪。
-5. 基础配置校验。
-6. `SkillExecutor` 或单位运行时组件可以持有当前对象的运行时 TagSet。
-7. 事件/debug 输出可以携带 Tag / TagSet。
+5. `GameplayTagRegistry.asset`。
+6. Combat Config 的 Tags 页。
+7. Tag 创建 / 搜索 / Root 分组浏览。
+8. 未注册 Tag 检查。
+9. Effect 缺失 Tag 检查。
+10. 基础配置校验。
+11. `SkillExecutor` 或单位运行时组件可以持有当前对象的运行时 TagSet。
+12. 事件/debug 输出可以携带 Tag / TagSet。
 
 Tag 最小闭环完成后，再进入：
 
@@ -330,12 +335,11 @@ Tag 最小闭环完成后，再进入：
 2. `basic_attack` 的 `DamageEffect` 带 Tag。
 3. AI debug 输出候选技能/目标相关 Tag。
 
-暂不实现：
+第一阶段可暂不实现：
 
-- 完整 TagRegistry 编辑器。
-- 自动补全。
-- 引用反查。
-- 废弃 Tag 迁移。
+- 全量自动补全。
+- 全项目引用反查。
+- 废弃 Tag 自动迁移。
 - 复杂 TagQuery 图形编辑器。
 
 ## 12. 新问题

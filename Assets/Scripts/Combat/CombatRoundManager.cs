@@ -32,7 +32,8 @@ namespace MiniChess.Combat
         [SerializeField] private int basicAttackDamage = 20;
 
         [Header("Debug")]
-        [SerializeField] private bool enemyFirstForDebug = true;
+        [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative. Intended only for AI testing — does not represent formal first-strike rules.")]
+        [SerializeField] private bool enemyFirstForDebug = false;
 
         private readonly List<ICombatUnit> _turnOrder = new List<ICombatUnit>();
         private readonly List<EnemyController> _enemyUnits = new List<EnemyController>();

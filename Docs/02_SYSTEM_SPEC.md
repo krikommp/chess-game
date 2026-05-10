@@ -115,6 +115,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。
 
 - `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
+- `CombatRoundManager` 提供 `enemyFirstForDebug` 调试开关（默认关闭）：开启时所有敌方单位排在玩家之前，仅用于 AI 测试，不代表正式先攻规则。
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
