@@ -161,7 +161,8 @@ namespace MiniChess.Combat
             {
                 foreach (Player1Controller p in players)
                 {
-                    if (p == null || !p.IsAlive) continue;
+                    var pAttr = p != null ? p.GetComponent<AttributeSet>() : null;
+                    if (p == null || (pAttr != null && !pAttr.IsAlive)) continue;
                     if (FlatSqrDistance(p.transform.position, destination) < minSqr) return false;
                 }
             }
@@ -170,7 +171,8 @@ namespace MiniChess.Combat
             {
                 foreach (EnemyController e in enemies)
                 {
-                    if (e == null || e == excludeEnemy || !e.IsAlive) continue;
+                    var eAttr = e != null ? e.GetComponent<AttributeSet>() : null;
+                    if (e == null || e == excludeEnemy || (eAttr != null && !eAttr.IsAlive)) continue;
                     if (FlatSqrDistance(e.transform.position, destination) < minSqr) return false;
                 }
             }

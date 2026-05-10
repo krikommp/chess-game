@@ -16,10 +16,10 @@ namespace MiniChess.Combat.Skills
         {
             if (context.Target == null || context.TargetExecutor == null) return;
             if ((context.TargetExecutor.Capabilities & RequiredCapability) == 0) return;
-            var unit = context.Target.GetComponent<ICombatUnit>();
-            if (unit != null && unit.IsAlive)
+            var attr = context.Target.GetComponent<AttributeSet>();
+            if (attr != null && attr.IsAlive)
             {
-                unit.Heal(m_amount);
+                attr.Modify("Attribute.HP", m_amount);
             }
         }
     }

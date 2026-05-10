@@ -253,6 +253,83 @@ public class SkillExecutorTests
         Object.DestroyImmediate(fx);
     }
 
+    // ── CR-0010: Apply failure must not deduct AP / record cooldown / apply effects ──
+
+    private class TestApplyFailAbility : SkillAbility
+    {
+        public override SkillCastResult Apply(SkillExecutionContext context)
+        {
+            return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Simulated Apply failure.");
+        }
+    }
+
+    [Test]
+    public void Execute_DoesNotDeductAp_WhenApplyFails()
+    {
+        m_casterUnit.SetCurrentAP(6);
+        var skill = CreateSkill("fail_skill", apCost: 2);
+
+        var ability = ScriptableObject.CreateInstance<TestApplyFailAbility>();
+        var so = new SerializedObject(skill);
+        so.FindProperty("m_ability").objectReferenceValue = ability;
+        so.ApplyModifiedProperties();
+
+        var result = m_casterExecutor.Execute(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.EffectApplicationFailed, result.Failure);
+        Assert.AreEqual(6, m_casterUnit.CurrentAP, "AP should not be deducted when Apply fails.");
+
+        Object.DestroyImmediate(ability);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void Execute_DoesNotRecordCooldown_WhenApplyFails()
+    {
+        var skill = CreateSkill("fail_skill_cooldown", apCost: 1, cooldown: 3);
+
+        var ability = ScriptableObject.CreateInstance<TestApplyFailAbility>();
+        var so = new SerializedObject(skill);
+        so.FindProperty("m_ability").objectReferenceValue = ability;
+        so.ApplyModifiedProperties();
+
+        var result = m_casterExecutor.Execute(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.EffectApplicationFailed, result.Failure);
+        Assert.AreEqual(0, m_casterExecutor.GetCooldownRemaining("fail_skill_cooldown"),
+            "Cooldown should not be recorded when Apply fails.");
+
+        Object.DestroyImmediate(ability);
+        Object.DestroyImmediate(skill);
+    }
+
+    [Test]
+    public void Execute_DoesNotApplyEffects_WhenApplyFails()
+    {
+        m_targetUnit.SetMaxHP(100);
+        m_targetUnit.SetCurrentHP(100);
+
+        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        SetEffectAmount(fx, 25);
+        var skill = CreateSkill("fail_skill_fx", apCost: 1);
+        SetEffectsOnSkill(skill, fx);
+
+        var ability = ScriptableObject.CreateInstance<TestApplyFailAbility>();
+        var so = new SerializedObject(skill);
+        so.FindProperty("m_ability").objectReferenceValue = ability;
+        so.ApplyModifiedProperties();
+
+        var result = m_casterExecutor.Execute(skill, m_targetObj);
+        Assert.IsFalse(result.IsSuccess);
+        Assert.AreEqual(ESkillCastFailure.EffectApplicationFailed, result.Failure);
+        Assert.AreEqual(100, m_targetUnit.CurrentHP,
+            "Effects should not be applied when Apply fails.");
+
+        Object.DestroyImmediate(ability);
+        Object.DestroyImmediate(fx);
+        Object.DestroyImmediate(skill);
+    }
+
     // ── Cooldown ─────────────────────────────────────────────────
 
     [Test]
@@ -544,7 +621,7 @@ public class SkillExecutorTests
 
         var result = m_casterExecutor.CanCast(skill, m_targetObj);
         Assert.IsTrue(result.IsSuccess,
-            "Faction.Enemy tag should be auto-synced from ICombatUnit.Faction for Tag checks.");
+            "Faction.Enemy tag should be auto-synced from AttributeSet.Faction for Tag checks.");
 
         Object.DestroyImmediate(skill);
     }
@@ -571,44 +648,53 @@ public class SkillExecutorTests
         Object.DestroyImmediate(fx);
     }
 
-    // ── CR-0002: GroundPoint skills (movement as skill) ────────────
+    // ── GroundPoint skills (movement as skill) via SkillExecutionContext ──
+
+    private static void SetAbilityOnSkill(SkillDefinition skill, SkillAbility ability)
+    {
+        var so = new SerializedObject(skill);
+        so.FindProperty("m_ability").objectReferenceValue = ability;
+        so.ApplyModifiedProperties();
+    }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenSkillIsNull()
+    public void CanExecute_WithGroundPoint_Fails_WhenSkillIsNull()
     {
-        var result = m_casterExecutor.CanCastGroundPoint(null, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, null, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenCasterDead()
+    public void CanExecute_WithGroundPoint_Fails_WhenCasterDead()
     {
         m_casterUnit.SetAlive(false);
         var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.CasterDead, result.Failure);
         Object.DestroyImmediate(skill);
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenOnCooldown()
+    public void CanExecute_WithGroundPoint_Fails_WhenOnCooldown()
     {
-        // Use a regular skill to set cooldown on "move_skill" id, then test CanCastGroundPoint
         var regularSkill = CreateSkill("move_skill", cooldown: 2, apCost: 0);
-        m_casterExecutor.Execute(regularSkill, m_targetObj); // succeeds → sets cooldown
+        m_casterExecutor.Execute(regularSkill, m_targetObj);
         Object.DestroyImmediate(regularSkill);
 
         var gpSkill = CreateSkill("move_skill", cooldown: 2, targetType: ESkillTargetType.GroundPoint);
-        var result = m_casterExecutor.CanCastGroundPoint(gpSkill, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, gpSkill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.OnCooldown, result.Failure);
         Object.DestroyImmediate(gpSkill);
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenCasterTagBlocked()
+    public void CanExecute_WithGroundPoint_Fails_WhenCasterTagBlocked()
     {
         var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
         tagComp.AddTag("State.Rooted");
@@ -617,7 +703,8 @@ public class SkillExecutorTests
         SetSkillTagConditions(skill,
             blockedCaster: new[] { "State.Rooted" });
 
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.TagConditionFailed, result.Failure);
 
@@ -625,72 +712,76 @@ public class SkillExecutorTests
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenNotGroundPointType()
+    public void CanExecute_WithGroundPoint_Fails_WhenPathIsNull()
     {
-        var skill = CreateSkill("not_move", targetType: ESkillTargetType.Self);
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
+        SetAbilityOnSkill(skill, GroundMoveAbility.DefaultInstance);
+
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+
         Object.DestroyImmediate(skill);
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenPathIsNull()
+    public void CanExecute_WithGroundPoint_Fails_WhenPathStatusInvalid()
     {
         var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
-        Assert.IsFalse(result.IsSuccess);
-        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
-        Object.DestroyImmediate(skill);
-    }
+        SetAbilityOnSkill(skill, GroundMoveAbility.DefaultInstance);
 
-    [Test]
-    public void CanCastGroundPoint_Fails_WhenPathStatusInvalid()
-    {
-        var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
-        // Create a NavMeshPath — in EditMode, it will have PathInvalid status
         var path = new NavMeshPath();
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, path);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, path);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+
         Object.DestroyImmediate(skill);
     }
 
     [Test]
-    public void CanCastGroundPoint_Fails_WhenInsufficientAp_ForSkillCost()
+    public void CanExecute_WithGroundPoint_Fails_WhenInsufficientAp_ForSkillCost()
     {
         m_casterUnit.SetCurrentAP(0);
         var skill = CreateSkill("move_skill", apCost: 2, targetType: ESkillTargetType.GroundPoint);
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.InsufficientAp, result.Failure);
         Object.DestroyImmediate(skill);
     }
 
     [Test]
-    public void ExecuteGroundPoint_Fails_WhenCanCastFails()
+    public void Execute_WithGroundPoint_Fails_WhenCanExecuteFails()
     {
         var skill = CreateSkill("move_skill", targetType: ESkillTargetType.GroundPoint);
-        var result = m_casterExecutor.ExecuteGroundPoint(skill, Vector3.zero, null);
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.Execute(ctx);
         Assert.IsFalse(result.IsSuccess);
         Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
         Object.DestroyImmediate(skill);
     }
 
     [Test]
-    public void CanCastGroundPoint_CasterRequiresTag_Works()
+    public void CanExecute_WithGroundPoint_CasterRequiresTag_Works()
     {
         var tagComp = m_casterObj.AddComponent<GameplayTagComponent>();
         tagComp.AddTag("Element.Wind");
 
         var skill = CreateSkill("dash_skill", targetType: ESkillTargetType.GroundPoint);
+        SetAbilityOnSkill(skill, GroundMoveAbility.DefaultInstance);
         SetSkillTagConditions(skill,
             requiredCaster: new[] { "Element.Wind" });
 
-        // Will fail at path validation (null path), but tag check passes
-        var result = m_casterExecutor.CanCastGroundPoint(skill, Vector3.zero, null);
+        // Path validation fails (null path via ForGroundPoint with null path)
+        // but tag check passes (would otherwise fail earlier)
+        var ctx = SkillExecutionContext.ForGroundPoint(m_casterExecutor, skill, Vector3.zero, null);
+        var result = m_casterExecutor.CanExecute(ctx);
         Assert.IsFalse(result.IsSuccess);
-        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure); // path check, not tag check
+        // Failure is from GroundMoveAbility checking null path, not tag check
+        Assert.AreEqual(ESkillCastFailure.TargetInvalid, result.Failure);
+
         Object.DestroyImmediate(skill);
     }
 
@@ -844,57 +935,52 @@ public class SkillExecutorTests
         }
     }
 
-    // ── Test ICombatUnit implementation ──────────────────────────
+    // ── Test AttributeSet implementation ─────────────────────────
 
-    private class TestCombatUnit : MonoBehaviour, ICombatUnit
+    private class TestCombatUnit : AttributeSet
     {
-        private int m_currentHP = 100;
-        private int m_maxHP = 100;
-        private bool m_isAlive = true;
-        private int m_currentAP = 6;
+        public int CurrentAP => (int)Get(WellKnownAttributeTags.AP);
+        public int MaxHP => (int)GetMax(WellKnownAttributeTags.HP);
+        public int CurrentHP => (int)Get(WellKnownAttributeTags.HP);
 
-        public EFaction Faction { get; private set; } = EFaction.Player;
-        public string DisplayName => "TestUnit";
-        public int Initiative => 10;
-        public int MaxAP => 6;
-        public int CurrentAP => m_currentAP;
-        public int MaxHP => m_maxHP;
-        public int CurrentHP => m_currentHP;
-        public bool IsAlive => m_isAlive;
-        public bool IsMoving => false;
-        public bool HasEndedRound => false;
-        public float MoveSpeedMetersPerAp => 2f;
-        public float RemainingMoveDistance => Mathf.Max(0f, m_currentAP * MoveSpeedMetersPerAp);
-
-        public void SetAlive(bool alive) => m_isAlive = alive;
-        public void SetCurrentAP(int ap) => m_currentAP = ap;
-        public void SetMaxHP(int hp) => m_maxHP = hp;
-        public void SetCurrentHP(int hp) => m_currentHP = hp;
-        public void SetFaction(EFaction faction) => Faction = faction;
-
-        public void BeginRound() => m_currentAP = 6;
-        public bool TryEndRound() => true;
-        public bool TryStartMove(NavMeshPath path) => false; // no NavMesh in EditMode tests
-        public bool TrySpendAP(int amount)
+        private void Awake()
         {
-            if (amount <= 0 || amount > m_currentAP) return false;
-            m_currentAP -= amount;
-            return true;
+            Testing_AddAttribute(WellKnownAttributeTags.HP, 100f, 100f);
+            Testing_AddAttribute(WellKnownAttributeTags.AP, 6f, 6f);
+            Testing_AddAttribute(WellKnownAttributeTags.Initiative, 10f, 0f);
+            Testing_AddAttribute(WellKnownAttributeTags.MoveSpeed, 2f, 0f);
         }
 
-        public void TakeDamage(int damage)
+        public void SetAlive(bool alive)
         {
-            if (!m_isAlive) return;
-            m_currentHP = Mathf.Max(0, m_currentHP - damage);
+            if (alive)
+            {
+                Set(WellKnownAttributeTags.HP, Mathf.Max(1f, GetMax(WellKnownAttributeTags.HP)));
+                return;
+            }
+
+            Set(WellKnownAttributeTags.HP, 0f);
         }
 
-        public void Heal(int amount)
+        public void SetCurrentAP(int ap)
         {
-            if (!m_isAlive || amount <= 0) return;
-            m_currentHP = Mathf.Min(m_maxHP, m_currentHP + amount);
+            Set(WellKnownAttributeTags.AP, ap);
         }
 
-        public void SetVisualState(EPlayerVisualState state) { }
+        public void SetMaxHP(int hp)
+        {
+            SetMax(WellKnownAttributeTags.HP, hp);
+        }
+
+        public void SetCurrentHP(int hp)
+        {
+            Set(WellKnownAttributeTags.HP, hp);
+        }
+
+        public void SetFaction(EFaction faction)
+        {
+            OverrideFactionForTesting(faction);
+        }
     }
 
 }

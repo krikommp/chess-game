@@ -14,7 +14,8 @@ namespace MiniChess.Combat.Skills
         public SkillInputRequest InputRequest;
 
         public GameObject Caster => CasterExecutor != null ? CasterExecutor.gameObject : null;
-        public ICombatUnit CasterUnit => CasterExecutor != null ? CasterExecutor.CombatUnit : null;
+        public AttributeSet CasterAttributes => CasterExecutor != null ? CasterExecutor.Attributes : null;
+        public MovementController CasterMovement => CasterExecutor != null ? CasterExecutor.Movement : null;
 
         public static SkillExecutionContext ForTarget(
             SkillExecutor casterExecutor,

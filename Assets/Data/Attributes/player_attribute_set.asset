@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23ad5832d4d220248a9b4ada24f3dde8, type: 3}
+  m_Name: player_attribute_set
+  m_EditorClassIdentifier: 
+  m_entries:
+  - Tag:
+      m_value: Attribute.HP
+    BaseValue: 100
+    MaxValue: 100
+  - Tag:
+      m_value: Attribute.AP
+    BaseValue: 6
+    MaxValue: 6
+  - Tag:
+      m_value: Attribute.Initiative
+    BaseValue: 10
+    MaxValue: 0
+  - Tag:
+      m_value: Attribute.MoveSpeed
+    BaseValue: 2
+    MaxValue: 0

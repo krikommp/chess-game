@@ -7989,6 +7989,8 @@ GameObject:
   - component: {fileID: 1235925682}
   - component: {fileID: 1235925681}
   - component: {fileID: 1235925686}
+  - component: {fileID: 1235925687}
+  - component: {fileID: 1235925688}
   m_Layer: 0
   m_Name: player2
   m_TagString: Untagged
@@ -8023,15 +8025,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_displayName: Player
   m_partySlot: 1
-  m_faction: 0
-  m_maxHP: 100
-  m_currentHP: 100
-  m_initiative: 10
-  m_maxAP: 6
-  m_moveSpeedMetersPerAp: 2
-  m_agentSpeed: 4
   m_allowDebugRefill: 1
   m_refillKey: 114
   m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
@@ -8144,9 +8138,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  availableSkills:
+  m_availableSkills:
   - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
   m_capabilities: 1
+--- !u!114 &1235925687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235925679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 888a10042098d8945a171ce50835a13d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_definition: {fileID: 11400000, guid: b393442751243be44ace134bb17d4a42, type: 2}
+  m_displayName: player2
+  m_faction: 0
+--- !u!114 &1235925688
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1235925679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e2818f803224f64e8f907c791330feb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_agentSpeed: 3.5
 --- !u!1 &1280178462
 GameObject:
   m_ObjectHideFlags: 0
@@ -8966,8 +8988,8 @@ MonoBehaviour:
   m_playerUnits: []
   m_endTurnKey: 32
   m_maxPartySize: 4
-  basicAttackSkillOverride: {fileID: 0}
-  basicMoveSkillOverride: {fileID: 0}
+  m_basicAttackSkillOverride: {fileID: 0}
+  m_basicMoveSkillOverride: {fileID: 0}
   m_enemyFirstForDebug: 0
 --- !u!43 &1417810919
 Mesh:
@@ -12737,6 +12759,8 @@ GameObject:
   - component: {fileID: 2067804695}
   - component: {fileID: 2067804694}
   - component: {fileID: 2067804696}
+  - component: {fileID: 2067804697}
+  - component: {fileID: 2067804698}
   m_Layer: 0
   m_Name: player1
   m_TagString: Untagged
@@ -12844,15 +12868,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_displayName: Player
   m_partySlot: 1
-  m_faction: 0
-  m_maxHP: 100
-  m_currentHP: 100
-  m_initiative: 10
-  m_maxAP: 6
-  m_moveSpeedMetersPerAp: 2
-  m_agentSpeed: 4
   m_allowDebugRefill: 1
   m_refillKey: 114
   m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
@@ -12892,9 +12908,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  availableSkills:
+  m_availableSkills:
   - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
   m_capabilities: 1
+--- !u!114 &2067804697
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2067804689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 888a10042098d8945a171ce50835a13d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_definition: {fileID: 11400000, guid: b393442751243be44ace134bb17d4a42, type: 2}
+  m_displayName: player1
+  m_faction: 0
+--- !u!114 &2067804698
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2067804689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e2818f803224f64e8f907c791330feb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_agentSpeed: 3.5
 --- !u!1 &2090583868
 GameObject:
   m_ObjectHideFlags: 0
@@ -13405,6 +13449,8 @@ GameObject:
   - component: {fileID: 2145461751}
   - component: {fileID: 2145461750}
   - component: {fileID: 2145461755}
+  - component: {fileID: 2145461756}
+  - component: {fileID: 2145461757}
   m_Layer: 0
   m_Name: player3
   m_TagString: Untagged
@@ -13439,15 +13485,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_displayName: Player
   m_partySlot: 1
-  m_faction: 0
-  m_maxHP: 100
-  m_currentHP: 100
-  m_initiative: 10
-  m_maxAP: 6
-  m_moveSpeedMetersPerAp: 2
-  m_agentSpeed: 4
   m_allowDebugRefill: 1
   m_refillKey: 114
   m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
@@ -13560,9 +13598,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5ceaadf07cf5df4fb2f6b8c08df4aa6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  availableSkills:
+  m_availableSkills:
   - {fileID: 11400000, guid: 2a5efc0e30c260a49a7a9b0a879d97b5, type: 2}
   m_capabilities: 1
+--- !u!114 &2145461756
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145461748}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 888a10042098d8945a171ce50835a13d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_definition: {fileID: 11400000, guid: b393442751243be44ace134bb17d4a42, type: 2}
+  m_displayName: player3
+  m_faction: 0
+--- !u!114 &2145461757
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2145461748}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e2818f803224f64e8f907c791330feb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_agentSpeed: 3.5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

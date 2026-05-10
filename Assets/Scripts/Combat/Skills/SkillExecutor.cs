@@ -10,28 +10,39 @@ namespace MiniChess.Combat.Skills
     public class SkillExecutor : MonoBehaviour
     {
         [Header("Skills")]
-        public SkillDefinition[] availableSkills;
+        [SerializeField] private SkillDefinition[] m_availableSkills;
 
         [Header("Target Capabilities")]
         [Tooltip("What effect types this object can receive.")]
         [SerializeField] private ETargetCapability m_capabilities = ETargetCapability.Damageable;
 
-        private ICombatUnit m_combatUnit;
+        private AttributeSet m_attributes;
+        private MovementController m_movement;
         private readonly Dictionary<string, int> m_cooldowns = new Dictionary<string, int>();
         private SkillDefinition m_activeSkill;
 
-        public SkillDefinition[] AvailableSkills => availableSkills ?? Array.Empty<SkillDefinition>();
+        public SkillDefinition[] AvailableSkills => m_availableSkills ?? Array.Empty<SkillDefinition>();
         public ETargetCapability Capabilities => m_capabilities;
         public SkillDefinition ActiveSkill => m_activeSkill;
         public int GetCooldownRemaining(string skillId) => m_cooldowns.TryGetValue(skillId, out int v) ? v : 0;
 
-        public ICombatUnit CombatUnit
+        public AttributeSet Attributes
         {
             get
             {
-                if (m_combatUnit == null)
-                    m_combatUnit = GetComponent<ICombatUnit>();
-                return m_combatUnit;
+                if (m_attributes == null)
+                    m_attributes = GetComponent<AttributeSet>();
+                return m_attributes;
+            }
+        }
+
+        public MovementController Movement
+        {
+            get
+            {
+                if (m_movement == null)
+                    m_movement = GetComponent<MovementController>();
+                return m_movement;
             }
         }
 
@@ -46,14 +57,14 @@ namespace MiniChess.Combat.Skills
             if (skill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
 
-            var caster = CombatUnit;
-            if (caster == null || !caster.IsAlive)
-                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing ICombatUnit.");
+            var casterAttr = Attributes;
+            if (casterAttr == null || !casterAttr.IsAlive)
+                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing AttributeSet.");
 
             int apCost = GetApCost(context);
-            if (caster.CurrentAP < apCost)
+            if (casterAttr.Get(WellKnownAttributeTags.AP) < apCost)
                 return SkillCastResult.Fail(ESkillCastFailure.InsufficientAp,
-                    $"Need {apCost} AP, have {caster.CurrentAP}.");
+                    $"Need {apCost} AP, have {casterAttr.Get(WellKnownAttributeTags.AP)}.");
 
             if (m_cooldowns.TryGetValue(skill.Id, out int remaining) && remaining > 0)
                 return SkillCastResult.Fail(ESkillCastFailure.OnCooldown,
@@ -68,8 +79,8 @@ namespace MiniChess.Combat.Skills
 
             if (!isSelf && !isGroundPoint)
             {
-                var targetUnit = resolved.Target.GetComponent<ICombatUnit>();
-                if (targetUnit != null && !targetUnit.IsAlive)
+                var targetAttr = resolved.Target != null ? resolved.Target.GetComponent<AttributeSet>() : null;
+                if (targetAttr != null && !targetAttr.IsAlive)
                     return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target is dead.");
 
                 if (resolved.TargetExecutor == null)
@@ -91,24 +102,24 @@ namespace MiniChess.Combat.Skills
 
             if (!isSelf && !isGroundPoint)
             {
-                var targetUnit = resolved.Target.GetComponent<ICombatUnit>();
-                if (targetUnit != null)
-                {
-                    bool factionMismatch = false;
-                    switch (skill.TargetType)
-                    {
-                        case ESkillTargetType.SingleEnemy:
-                            factionMismatch = targetUnit.Faction == caster.Faction;
-                            break;
-                        case ESkillTargetType.SingleAlly:
-                            factionMismatch = targetUnit.Faction != caster.Faction;
-                            break;
-                    }
+                var targetAttr = resolved.Target != null ? resolved.Target.GetComponent<AttributeSet>() : null;
+                EFaction targetFaction = targetAttr != null ? targetAttr.Faction : EFaction.Player;
+                EFaction casterFaction = casterAttr.Faction;
 
-                    if (factionMismatch)
-                        return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
-                            $"Target faction '{targetUnit.Faction}' is invalid for {skill.TargetType}.");
+                bool factionMismatch = false;
+                switch (skill.TargetType)
+                {
+                    case ESkillTargetType.SingleEnemy:
+                        factionMismatch = targetFaction == casterFaction;
+                        break;
+                    case ESkillTargetType.SingleAlly:
+                        factionMismatch = targetFaction != casterFaction;
+                        break;
                 }
+
+                if (factionMismatch)
+                    return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
+                        $"Target faction '{targetFaction}' is invalid for {skill.TargetType}.");
             }
 
             if (!isSelf && !isGroundPoint)
@@ -138,13 +149,11 @@ namespace MiniChess.Combat.Skills
                 return canExecute;
 
             var skill = context.Skill;
-            var caster = CombatUnit;
-            if (caster == null)
-                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is null.");
+            var casterAttr = Attributes;
+            if (casterAttr == null)
+                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster has no AttributeSet.");
 
             var resolved = ResolveTarget(skill, context.Target);
-            int apCost = GetApCost(context);
-            caster.TrySpendAP(apCost);
 
             if (skill.Ability != null)
             {
@@ -152,6 +161,11 @@ namespace MiniChess.Combat.Skills
                 if (!abilityResult.IsSuccess)
                     return abilityResult;
             }
+
+            int apCost = GetApCost(context);
+            if (!casterAttr.TrySpend(WellKnownAttributeTags.AP, apCost))
+                return SkillCastResult.Fail(ESkillCastFailure.InsufficientAp,
+                    $"Failed to spend {apCost} AP after successful Apply.");
 
             var effectContext = new EffectContext
             {
@@ -195,7 +209,7 @@ namespace MiniChess.Combat.Skills
 
         public void SetSkills(SkillDefinition[] skills)
         {
-            availableSkills = skills;
+            m_availableSkills = skills;
         }
 
         public bool ActivateSkill(SkillDefinition skill)
@@ -262,8 +276,8 @@ namespace MiniChess.Combat.Skills
             if (target == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Target lost during approach.");
 
-            var targetUnit = target.GetComponent<ICombatUnit>();
-            if (targetUnit != null && !targetUnit.IsAlive)
+            var targetAttr = target.GetComponent<AttributeSet>();
+            if (targetAttr != null && !targetAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target died during approach.");
 
             if (!CombatMovementResolver.IsInRange(transform.position, target.transform.position, skill.Range))
@@ -273,19 +287,6 @@ namespace MiniChess.Combat.Skills
             return Execute(skill, target);
         }
 
-        public SkillCastResult CanCastGroundPoint(SkillDefinition skill, Vector3 groundPosition, NavMeshPath path)
-        {
-            if (skill != null && skill.TargetType != ESkillTargetType.GroundPoint)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
-                    $"Expected GroundPoint target type, got {skill.TargetType}.");
-
-            return CanExecute(SkillExecutionContext.ForGroundPoint(this, skill, groundPosition, path));
-        }
-
-        public SkillCastResult ExecuteGroundPoint(SkillDefinition skill, Vector3 groundPosition, NavMeshPath path)
-        {
-            return Execute(SkillExecutionContext.ForGroundPoint(this, skill, groundPosition, path));
-        }
 
         private readonly struct ResolvedTarget
         {
@@ -372,10 +373,11 @@ namespace MiniChess.Combat.Skills
                     outTags.Add(tag, "SkillExecutor.CollectTags");
             }
 
-            var unit = obj.GetComponent<ICombatUnit>();
-            if (unit != null)
+            // AttributeSet auto-syncs faction to GameplayTagComponent on Awake
+            var attr = obj.GetComponent<AttributeSet>();
+            if (attr != null)
             {
-                var factionTag = new GameplayTag(unit.Faction == EFaction.Player ? "Faction.Player" : "Faction.Enemy");
+                var factionTag = new GameplayTag(attr.Faction == EFaction.Player ? "Faction.Player" : "Faction.Enemy");
                 outTags.Add(factionTag, "SkillExecutor.FactionAutoSync");
             }
         }

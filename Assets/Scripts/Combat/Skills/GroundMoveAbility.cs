@@ -33,17 +33,21 @@ namespace MiniChess.Combat.Skills
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     $"Expected GroundPoint target type, got {skill.TargetType}.");
 
-            var caster = context.CasterUnit;
-            if (caster == null || !caster.IsAlive)
-                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing ICombatUnit.");
+            var attr = context.CasterAttributes;
+            if (attr == null || !attr.IsAlive)
+                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing AttributeSet.");
 
             var path = context.Path;
             if (path == null || path.status != NavMeshPathStatus.PathComplete || path.corners.Length < 2)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     "NavMesh path is invalid or incomplete.");
 
+            var movement = context.CasterMovement;
+            if (movement == null)
+                return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Caster has no MovementController.");
+            float remainingDistance = movement.RemainingMoveDistance;
+
             float pathLength = PathCostCalculator.PathLength(path.corners);
-            float remainingDistance = caster.RemainingMoveDistance;
             if (pathLength > remainingDistance + 0.001f)
                 return SkillCastResult.Fail(ESkillCastFailure.InsufficientAp,
                     $"Move path ({pathLength:F2}m) exceeds remaining move distance ({remainingDistance:F2}m).");
@@ -53,13 +57,13 @@ namespace MiniChess.Combat.Skills
 
         public override SkillCastResult Apply(SkillExecutionContext context)
         {
-            var caster = context.CasterUnit;
-            if (caster == null)
-                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is null.");
+            var movement = context.CasterMovement;
+            if (movement == null)
+                return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster has no MovementController.");
 
-            if (!caster.TryStartMove(context.Path))
+            if (!movement.TryStartMove(context.Path))
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
-                    "Failed to start movement via TryStartMove.");
+                    "Failed to start movement via MovementController.");
 
             return SkillCastResult.Success();
         }
@@ -103,8 +107,8 @@ namespace MiniChess.Combat.Skills
             var preview = PathPreview.Instance;
             if (preview == null) return;
 
-            var caster = context.CasterUnit;
-            if (caster == null || !TryGetOrigin(context, out Vector3 origin))
+            var movement = context.CasterMovement;
+            if (movement == null || !TryGetOrigin(context, out Vector3 origin))
             {
                 preview.Clear();
                 return;
@@ -130,13 +134,13 @@ namespace MiniChess.Combat.Skills
             }
 
             float length = PathCostCalculator.PathLength(path.corners);
-            if (length <= caster.RemainingMoveDistance)
+            if (length <= movement.RemainingMoveDistance)
             {
                 preview.Show(path.corners, System.Array.Empty<Vector3>());
                 return;
             }
 
-            PathCostCalculator.Clip(path.corners, caster.RemainingMoveDistance,
+            PathCostCalculator.Clip(path.corners, movement.RemainingMoveDistance,
                 out Vector3[] head, out Vector3[] tail);
             preview.Show(head, tail);
         }
@@ -146,8 +150,9 @@ namespace MiniChess.Combat.Skills
             destination = default;
             path = null;
 
-            var caster = context.CasterUnit;
-            if (caster == null || caster.RemainingMoveDistance <= 0f) return false;
+            var move = context.CasterMovement;
+            if (move == null || move.RemainingMoveDistance <= 0f) return false;
+            float remainingDist = move.RemainingMoveDistance;
             if (!TryGetOrigin(context, out Vector3 origin)) return false;
 
             if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav, NavMeshManager.Instance.MouseSnapRadius, NavMesh.AllAreas))
@@ -165,9 +170,9 @@ namespace MiniChess.Combat.Skills
             float length = PathCostCalculator.PathLength(fullPath.corners);
             destination = nav.position;
 
-            if (length > caster.RemainingMoveDistance + 0.001f)
+            if (length > remainingDist + 0.001f)
             {
-                PathCostCalculator.Clip(fullPath.corners, caster.RemainingMoveDistance,
+                PathCostCalculator.Clip(fullPath.corners, remainingDist,
                     out Vector3[] head, out _);
                 if (head == null || head.Length < 2) return false;
                 destination = head[head.Length - 1];

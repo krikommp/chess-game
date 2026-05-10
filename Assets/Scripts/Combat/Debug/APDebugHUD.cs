@@ -47,7 +47,9 @@ namespace MiniChess.Combat.DebugUI
             string waitingLine = "";
             if (m_combatManager != null && m_combatManager.IsWaiting && m_combatManager.SelectedUnit != null)
             {
-                waitingLine = $" >>> {m_combatManager.SelectedUnit.DisplayName} acting... <<<";
+                var selAttr = m_combatManager.SelectedUnit.GetComponent<AttributeSet>();
+                string selName = selAttr != null ? selAttr.DisplayName : "?";
+                waitingLine = $" >>> {selName} acting... <<<";
             }
 
             string costLine = "Input: routed through active skill";
@@ -62,8 +64,15 @@ namespace MiniChess.Combat.DebugUI
             GUI.Label(new Rect(20, 62, 380, 24),
                 activePlayer.IsMoving ? "Moving..." : "Space = end selected m_player", m_smallStyle);
 
+            var aAttr = activePlayer.GetComponent<AttributeSet>();
+            string aName = aAttr != null ? aAttr.DisplayName : activePlayer.DisplayName;
+            int aHP = (int)(aAttr != null ? aAttr.Get(WellKnownAttributeTags.HP) : activePlayer.CurrentHP);
+            int aMaxHP = (int)(aAttr != null ? aAttr.GetMax(WellKnownAttributeTags.HP) : activePlayer.MaxHP);
+            int aAP = (int)(aAttr != null ? aAttr.Get(WellKnownAttributeTags.AP) : activePlayer.CurrentAP);
+            int aMaxAP = (int)(aAttr != null ? aAttr.GetMax(WellKnownAttributeTags.AP) : activePlayer.MaxAP);
+
             GUI.Label(new Rect(20, 88, 380, 22),
-                $"Selected: {activePlayer.DisplayName} | HP {activePlayer.CurrentHP}/{activePlayer.MaxHP} | AP {activePlayer.CurrentAP}/{activePlayer.MaxAP}",
+                $"Selected: {aName} | HP {aHP}/{aMaxHP} | AP {aAP}/{aMaxAP}",
                 m_smallStyle);
 
             if (m_combatManager == null) return;
@@ -73,23 +82,27 @@ namespace MiniChess.Combat.DebugUI
 
             for (int i = 0; i < turnCount && i < 8; i++)
             {
-                ICombatUnit unit = m_combatManager.TurnOrder[i];
-                if (unit == null || !unit.IsAlive) continue;
+                GameObject go = m_combatManager.TurnOrder[i];
+                if (go == null) continue;
+                var attr = go.GetComponent<AttributeSet>();
+                if (attr == null || !attr.IsAlive) continue;
 
-                bool isActive = (unit == m_combatManager.SelectedUnit);
+                bool isActive = (go == m_combatManager.SelectedUnit);
                 string marker = isActive ? ">" : " ";
-                string typeTag = unit.Faction == EFaction.Enemy ? "[E]" : "[P]";
-                string state = unit.HasEndedRound ? "DONE" : $"{unit.CurrentAP}/{unit.MaxAP} AP";
-                string hpStr = $"HP {unit.CurrentHP}/{unit.MaxHP}";
+                string typeTag = attr.Faction == EFaction.Enemy ? "[E]" : "[P]";
+                bool ended = m_combatManager.HasEndedRound(go);
+                string state = ended ? "DONE" : $"{(int)attr.Get(WellKnownAttributeTags.AP)}/{(int)attr.GetMax(WellKnownAttributeTags.AP)} AP";
+                string hpStr = $"HP {(int)attr.Get(WellKnownAttributeTags.HP)}/{(int)attr.GetMax(WellKnownAttributeTags.HP)}";
+                float init = attr.Get(WellKnownAttributeTags.Initiative);
+                string dispName = attr.DisplayName;
 
-                GUIStyle rowStyle = unit.Faction == EFaction.Enemy ? m_enemyStyle : m_smallStyle;
+                GUIStyle rowStyle = attr.Faction == EFaction.Enemy ? m_enemyStyle : m_smallStyle;
                 GUI.Label(new Rect(20, 132 + i * 20, 380, 20),
-                    $"{marker} {i + 1}. {typeTag} {unit.DisplayName}  Init:{unit.Initiative}  {hpStr}  {state}",
+                    $"{marker} {i + 1}. {typeTag} {dispName}  Init:{init}  {hpStr}  {state}",
                     rowStyle);
             }
         }
     }
 }
-
 
 

@@ -41,15 +41,22 @@ namespace MiniChess.Combat
                 renderer.material.color = m_enemyColor;
             }
 
+            // New component stack: AttributeSet → MovementController → SkillExecutor → EnemyController
+            var attr = go.AddComponent<AttributeSet>();
+            attr.Testing_AddAttribute(WellKnownAttributeTags.HP, m_hp, m_hp);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.AP, 6f, 6f);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.Initiative, m_initiative, 0f);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.MoveSpeed, 2f, 0f);
+            attr.DisplayName = m_enemyName;
+            attr.OverrideFactionForTesting(EFaction.Enemy);
+
+            go.AddComponent<MovementController>();
+
             SkillExecutor skillExecutor = go.AddComponent<SkillExecutor>();
             skillExecutor.SetSkills(m_defaultSkills);
 
-            // Enemy controller
+            // Enemy controller (bridge phase — syncs from AttributeSet)
             EnemyController enemy = go.AddComponent<EnemyController>();
-            enemy.DisplayName = m_enemyName;
-            enemy.Initiative = m_initiative;
-            enemy.MaxHP = m_hp;
-            enemy.CurrentHP = m_hp;
             enemy.DefaultColor = m_enemyColor;
 
             // TODO(Docs/06_MAP_SPEC.md §2): Revisit dynamic unit blocking once
