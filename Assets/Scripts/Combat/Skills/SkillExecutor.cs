@@ -19,7 +19,6 @@ namespace MiniChess.Combat.Skills
         private ICombatUnit m_combatUnit;
         private readonly Dictionary<string, int> m_cooldowns = new Dictionary<string, int>();
         private SkillDefinition m_activeSkill;
-        private SkillInputServices m_inputServices;
 
         public SkillDefinition[] AvailableSkills => availableSkills ?? Array.Empty<SkillDefinition>();
         public ETargetCapability Capabilities => m_capabilities;
@@ -199,7 +198,7 @@ namespace MiniChess.Combat.Skills
             availableSkills = skills;
         }
 
-        public bool ActivateSkill(SkillDefinition skill, SkillInputServices inputServices)
+        public bool ActivateSkill(SkillDefinition skill)
         {
             if (skill == null || !HasSkill(skill))
             {
@@ -208,7 +207,6 @@ namespace MiniChess.Combat.Skills
             }
 
             m_activeSkill = skill;
-            m_inputServices = inputServices;
             return true;
         }
 
@@ -226,7 +224,7 @@ namespace MiniChess.Combat.Skills
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     $"Active skill '{m_activeSkill.Id}' has no ability to handle input.");
 
-            var context = SkillExecutionContext.ForInput(this, m_activeSkill, inputRequest, m_inputServices);
+            var context = SkillExecutionContext.ForInput(this, m_activeSkill, inputRequest);
             return m_activeSkill.Ability.HandleInput(context, inputRequest);
         }
 

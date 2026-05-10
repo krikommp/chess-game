@@ -12,7 +12,6 @@ namespace MiniChess.Combat.Skills
         public Vector3? TargetPosition;
         public NavMeshPath Path;
         public SkillInputRequest InputRequest;
-        public SkillInputServices InputServices;
 
         public GameObject Caster => CasterExecutor != null ? CasterExecutor.gameObject : null;
         public ICombatUnit CasterUnit => CasterExecutor != null ? CasterExecutor.CombatUnit : null;
@@ -48,8 +47,7 @@ namespace MiniChess.Combat.Skills
         public static SkillExecutionContext ForInput(
             SkillExecutor casterExecutor,
             SkillDefinition skill,
-            SkillInputRequest inputRequest,
-            SkillInputServices inputServices)
+            SkillInputRequest inputRequest)
         {
             return new SkillExecutionContext
             {
@@ -58,7 +56,6 @@ namespace MiniChess.Combat.Skills
                 Target = inputRequest.TargetObject,
                 TargetPosition = inputRequest.HasWorldPosition ? inputRequest.WorldPosition : null,
                 InputRequest = inputRequest,
-                InputServices = inputServices,
             };
         }
     }

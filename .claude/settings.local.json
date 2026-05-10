@@ -45,7 +45,10 @@
       "Bash(\"C:\\\\Program Files\\\\Unity\\\\Hub\\\\Editor\\\\*\\\\Unity.exe\" -quit -batchmode -nographics -runTests -testPlatform EditMode -projectPath . -testResults results.xml)",
       "Read(//c/Program Files/Unity/Hub/Editor/**)",
       "Read(//c/Program Files/Unity/**)",
-      "Bash(\"C:/Program Files/Unity/Hub/Editor/2022.3.62f3c1/Editor/Unity.exe\" -quit -batchmode -nographics -runTests -testPlatform EditMode -projectPath \".\" -testResults \"results.xml\")"
+      "Bash(\"C:/Program Files/Unity/Hub/Editor/2022.3.62f3c1/Editor/Unity.exe\" -quit -batchmode -nographics -runTests -testPlatform EditMode -projectPath \".\" -testResults \"results.xml\")",
+      "Bash(echo \"EXIT:$?\")",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npx skills *)"
     ]
   }
 }

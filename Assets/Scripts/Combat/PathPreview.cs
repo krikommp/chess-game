@@ -10,6 +10,8 @@ namespace MiniChess.Combat
     /// </summary>
     public class PathPreview : MonoBehaviour
     {
+        public static PathPreview Instance { get; private set; }
+
         [Header("Lines (assign in inspector)")]
         [SerializeField] private LineRenderer m_reachableLine;
         [SerializeField] private LineRenderer m_unreachableLine;
@@ -35,12 +37,34 @@ namespace MiniChess.Combat
 
         private void Awake()
         {
+            Instance = this;
+            if (m_reachableLine == null)
+                m_reachableLine = FindLineRendererChild("ReachableLine");
+            if (m_unreachableLine == null)
+                m_unreachableLine = FindLineRendererChild("UnreachableLine");
             EnsureActiveMoveLine();
             ConfigureLine(m_reachableLine, m_reachableColor);
             ConfigureLine(m_unreachableLine, m_unreachableColor);
             ConfigureLine(m_activeMoveLine, m_activeMoveColor);
             Clear();
             ClearActivePath();
+        }
+
+        private LineRenderer FindLineRendererChild(string name)
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                var child = transform.GetChild(i);
+                if (child.name == name)
+                    return child.GetComponent<LineRenderer>();
+            }
+            return null;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
         }
 
         private void ConfigureLine(LineRenderer lr, Color c)

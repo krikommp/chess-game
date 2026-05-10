@@ -2215,12 +2215,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_cam: {fileID: 0}
-  m_preview: {fileID: 0}
   m_groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_navMeshSnapRadius: 0.5
-  m_originSnapRadius: 2
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -3677,7 +3674,6 @@ Transform:
   m_Children:
   - {fileID: 330585546}
   - {fileID: 259119424}
-  - {fileID: 1339531490}
   - {fileID: 1235105995}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -8896,7 +8892,7 @@ Transform:
   m_Children:
   - {fileID: 623563029}
   - {fileID: 840057364}
-  m_Father: {fileID: 480554262}
+  m_Father: {fileID: 1930558650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1339531491
 MonoBehaviour:
@@ -8910,8 +8906,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3cb02e45d222f74991fc3530e328133, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_reachableLine: {fileID: 0}
-  m_unreachableLine: {fileID: 0}
+  m_reachableLine: {fileID: 623563030}
+  m_unreachableLine: {fileID: 840057365}
   m_activeMoveLine: {fileID: 0}
   m_reachableColor: {r: 0.3, g: 1, b: 0.4, a: 1}
   m_unreachableColor: {r: 1, g: 0.25, b: 0.2, a: 1}
@@ -11797,6 +11793,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1930558650}
+  - component: {fileID: 1930558651}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -11818,8 +11815,23 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1381118307}
+  - {fileID: 1339531490}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1930558651
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1930558649}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddbbbd5880ba285478a1524e2ffa319f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_mouseSnapRadius: 0.5
+  m_originSnapRadius: 2
 --- !u!1 &1952944580
 GameObject:
   m_ObjectHideFlags: 0

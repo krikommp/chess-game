@@ -68,7 +68,7 @@ namespace MiniChess.Combat.Skills
         {
             if (!inputRequest.IsTarget(SkillInputTag.k_TargetGround) || !inputRequest.HasWorldPosition)
             {
-                context.InputServices.Preview?.Clear();
+                PathPreview.Instance?.Clear();
                 return SkillCastResult.Success();
             }
 
@@ -91,8 +91,8 @@ namespace MiniChess.Combat.Skills
             var result = context.CasterExecutor.Execute(executeContext);
             if (result.IsSuccess)
             {
-                context.InputServices.Preview?.Clear();
-                context.InputServices.Preview?.ShowActivePath(path.corners);
+                PathPreview.Instance?.Clear();
+                PathPreview.Instance?.ShowActivePath(path.corners);
             }
 
             return result;
@@ -100,7 +100,7 @@ namespace MiniChess.Combat.Skills
 
         private static void ShowMovePreview(SkillExecutionContext context, Vector3 worldPosition)
         {
-            var preview = context.InputServices.Preview;
+            var preview = PathPreview.Instance;
             if (preview == null) return;
 
             var caster = context.CasterUnit;
@@ -110,7 +110,7 @@ namespace MiniChess.Combat.Skills
                 return;
             }
 
-            if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav, context.InputServices.NavMeshSnapRadius, NavMesh.AllAreas))
+            if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav, NavMeshManager.Instance.MouseSnapRadius, NavMesh.AllAreas))
             {
                 preview.Show(System.Array.Empty<Vector3>(), new[] { origin, worldPosition });
                 return;
@@ -150,7 +150,7 @@ namespace MiniChess.Combat.Skills
             if (caster == null || caster.RemainingMoveDistance <= 0f) return false;
             if (!TryGetOrigin(context, out Vector3 origin)) return false;
 
-            if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav, context.InputServices.NavMeshSnapRadius, NavMesh.AllAreas))
+            if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav, NavMeshManager.Instance.MouseSnapRadius, NavMesh.AllAreas))
                 return false;
 
             var fullPath = new NavMeshPath();
@@ -189,7 +189,7 @@ namespace MiniChess.Combat.Skills
         {
             var casterObject = context.Caster;
             if (casterObject != null && NavMesh.SamplePosition(casterObject.transform.position, out NavMeshHit hit,
-                    context.InputServices.OriginSnapRadius, NavMesh.AllAreas))
+                    NavMeshManager.Instance.OriginSnapRadius, NavMesh.AllAreas))
             {
                 origin = hit.position;
                 return true;

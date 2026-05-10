@@ -208,7 +208,7 @@ namespace MiniChess.Combat
                 }
                 else
                 {
-                    executor.ActivateSkill(moveSkill, m_inputController.CreateSkillInputServices());
+                    executor.ActivateSkill(moveSkill);
                 }
             }
 

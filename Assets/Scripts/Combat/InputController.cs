@@ -1,5 +1,4 @@
 using System;
-using MiniChess.Combat.Skills;
 using MiniChess.GameplayTags;
 using UnityEngine;
 
@@ -15,17 +14,10 @@ namespace MiniChess.Combat
 
         [Header("Refs")]
         [SerializeField] private Camera m_cam;
-        [SerializeField] private PathPreview m_preview;
 
         [Header("Raycast")]
         [Tooltip("Layers considered as 'ground' for mouse raycast (e.g. Ground + Obstacle).")]
         [SerializeField] private LayerMask m_groundMask = ~0;
-
-        [Tooltip("Max distance from mouse hit point to a NavMesh point. Smaller = stricter.")]
-        [SerializeField, Min(0.05f)] private float m_navMeshSnapRadius = 0.5f;
-
-        [Tooltip("Max distance from unit transform to the nearest NavMesh point. Handles capsule pivot height.")]
-        [SerializeField, Min(0.05f)] private float m_originSnapRadius = 2f;
 
         private void Awake()
         {
@@ -54,11 +46,6 @@ namespace MiniChess.Combat
             {
                 InputReceived?.Invoke(BuildRequest(SkillInputTag.k_PrimaryPressed, hit));
             }
-        }
-
-        public SkillInputServices CreateSkillInputServices()
-        {
-            return new SkillInputServices(m_preview, m_navMeshSnapRadius, m_originSnapRadius);
         }
 
         private SkillInputRequest BuildRequest(GameplayTag signalTag, RaycastHit hit)
