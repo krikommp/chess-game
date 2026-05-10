@@ -95,7 +95,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 建立技能系统的静态数据结构，让攻击、治疗、buff、debuff 都能由配置表达。
@@ -110,11 +110,11 @@
 - 第一阶段只确定最小技能配置资产，不急着实现完整编辑器窗口；后续编辑器窗口基于这些资产做统一管理。
 
 产出：
-- `Assets/Scripts/Combat/Skills/SkillDefinition.cs`
-- `Assets/Scripts/Combat/Skills/SkillTargetType.cs`
-- `Assets/Scripts/Combat/Skills/AISkillTag.cs`
-- `Assets/Data/Skills/`
-- `Assets/Data/Effects/`
+- [x] Assets/Scripts/Combat/Skills/SkillDefinition.cs`
+- [x] Assets/Scripts/Combat/Skills/SkillTargetType.cs`
+- [x] Assets/Scripts/Combat/Skills/AISkillTag.cs`
+- [x] Assets/Data/Skills/
+- [x] Assets/Data/Effects/
 
 验证：
 - Unity 编译无错误。
