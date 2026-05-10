@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -11,12 +11,12 @@ namespace MiniChess.Combat
     /// </summary>
     public class EnemyTurnRunner : MonoBehaviour
     {
-        [SerializeField, Min(0f)] private float turnStartDelay = 0.25f;
-        [SerializeField, Min(0f)] private float afterActionDelay = 0.25f;
-        [SerializeField, Min(0.05f)] private float navMeshSnapRadius = 2f;
-        [SerializeField, Min(0.1f)] private float movementTimeoutSeconds = 8f;
-        [SerializeField, Min(0.2f)] private float occupiedRadius = 1.0f;
-        [SerializeField, Range(4, 24)] private int occupancyProbeCount = 12;
+        [SerializeField, Min(0f)] private float m_turnStartDelay = 0.25f;
+        [SerializeField, Min(0f)] private float m_afterActionDelay = 0.25f;
+        [SerializeField, Min(0.05f)] private float m_navMeshSnapRadius = 2f;
+        [SerializeField, Min(0.1f)] private float m_movementTimeoutSeconds = 8f;
+        [SerializeField, Min(0.2f)] private float m_occupiedRadius = 1.0f;
+        [SerializeField, Range(4, 24)] private int m_occupancyProbeCount = 12;
 
         public IEnumerator RunTurn(
             EnemyController enemy,
@@ -31,7 +31,7 @@ namespace MiniChess.Combat
                 yield break;
             }
 
-            yield return new WaitForSeconds(turnStartDelay);
+            yield return new WaitForSeconds(m_turnStartDelay);
 
             Player1Controller target = FindNearestLivingPlayer(enemy, players);
             if (target == null)
@@ -47,7 +47,7 @@ namespace MiniChess.Combat
                 float waitStart = Time.time;
                 while (enemy.IsMoving)
                 {
-                    if (Time.time - waitStart > movementTimeoutSeconds)
+                    if (Time.time - waitStart > m_movementTimeoutSeconds)
                     {
                         enemy.StopMovement();
                         Debug.LogWarning($"[EnemyAI] {enemy.DisplayName} movement timed out.");
@@ -70,7 +70,7 @@ namespace MiniChess.Combat
                 Debug.Log($"[EnemyAI] {enemy.DisplayName} cannot attack {target.DisplayName}; AP {enemy.CurrentAP}/{enemy.MaxAP}.");
             }
 
-            yield return new WaitForSeconds(afterActionDelay);
+            yield return new WaitForSeconds(m_afterActionDelay);
         }
 
         private Player1Controller FindNearestLivingPlayer(EnemyController enemy, IReadOnlyList<Player1Controller> players)
@@ -113,9 +113,9 @@ namespace MiniChess.Combat
                 currentAp: enemy.CurrentAP,
                 remainingMoveDistance: enemy.RemainingMoveDistance,
                 moveSpeedMetersPerAp: enemy.MoveSpeedMetersPerAp,
-                navMeshSnapRadius: navMeshSnapRadius);
+                navMeshSnapRadius: m_navMeshSnapRadius);
 
-            if (!CombatMovementResolver.TryGetNavMeshPosition(enemy.transform.position, navMeshSnapRadius, out Vector3 origin))
+            if (!CombatMovementResolver.TryGetNavMeshPosition(enemy.transform.position, m_navMeshSnapRadius, out Vector3 origin))
                 return;
 
             Vector3 destination = default;
@@ -190,11 +190,11 @@ namespace MiniChess.Combat
             baseDirection.Normalize();
 
             float baseAngle = Mathf.Atan2(baseDirection.z, baseDirection.x) * Mathf.Rad2Deg;
-            for (int i = 0; i < occupancyProbeCount; i++)
+            for (int i = 0; i < m_occupancyProbeCount; i++)
             {
                 int step = (i + 1) / 2;
                 float sign = i % 2 == 0 ? 1f : -1f;
-                float angle = baseAngle + sign * step * (360f / occupancyProbeCount);
+                float angle = baseAngle + sign * step * (360f / m_occupancyProbeCount);
                 Vector3 direction = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), 0f, Mathf.Sin(angle * Mathf.Deg2Rad));
                 Vector3 candidate = targetPosition + direction * attackRange;
 
@@ -217,10 +217,10 @@ namespace MiniChess.Combat
             if (TryUseDestination(enemy, players, enemies, origin, preferred, reserveAp: 0, out destination))
                 return true;
 
-            for (int i = 0; i < occupancyProbeCount; i++)
+            for (int i = 0; i < m_occupancyProbeCount; i++)
             {
-                float angle = i * Mathf.PI * 2f / occupancyProbeCount;
-                Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * occupiedRadius;
+                float angle = i * Mathf.PI * 2f / m_occupancyProbeCount;
+                Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * m_occupiedRadius;
                 if (TryUseDestination(enemy, players, enemies, origin, preferred + offset, reserveAp: 0, out destination))
                     return true;
             }
@@ -238,8 +238,8 @@ namespace MiniChess.Combat
             int reserveAp,
             out Vector3 destination)
         {
-            if (!CombatMovementResolver.TryGetNavMeshPosition(candidate, navMeshSnapRadius, out Vector3 navDestination)
-                || !CombatMovementResolver.IsDestinationOpen(navDestination, occupiedRadius, players, enemies, enemy)
+            if (!CombatMovementResolver.TryGetNavMeshPosition(candidate, m_navMeshSnapRadius, out Vector3 navDestination)
+                || !CombatMovementResolver.IsDestinationOpen(navDestination, m_occupiedRadius, players, enemies, enemy)
                 || !CombatMovementResolver.TryBuildCompletePath(origin, navDestination, out NavMeshPath path))
             {
                 destination = default;
@@ -265,3 +265,5 @@ namespace MiniChess.Combat
         }
     }
 }
+
+

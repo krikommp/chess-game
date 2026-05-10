@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
@@ -6,11 +6,12 @@ namespace MiniChess.Combat.Skills
     public class AddStatusEffectDefinition : EffectDefinition
     {
         [Tooltip("Status to apply. Pending StatusDefinition type.")]
-        [SerializeField] private string _statusId;
+        [SerializeField] private string m_statusId;
 
-        [SerializeField] private int _durationTurns = 1;
+        [SerializeField] private int m_durationTurns = 1;
 
-        public string StatusId => _statusId ?? string.Empty;
-        public int DurationTurns => _durationTurns;
+        public string StatusId => m_statusId ?? string.Empty;
+        public int DurationTurns => m_durationTurns;
     }
 }
+

@@ -1,14 +1,14 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
     public abstract class EffectDefinition : ScriptableObject
     {
-        [SerializeField] private GameplayTags.GameplayTagRef[] _tags;
-        [SerializeField, TextArea(1, 3)] private string _description;
+        [SerializeField] private GameplayTags.GameplayTagRef[] m_tags;
+        [SerializeField, TextArea(1, 3)] private string m_description;
 
-        public GameplayTags.GameplayTagRef[] Tags => _tags ?? System.Array.Empty<GameplayTags.GameplayTagRef>();
-        public string Description => _description ?? string.Empty;
+        public GameplayTags.GameplayTagRef[] Tags => m_tags ?? System.Array.Empty<GameplayTags.GameplayTagRef>();
+        public string Description => m_description ?? string.Empty;
 
         public bool HasAnyTag()
         {
@@ -22,3 +22,4 @@ namespace MiniChess.Combat.Skills
         }
     }
 }
+

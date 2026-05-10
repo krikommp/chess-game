@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,42 +17,42 @@ namespace MiniChess.Combat
         public event Action RoundChanged;
 
         [Header("Refs")]
-        [SerializeField] private MoveInputController moveInput;
-        [SerializeField] private CameraController cameraController;
-        [SerializeField] private EnemyTurnRunner enemyTurnRunner;
-        [SerializeField] private List<Player1Controller> playerUnits = new List<Player1Controller>();
+        [SerializeField] private MoveInputController m_moveInput;
+        [SerializeField] private CameraController m_cameraController;
+        [SerializeField] private EnemyTurnRunner m_enemyTurnRunner;
+        [SerializeField] private List<Player1Controller> m_playerUnits = new List<Player1Controller>();
 
         [Header("Controls")]
-        [SerializeField] private KeyCode endTurnKey = KeyCode.Space;
+        [SerializeField] private KeyCode m_endTurnKey = KeyCode.Space;
 
         [Header("Combat")]
-        [SerializeField, Range(1, 4)] private int maxPartySize = 4;
-        [SerializeField] private float attackRange = 1.5f;
-        [SerializeField] private int basicAttackCost = 1;
-        [SerializeField] private int basicAttackDamage = 20;
+        [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
+        [SerializeField] private float m_attackRange = 1.5f;
+        [SerializeField] private int m_basicAttackCost = 1;
+        [SerializeField] private int m_basicAttackDamage = 20;
 
         [Header("Debug")]
         [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative. Intended only for AI testing — does not represent formal first-strike rules.")]
-        [SerializeField] private bool enemyFirstForDebug = false;
+        [SerializeField] private bool m_enemyFirstForDebug = false;
 
-        private readonly List<ICombatUnit> _turnOrder = new List<ICombatUnit>();
-        private readonly List<EnemyController> _enemyUnits = new List<EnemyController>();
-        private readonly List<Player1Controller> _controllableBlock = new List<Player1Controller>();
+        private readonly List<ICombatUnit> m_turnOrder = new List<ICombatUnit>();
+        private readonly List<EnemyController> m_enemyUnits = new List<EnemyController>();
+        private readonly List<Player1Controller> m_controllableBlock = new List<Player1Controller>();
 
-        public IReadOnlyList<ICombatUnit> TurnOrder => _turnOrder;
-        public IReadOnlyList<Player1Controller> ControllableBlock => _controllableBlock;
+        public IReadOnlyList<ICombatUnit> TurnOrder => m_turnOrder;
+        public IReadOnlyList<Player1Controller> ControllableBlock => m_controllableBlock;
         public ICombatUnit SelectedUnit { get; private set; }
         public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
-        public float AttackRange => attackRange;
+        public float AttackRange => m_attackRange;
         public int RoundCount { get; private set; }
         public bool IsWaiting { get; private set; }
 
         private void Awake()
         {
-            if (moveInput == null) moveInput = FindObjectOfType<MoveInputController>();
-            if (cameraController == null) cameraController = FindObjectOfType<CameraController>();
-            if (enemyTurnRunner == null) enemyTurnRunner = GetComponent<EnemyTurnRunner>();
-            if (enemyTurnRunner == null) enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
+            if (m_moveInput == null) m_moveInput = FindObjectOfType<MoveInputController>();
+            if (m_cameraController == null) m_cameraController = FindObjectOfType<CameraController>();
+            if (m_enemyTurnRunner == null) m_enemyTurnRunner = GetComponent<EnemyTurnRunner>();
+            if (m_enemyTurnRunner == null) m_enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
             CacheUnits();
         }
 
@@ -65,16 +65,16 @@ namespace MiniChess.Combat
         {
             if (IsWaiting) return;
 
-            if (Input.GetKeyDown(endTurnKey))
+            if (Input.GetKeyDown(m_endTurnKey))
             {
                 TryEndSelectedPlayerRound();
             }
 
-            for (int i = 0; i < _controllableBlock.Count && i < 4; i++)
+            for (int i = 0; i < m_controllableBlock.Count && i < 4; i++)
             {
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i)))
                 {
-                    TrySelectPlayer(_controllableBlock[i]);
+                    TrySelectPlayer(m_controllableBlock[i]);
                 }
             }
         }
@@ -89,22 +89,22 @@ namespace MiniChess.Combat
 
         public bool TrySelectPlayer(Player1Controller player)
         {
-            if (player == null || !_controllableBlock.Contains(player) || player.HasEndedRound)
+            if (player == null || !m_controllableBlock.Contains(player) || player.HasEndedRound)
             {
                 return false;
             }
 
             if (SelectedPlayer != null && SelectedPlayer != player)
             {
-                SelectedPlayer.SetVisualState(PlayerVisualState.Default);
+                SelectedPlayer.SetVisualState(EPlayerVisualState.Default);
             }
 
             SelectedUnit = player;
-            player.SetVisualState(PlayerVisualState.Selected);
+            player.SetVisualState(EPlayerVisualState.Selected);
 
-            if (moveInput != null)
+            if (m_moveInput != null)
             {
-                moveInput.SetPlayer(player);
+                m_moveInput.SetPlayer(player);
             }
 
             FocusCameraOnUnit(player);
@@ -129,7 +129,7 @@ namespace MiniChess.Combat
             // Find the nearest alive enemy
             EnemyController best = null;
             float bestDist = float.MaxValue;
-            foreach (var enemy in _enemyUnits)
+            foreach (var enemy in m_enemyUnits)
             {
                 if (enemy == null || !enemy.IsAlive) continue;
                 float dist = Vector3.Distance(attacker.transform.position, enemy.transform.position);
@@ -144,28 +144,28 @@ namespace MiniChess.Combat
 
         private void CacheUnits()
         {
-            playerUnits.RemoveAll(p => p == null);
-            if (playerUnits.Count == 0)
+            m_playerUnits.RemoveAll(p => p == null);
+            if (m_playerUnits.Count == 0)
             {
-                playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
+                m_playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
             }
 
             // Always re-scan enemies because EnemySpawners may have run their Awake
             // after our first CacheUnits call (Awake order is non-deterministic).
-            _enemyUnits.Clear();
-            _enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
+            m_enemyUnits.Clear();
+            m_enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
         }
 
         private void BuildTurnOrder()
         {
-            _turnOrder.Clear();
+            m_turnOrder.Clear();
 
             var allUnits = new List<ICombatUnit>();
-            allUnits.AddRange(playerUnits.Where(p => p != null && p.gameObject.activeInHierarchy).Take(maxPartySize));
-            allUnits.AddRange(_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy));
+            allUnits.AddRange(m_playerUnits.Where(p => p != null && p.gameObject.activeInHierarchy).Take(m_maxPartySize));
+            allUnits.AddRange(m_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy));
 
-            _turnOrder.AddRange(allUnits
-                .OrderBy(u => enemyFirstForDebug && u is EnemyController ? 0 : 1)
+            m_turnOrder.AddRange(allUnits
+                .OrderBy(u => m_enemyFirstForDebug && u is EnemyController ? 0 : 1)
                 .ThenByDescending(u => u.Initiative)
                 .ThenBy(u => u is Player1Controller p ? p.PartySlot : 99));
         }
@@ -178,7 +178,7 @@ namespace MiniChess.Combat
             CacheUnits();
             BuildTurnOrder();
 
-            foreach (var unit in _turnOrder)
+            foreach (var unit in m_turnOrder)
             {
                 if (unit.IsAlive)
                 {
@@ -199,10 +199,10 @@ namespace MiniChess.Combat
             enemy.FlashTurn();
             Debug.Log($"[Combat] Enemy turn starts: {enemy.DisplayName}");
 
-            yield return enemyTurnRunner.RunTurn(enemy, playerUnits, _enemyUnits, attackRange, basicAttackCost, basicAttackDamage);
+            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits, m_attackRange, m_basicAttackCost, m_basicAttackDamage);
 
             enemy.TryEndRound();
-            _turnOrder.RemoveAt(0);
+            m_turnOrder.RemoveAt(0);
             SelectedUnit = null;
             IsWaiting = false;
 
@@ -211,15 +211,15 @@ namespace MiniChess.Combat
 
         private void RefreshControllableBlock()
         {
-            _controllableBlock.Clear();
-            foreach (var unit in _turnOrder)
+            m_controllableBlock.Clear();
+            foreach (var unit in m_turnOrder)
             {
                 if (unit == null || !unit.IsAlive) continue;
                 if (unit.HasEndedRound) continue;
 
                 if (unit is Player1Controller player)
                 {
-                    _controllableBlock.Add(player);
+                    m_controllableBlock.Add(player);
                 }
                 else
                 {
@@ -231,42 +231,42 @@ namespace MiniChess.Combat
         private void AdvanceTurn()
         {
             // Skip finished/dead units at the front
-            while (_turnOrder.Count > 0)
+            while (m_turnOrder.Count > 0)
             {
-                var front = _turnOrder[0];
+                var front = m_turnOrder[0];
                 if (front == null || !front.IsAlive)
                 {
-                    _turnOrder.RemoveAt(0);
+                    m_turnOrder.RemoveAt(0);
                     continue;
                 }
                 if (front.HasEndedRound)
                 {
-                    _turnOrder.RemoveAt(0);
+                    m_turnOrder.RemoveAt(0);
                     continue;
                 }
                 break;
             }
 
-            if (_turnOrder.Count == 0)
+            if (m_turnOrder.Count == 0)
             {
                 StartNextRound();
                 return;
             }
 
-            var next = _turnOrder[0];
+            var next = m_turnOrder[0];
 
             if (next is Player1Controller player)
             {
                 // Player unit → refresh block and select
                 RefreshControllableBlock();
-                if (!TrySelectPlayer(_controllableBlock.FirstOrDefault(p => !p.HasEndedRound)))
+                if (!TrySelectPlayer(m_controllableBlock.FirstOrDefault(p => !p.HasEndedRound)))
                 {
                     // No selectable player in block → all ended, advance past them
-                    foreach (var p in _controllableBlock)
+                    foreach (var p in m_controllableBlock)
                     {
                         if (!p.HasEndedRound) p.TryEndRound();
                     }
-                    _turnOrder.RemoveAll(u => u is Player1Controller pc && _controllableBlock.Contains(pc));
+                    m_turnOrder.RemoveAll(u => u is Player1Controller pc && m_controllableBlock.Contains(pc));
                     AdvanceTurn();
                 }
             }
@@ -279,10 +279,14 @@ namespace MiniChess.Combat
 
         private void FocusCameraOnUnit(ICombatUnit unit)
         {
-            if (cameraController == null) return;
+            if (m_cameraController == null) return;
             if (!(unit is Component component)) return;
 
-            cameraController.FocusOn(component.transform);
+            m_cameraController.FocusOn(component.transform);
         }
     }
 }
+
+
+
+

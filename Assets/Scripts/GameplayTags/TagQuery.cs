@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -12,26 +12,26 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public struct TagQuery
     {
-        [SerializeField] private GameplayTagRef[] _requiredAll;
-        [SerializeField] private GameplayTagRef[] _requiredAny;
-        [SerializeField] private GameplayTagRef[] _blockedAny;
-        [SerializeField] private TagMatchMode _matchMode;
+        [SerializeField] private GameplayTagRef[] m_requiredAll;
+        [SerializeField] private GameplayTagRef[] m_requiredAny;
+        [SerializeField] private GameplayTagRef[] m_blockedAny;
+        [SerializeField] private ETagMatchMode m_matchMode;
 
-        public IReadOnlyList<GameplayTagRef> RequiredAll => _requiredAll ?? Array.Empty<GameplayTagRef>();
-        public IReadOnlyList<GameplayTagRef> RequiredAny => _requiredAny ?? Array.Empty<GameplayTagRef>();
-        public IReadOnlyList<GameplayTagRef> BlockedAny => _blockedAny ?? Array.Empty<GameplayTagRef>();
-        public TagMatchMode MatchMode => _matchMode;
+        public IReadOnlyList<GameplayTagRef> RequiredAll => m_requiredAll ?? Array.Empty<GameplayTagRef>();
+        public IReadOnlyList<GameplayTagRef> RequiredAny => m_requiredAny ?? Array.Empty<GameplayTagRef>();
+        public IReadOnlyList<GameplayTagRef> BlockedAny => m_blockedAny ?? Array.Empty<GameplayTagRef>();
+        public ETagMatchMode MatchMode => m_matchMode;
 
         public TagQuery(
             GameplayTagRef[] requiredAll = null,
             GameplayTagRef[] requiredAny = null,
             GameplayTagRef[] blockedAny = null,
-            TagMatchMode matchMode = TagMatchMode.Exact)
+            ETagMatchMode matchMode = ETagMatchMode.Exact)
         {
-            _requiredAll = requiredAll;
-            _requiredAny = requiredAny;
-            _blockedAny = blockedAny;
-            _matchMode = matchMode;
+            m_requiredAll = requiredAll;
+            m_requiredAny = requiredAny;
+            m_blockedAny = blockedAny;
+            m_matchMode = matchMode;
         }
 
         /// <summary>
@@ -79,3 +79,5 @@ namespace MiniChess.GameplayTags
             RequiredAll.Count == 0 && RequiredAny.Count == 0 && BlockedAny.Count == 0;
     }
 }
+
+

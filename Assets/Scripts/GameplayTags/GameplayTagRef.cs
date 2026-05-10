@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -12,13 +12,13 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public struct GameplayTagRef
     {
-        [SerializeField] private string _value;
+        [SerializeField] private string m_value;
 
-        public string Value => _value ?? string.Empty;
+        public string Value => m_value ?? string.Empty;
 
         public GameplayTagRef(string value)
         {
-            _value = value;
+            m_value = value;
         }
 
         public GameplayTag ToTag()
@@ -45,3 +45,4 @@ namespace MiniChess.GameplayTags
         public static implicit operator GameplayTag(GameplayTagRef r) => r.ToTag();
     }
 }
+

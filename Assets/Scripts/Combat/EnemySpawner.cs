@@ -1,4 +1,5 @@
 using UnityEngine;
+
 namespace MiniChess.Combat
 {
     /// <summary>
@@ -8,12 +9,12 @@ namespace MiniChess.Combat
     public class EnemySpawner : MonoBehaviour
     {
         [Header("Enemy Config")]
-        public string enemyName = "Enemy";
-        public int initiative = 5;
-        public int hp = 100;
+        [SerializeField] private string m_enemyName = "Enemy";
+        [SerializeField] private int m_initiative = 5;
+        [SerializeField] private int m_hp = 100;
 
         [Header("Visual")]
-        public Color enemyColor = new Color(0.7f, 0.2f, 0.2f);
+        [SerializeField] private Color m_enemyColor = new Color(0.7f, 0.2f, 0.2f);
 
         private void Awake()
         {
@@ -24,7 +25,7 @@ namespace MiniChess.Combat
         private void SpawnEnemy()
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = enemyName;
+            go.name = m_enemyName;
             go.transform.position = transform.position;
             go.transform.localScale = new Vector3(0.6f, 1.2f, 0.6f);
 
@@ -32,15 +33,16 @@ namespace MiniChess.Combat
             MeshRenderer renderer = go.GetComponent<MeshRenderer>();
             if (renderer != null)
             {
-                renderer.material.color = enemyColor;
+                renderer.material.color = m_enemyColor;
             }
 
             // Enemy controller
             EnemyController enemy = go.AddComponent<EnemyController>();
-            enemy.displayName = enemyName;
-            enemy.initiative = initiative;
-            enemy.maxHP = hp;
-            enemy.defaultColor = enemyColor;
+            enemy.DisplayName = m_enemyName;
+            enemy.Initiative = m_initiative;
+            enemy.MaxHP = m_hp;
+            enemy.CurrentHP = m_hp;
+            enemy.DefaultColor = m_enemyColor;
 
             // TODO(Docs/06_MAP_SPEC.md §2): Revisit dynamic unit blocking once
             // enemy AI movement and obstacle carving share a proper movement layer.

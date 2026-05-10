@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -8,60 +8,61 @@ namespace MiniChess.Combat
     public class EnemyController : MonoBehaviour, ICombatUnit
     {
         [Header("Identity")]
-        public string displayName = "Enemy";
+        [SerializeField] private string m_displayName = "Enemy";
 
         [Header("HP")]
-        public int maxHP = 100;
-        public int currentHP = 100;
+        [SerializeField] private int m_maxHP = 100;
+        [SerializeField] private int m_currentHP = 100;
 
         [Header("Initiative")]
-        public int initiative = 5;
+        [SerializeField] private int m_initiative = 5;
 
         [Header("AP")]
         [Tooltip("Action Points granted at the start of each round.")]
-        public int maxAP = 6;
+        [SerializeField] private int m_maxAP = 6;
 
         [Header("Move")]
         [Tooltip("Meters one AP can buy (path length, not straight line).")]
-        [Min(0.01f)] public float moveSpeedMetersPerAp = 2f;
+        [SerializeField, Min(0.01f)] private float m_moveSpeedMetersPerAp = 2f;
 
         [Tooltip("Animation/agent speed (meters/second). Independent from AP.")]
-        [Min(0.1f)] public float agentSpeed = 3.5f;
+        [SerializeField, Min(0.1f)] private float m_agentSpeed = 3.5f;
 
         [Header("Visuals")]
-        public Color defaultColor = new Color(0.7f, 0.2f, 0.2f);
-        public Color actingColor = new Color(1f, 0.5f, 0f);
+        [SerializeField] private Color m_defaultColor = new Color(0.7f, 0.2f, 0.2f);
+        [SerializeField] private Color m_actingColor = new Color(1f, 0.5f, 0f);
 
         // ICombatUnit implementation
-        public Faction Faction => Faction.Enemy;
-        public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? gameObject.name : displayName;
-        public int Initiative => initiative;
-        public int MaxAP => maxAP;
+        public EFaction Faction => EFaction.Enemy;
+        public string DisplayName { get => string.IsNullOrWhiteSpace(m_displayName) ? gameObject.name : m_displayName; set => m_displayName = value; }
+        public int Initiative { get => m_initiative; set => m_initiative = value; }
+        public int MaxAP { get => m_maxAP; set => m_maxAP = Mathf.Max(0, value); }
         public int CurrentAP { get; private set; }
-        public int MaxHP => maxHP;
-        public int CurrentHP { get => currentHP; set => currentHP = Mathf.Clamp(value, 0, maxHP); }
-        public bool IsAlive => currentHP > 0;
+        public int MaxHP { get => m_maxHP; set => m_maxHP = Mathf.Max(0, value); }
+        public int CurrentHP { get => m_currentHP; set => m_currentHP = Mathf.Clamp(value, 0, m_maxHP); }
+        public bool IsAlive => m_currentHP > 0;
         public bool IsMoving { get; private set; }
         public bool HasEndedRound { get; private set; }
-        public float MoveSpeedMetersPerAp => moveSpeedMetersPerAp;
-        public float RemainingMoveDistance => Mathf.Max(0f, CurrentAP * MoveSpeedMetersPerAp - _unpaidMoveDistance);
-        public bool HasPath => _agent != null && _agent.enabled && _agent.isOnNavMesh && _agent.hasPath;
-        public float RemainingPathDistance => _agent != null && _agent.enabled && _agent.isOnNavMesh ? _agent.remainingDistance : 0f;
+        public float MoveSpeedMetersPerAp { get => m_moveSpeedMetersPerAp; set => m_moveSpeedMetersPerAp = Mathf.Max(0.01f, value); }
+        public Color DefaultColor { get => m_defaultColor; set => m_defaultColor = value; }
+        public float RemainingMoveDistance => Mathf.Max(0f, CurrentAP * MoveSpeedMetersPerAp - m_unpaidMoveDistance);
+        public bool HasPath => m_agent != null && m_agent.enabled && m_agent.isOnNavMesh && m_agent.hasPath;
+        public float RemainingPathDistance => m_agent != null && m_agent.enabled && m_agent.isOnNavMesh ? m_agent.remainingDistance : 0f;
 
-        private NavMeshAgent _agent;
-        private MeshRenderer _meshRenderer;
-        private Material _materialInstance;
-        private Vector3 _lastMovementPosition;
-        private float _unpaidMoveDistance;
+        private NavMeshAgent m_agent;
+        private MeshRenderer m_meshRenderer;
+        private Material m_materialInstance;
+        private Vector3 m_lastMovementPosition;
+        private float m_unpaidMoveDistance;
 
         private void Awake()
         {
-            currentHP = maxHP;
-            CurrentAP = maxAP;
-            _agent = GetComponent<NavMeshAgent>();
-            _agent.speed = agentSpeed;
-            _agent.stoppingDistance = 0.05f;
-            _agent.autoBraking = true;
+            m_currentHP = m_maxHP;
+            CurrentAP = m_maxAP;
+            m_agent = GetComponent<NavMeshAgent>();
+            m_agent.speed = m_agentSpeed;
+            m_agent.stoppingDistance = 0.05f;
+            m_agent.autoBraking = true;
 
             NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
             if (obstacle != null)
@@ -70,7 +71,7 @@ namespace MiniChess.Combat
                 obstacle.enabled = false;
             }
 
-            _meshRenderer = GetComponentInChildren<MeshRenderer>();
+            m_meshRenderer = GetComponentInChildren<MeshRenderer>();
         }
 
         private void Update()
@@ -79,8 +80,8 @@ namespace MiniChess.Combat
 
             AccountMovementDistance();
 
-            if (!_agent.pathPending
-                && (!_agent.hasPath || _agent.remainingDistance <= _agent.stoppingDistance + 0.1f))
+            if (!m_agent.pathPending
+                && (!m_agent.hasPath || m_agent.remainingDistance <= m_agent.stoppingDistance + 0.1f))
             {
                 StopMovement();
             }
@@ -88,18 +89,18 @@ namespace MiniChess.Combat
 
         private void Start()
         {
-            if (_meshRenderer != null)
+            if (m_meshRenderer != null)
             {
-                _materialInstance = _meshRenderer.material;
-                ApplyColor(defaultColor);
+                m_materialInstance = m_meshRenderer.material;
+                ApplyColor(m_defaultColor);
             }
         }
 
         public void BeginRound()
         {
-            CurrentAP = maxAP;
+            CurrentAP = m_maxAP;
             HasEndedRound = false;
-            _unpaidMoveDistance = 0f;
+            m_unpaidMoveDistance = 0f;
         }
 
         public bool TryEndRound()
@@ -108,20 +109,20 @@ namespace MiniChess.Combat
 
             HasEndedRound = true;
             CurrentAP = 0;
-            _unpaidMoveDistance = 0f;
+            m_unpaidMoveDistance = 0f;
             return true;
         }
 
         public bool TryMove(NavMeshPath path)
         {
             if (HasEndedRound) return false;
-            if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh) return false;
+            if (m_agent == null || !m_agent.enabled || !m_agent.isOnNavMesh) return false;
             if (path == null || path.status != NavMeshPathStatus.PathComplete) return false;
             if (!CanMoveAlong(path)) return false;
 
-            _agent.SetPath(path);
+            m_agent.SetPath(path);
             IsMoving = true;
-            _lastMovementPosition = transform.position;
+            m_lastMovementPosition = transform.position;
             return true;
         }
 
@@ -134,9 +135,9 @@ namespace MiniChess.Combat
 
         public void StopMovement()
         {
-            if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
+            if (m_agent != null && m_agent.enabled && m_agent.isOnNavMesh)
             {
-                _agent.ResetPath();
+                m_agent.ResetPath();
             }
 
             IsMoving = false;
@@ -146,7 +147,7 @@ namespace MiniChess.Combat
         {
             if (pathLength <= 0f || MoveSpeedMetersPerAp <= 0f) return 0;
 
-            float projectedDistance = _unpaidMoveDistance + pathLength;
+            float projectedDistance = m_unpaidMoveDistance + pathLength;
             int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / MoveSpeedMetersPerAp);
             return Mathf.Clamp(cost, 0, CurrentAP);
         }
@@ -154,7 +155,7 @@ namespace MiniChess.Combat
         public void TakeDamage(int damage)
         {
             if (!IsAlive) return;
-            currentHP = Mathf.Max(0, currentHP - damage);
+            m_currentHP = Mathf.Max(0, m_currentHP - damage);
 
             if (!IsAlive)
             {
@@ -162,7 +163,7 @@ namespace MiniChess.Combat
             }
         }
 
-        public void SetVisualState(PlayerVisualState state) { }
+        public void SetVisualState(EPlayerVisualState state) { }
 
         public void FlashTurn()
         {
@@ -171,14 +172,14 @@ namespace MiniChess.Combat
 
         private IEnumerator FlashCoroutine()
         {
-            ApplyColor(actingColor);
+            ApplyColor(m_actingColor);
             yield return new WaitForSeconds(0.5f);
-            ApplyColor(defaultColor);
+            ApplyColor(m_defaultColor);
         }
 
         private void ApplyColor(Color color)
         {
-            if (_materialInstance != null) _materialInstance.color = color;
+            if (m_materialInstance != null) m_materialInstance.color = color;
         }
 
         private bool CanMoveAlong(NavMeshPath path)
@@ -193,18 +194,22 @@ namespace MiniChess.Combat
         private void AccountMovementDistance()
         {
             Vector3 currentPosition = transform.position;
-            float delta = Vector3.Distance(_lastMovementPosition, currentPosition);
-            _lastMovementPosition = currentPosition;
+            float delta = Vector3.Distance(m_lastMovementPosition, currentPosition);
+            m_lastMovementPosition = currentPosition;
 
             if (delta <= 0.0001f || MoveSpeedMetersPerAp <= 0f) return;
 
-            _unpaidMoveDistance += delta;
+            m_unpaidMoveDistance += delta;
 
-            while (_unpaidMoveDistance + 0.0001f >= MoveSpeedMetersPerAp && CurrentAP > 0)
+            while (m_unpaidMoveDistance + 0.0001f >= MoveSpeedMetersPerAp && CurrentAP > 0)
             {
-                _unpaidMoveDistance -= MoveSpeedMetersPerAp;
+                m_unpaidMoveDistance -= MoveSpeedMetersPerAp;
                 CurrentAP--;
             }
         }
     }
 }
+
+
+
+

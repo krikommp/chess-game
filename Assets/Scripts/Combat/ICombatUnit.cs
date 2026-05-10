@@ -1,10 +1,10 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MiniChess.Combat
 {
     public interface ICombatUnit
     {
-        Faction Faction { get; }
+        EFaction Faction { get; }
         string DisplayName { get; }
         int Initiative { get; }
         int MaxAP { get; }
@@ -19,6 +19,8 @@ namespace MiniChess.Combat
         void BeginRound();
         bool TryEndRound();
         void TakeDamage(int damage);
-        void SetVisualState(PlayerVisualState state);
+        void SetVisualState(EPlayerVisualState state);
     }
 }
+
+

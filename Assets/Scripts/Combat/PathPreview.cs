@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MiniChess.Combat
 {
@@ -11,34 +11,34 @@ namespace MiniChess.Combat
     public class PathPreview : MonoBehaviour
     {
         [Header("Lines (assign in inspector)")]
-        public LineRenderer reachableLine;
-        public LineRenderer unreachableLine;
-        public LineRenderer activeMoveLine;
+        [SerializeField] private LineRenderer m_reachableLine;
+        [SerializeField] private LineRenderer m_unreachableLine;
+        [SerializeField] private LineRenderer m_activeMoveLine;
 
         [Header("Style")]
-        [SerializeField] private Color reachableColor = new Color(0.3f, 1f, 0.4f, 1f);
-        [SerializeField] private Color unreachableColor = new Color(1f, 0.25f, 0.2f, 1f);
-        [SerializeField] private Color activeMoveColor = new Color(0.25f, 0.75f, 1f, 0.95f);
-        [SerializeField, Min(0.01f)] private float width = 0.12f;
+        [SerializeField] private Color m_reachableColor = new Color(0.3f, 1f, 0.4f, 1f);
+        [SerializeField] private Color m_unreachableColor = new Color(1f, 0.25f, 0.2f, 1f);
+        [SerializeField] private Color m_activeMoveColor = new Color(0.25f, 0.75f, 1f, 0.95f);
+        [SerializeField, Min(0.01f)] private float m_width = 0.12f;
         [Tooltip("Lift line off the ground to avoid z-fighting.")]
-        [SerializeField] private float yLift = 0.05f;
+        [SerializeField] private float m_yLift = 0.05f;
 
         [Header("Distance Label")]
-        [SerializeField] private bool showDistanceLabel = true;
-        [SerializeField] private Vector2 labelPixelOffset = new Vector2(10f, -28f);
+        [SerializeField] private bool m_showDistanceLabel = true;
+        [SerializeField] private Vector2 m_labelPixelOffset = new Vector2(10f, -28f);
 
-        private GUIStyle _distanceLabelStyle;
-        private bool _hasDistanceLabel;
-        private Vector3 _distanceLabelWorldPosition;
-        private float _reachableDistance;
-        private float _totalDistance;
+        private GUIStyle m_distanceLabelStyle;
+        private bool m_hasDistanceLabel;
+        private Vector3 m_distanceLabelWorldPosition;
+        private float m_reachableDistance;
+        private float m_totalDistance;
 
         private void Awake()
         {
             EnsureActiveMoveLine();
-            ConfigureLine(reachableLine, reachableColor);
-            ConfigureLine(unreachableLine, unreachableColor);
-            ConfigureLine(activeMoveLine, activeMoveColor);
+            ConfigureLine(m_reachableLine, m_reachableColor);
+            ConfigureLine(m_unreachableLine, m_unreachableColor);
+            ConfigureLine(m_activeMoveLine, m_activeMoveColor);
             Clear();
             ClearActivePath();
         }
@@ -47,8 +47,8 @@ namespace MiniChess.Combat
         {
             if (lr == null) return;
             lr.useWorldSpace = true;
-            lr.startWidth = width;
-            lr.endWidth = width;
+            lr.startWidth = m_width;
+            lr.endWidth = m_width;
             lr.numCapVertices = 2;
             lr.numCornerVertices = 2;
             lr.textureMode = LineTextureMode.Tile;
@@ -64,26 +64,26 @@ namespace MiniChess.Combat
 
         public void Show(Vector3[] reachable, Vector3[] unreachable)
         {
-            SetPoints(reachableLine, reachable);
-            SetPoints(unreachableLine, unreachable);
+            SetPoints(m_reachableLine, reachable);
+            SetPoints(m_unreachableLine, unreachable);
             UpdateDistanceLabel(reachable, unreachable);
         }
 
         public void Clear()
         {
-            if (reachableLine != null) reachableLine.positionCount = 0;
-            if (unreachableLine != null) unreachableLine.positionCount = 0;
-            _hasDistanceLabel = false;
+            if (m_reachableLine != null) m_reachableLine.positionCount = 0;
+            if (m_unreachableLine != null) m_unreachableLine.positionCount = 0;
+            m_hasDistanceLabel = false;
         }
 
         public void ShowActivePath(Vector3[] path)
         {
-            SetPoints(activeMoveLine, path);
+            SetPoints(m_activeMoveLine, path);
         }
 
         public void ClearActivePath()
         {
-            if (activeMoveLine != null) activeMoveLine.positionCount = 0;
+            if (m_activeMoveLine != null) m_activeMoveLine.positionCount = 0;
         }
 
         private void SetPoints(LineRenderer lr, Vector3[] pts)
@@ -95,81 +95,81 @@ namespace MiniChess.Combat
             for (int i = 0; i < pts.Length; i++)
             {
                 var p = pts[i];
-                p.y += yLift;
+                p.y += m_yLift;
                 lr.SetPosition(i, p);
             }
         }
 
         private void OnGUI()
         {
-            if (!showDistanceLabel || !_hasDistanceLabel) return;
+            if (!m_showDistanceLabel || !m_hasDistanceLabel) return;
 
             Camera cam = Camera.main;
             if (cam == null) return;
 
-            Vector3 screenPoint = cam.WorldToScreenPoint(_distanceLabelWorldPosition);
+            Vector3 screenPoint = cam.WorldToScreenPoint(m_distanceLabelWorldPosition);
             if (screenPoint.z <= 0f) return;
 
             EnsureDistanceLabelStyle();
 
             string text = BuildDistanceText();
-            Vector2 size = _distanceLabelStyle.CalcSize(new GUIContent(text));
+            Vector2 size = m_distanceLabelStyle.CalcSize(new GUIContent(text));
             Rect rect = new Rect(
-                screenPoint.x + labelPixelOffset.x,
-                Screen.height - screenPoint.y + labelPixelOffset.y,
+                screenPoint.x + m_labelPixelOffset.x,
+                Screen.height - screenPoint.y + m_labelPixelOffset.y,
                 size.x + 14f,
                 size.y + 8f);
 
             GUI.Box(rect, GUIContent.none);
-            GUI.Label(new Rect(rect.x + 7f, rect.y + 4f, size.x, size.y), text, _distanceLabelStyle);
+            GUI.Label(new Rect(rect.x + 7f, rect.y + 4f, size.x, size.y), text, m_distanceLabelStyle);
         }
 
         private void UpdateDistanceLabel(Vector3[] reachable, Vector3[] unreachable)
         {
-            _reachableDistance = PathCostCalculator.PathLength(reachable);
+            m_reachableDistance = PathCostCalculator.PathLength(reachable);
             float unreachableDistance = PathCostCalculator.PathLength(unreachable);
-            _totalDistance = _reachableDistance + unreachableDistance;
+            m_totalDistance = m_reachableDistance + unreachableDistance;
 
-            if (_totalDistance <= 0.001f)
+            if (m_totalDistance <= 0.001f)
             {
-                _hasDistanceLabel = false;
+                m_hasDistanceLabel = false;
                 return;
             }
 
             if (reachable != null && reachable.Length > 0)
             {
-                _distanceLabelWorldPosition = reachable[reachable.Length - 1];
+                m_distanceLabelWorldPosition = reachable[reachable.Length - 1];
             }
             else if (unreachable != null && unreachable.Length > 0)
             {
-                _distanceLabelWorldPosition = unreachable[unreachable.Length - 1];
+                m_distanceLabelWorldPosition = unreachable[unreachable.Length - 1];
             }
             else
             {
-                _hasDistanceLabel = false;
+                m_hasDistanceLabel = false;
                 return;
             }
 
-            _distanceLabelWorldPosition.y += yLift + 0.35f;
-            _hasDistanceLabel = true;
+            m_distanceLabelWorldPosition.y += m_yLift + 0.35f;
+            m_hasDistanceLabel = true;
         }
 
         private string BuildDistanceText()
         {
-            bool hasUnreachablePart = _totalDistance - _reachableDistance > 0.05f;
-            if (hasUnreachablePart && _reachableDistance > 0.05f)
+            bool hasUnreachablePart = m_totalDistance - m_reachableDistance > 0.05f;
+            if (hasUnreachablePart && m_reachableDistance > 0.05f)
             {
-                return $"{_reachableDistance:0.0}m / {_totalDistance:0.0}m";
+                return $"{m_reachableDistance:0.0}m / {m_totalDistance:0.0}m";
             }
 
-            return $"{_totalDistance:0.0}m";
+            return $"{m_totalDistance:0.0}m";
         }
 
         private void EnsureDistanceLabelStyle()
         {
-            if (_distanceLabelStyle != null) return;
+            if (m_distanceLabelStyle != null) return;
 
-            _distanceLabelStyle = new GUIStyle(GUI.skin.label)
+            m_distanceLabelStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize = 14,
                 alignment = TextAnchor.MiddleCenter,
@@ -179,11 +179,13 @@ namespace MiniChess.Combat
 
         private void EnsureActiveMoveLine()
         {
-            if (activeMoveLine != null) return;
+            if (m_activeMoveLine != null) return;
 
-            GameObject lineObject = new GameObject("ActiveMoveLine");
+            GameObject lineObject = new GameObject("m_activeMoveLine");
             lineObject.transform.SetParent(transform, false);
-            activeMoveLine = lineObject.AddComponent<LineRenderer>();
+            m_activeMoveLine = lineObject.AddComponent<LineRenderer>();
         }
     }
 }
+
+

@@ -1,43 +1,43 @@
-using MiniChess.Combat;
+﻿using MiniChess.Combat;
 using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
-    public Transform target;
+    [SerializeField] private Transform m_target;
 
     [Header("Follow")]
-    [SerializeField] private Vector3 offset = new Vector3(0f, 10f, -8f);
-    [SerializeField, Min(0.01f)] private float followSmoothTime = 0.18f;
+    [SerializeField] private Vector3 m_offset = new Vector3(0f, 10f, -8f);
+    [SerializeField, Min(0.01f)] private float m_followSmoothTime = 0.18f;
     [Tooltip("Fixed camera rotation. Position may smooth, rotation must not.")]
-    [SerializeField] private Vector3 fixedEulerAngles = new Vector3(51f, 0f, 0f);
-    [SerializeField, Min(0.01f)] private float focusReturnSmoothTime = 0.18f;
+    [SerializeField] private Vector3 m_fixedEulerAngles = new Vector3(51f, 0f, 0f);
+    [SerializeField, Min(0.01f)] private float m_focusReturnSmoothTime = 0.18f;
 
     [Header("Pan")]
-    [SerializeField, Min(0.1f)] private float keyboardPanSpeed = 12f;
-    [SerializeField, Min(0.001f)] private float dragPanSensitivity = 0.03f;
+    [SerializeField, Min(0.1f)] private float m_keyboardPanSpeed = 12f;
+    [SerializeField, Min(0.001f)] private float m_dragPanSensitivity = 0.03f;
 
     [Header("Zoom")]
-    [SerializeField, Min(1f)] private float minDistance = 7f;
-    [SerializeField, Min(1f)] private float maxDistance = 18f;
-    [SerializeField, Min(0.1f)] private float zoomSpeed = 6f;
-    [SerializeField, Min(0.01f)] private float zoomSmoothTime = 0.12f;
+    [SerializeField, Min(1f)] private float m_minDistance = 7f;
+    [SerializeField, Min(1f)] private float m_maxDistance = 18f;
+    [SerializeField, Min(0.1f)] private float m_zoomSpeed = 6f;
+    [SerializeField, Min(0.01f)] private float m_zoomSmoothTime = 0.12f;
 
-    private float _targetDistance = 12f;
-    private float _currentDistance = 12f;
-    private float _zoomVelocity;
-    private Vector3 _followVelocity;
-    private Vector3 _offsetDirection;
-    private Vector3 _manualPanOffset;
-    private Vector3 _manualPanVelocity;
-    private Vector3 _lastMousePosition;
-    private Player1Controller _trackedPlayer;
-    private bool _autoFocusActive = true;
+    private float m_targetDistance = 12f;
+    private float m_currentDistance = 12f;
+    private float m_zoomVelocity;
+    private Vector3 m_followVelocity;
+    private Vector3 m_offsetDirection;
+    private Vector3 m_manualPanOffset;
+    private Vector3 m_manualPanVelocity;
+    private Vector3 m_lastMousePosition;
+    private Player1Controller m_trackedPlayer;
+    private bool m_autoFocusActive = true;
 
     private void Awake()
     {
         CacheOffset();
-        _targetDistance = Mathf.Clamp(offset.magnitude, minDistance, maxDistance);
-        _currentDistance = _targetDistance;
+        m_targetDistance = Mathf.Clamp(m_offset.magnitude, m_minDistance, m_maxDistance);
+        m_currentDistance = m_targetDistance;
         ApplyFixedRotation();
         BindDefaultTargetIfNeeded();
     }
@@ -50,40 +50,40 @@ public class CameraController : MonoBehaviour
     private void LateUpdate()
     {
         BindDefaultTargetIfNeeded();
-        if (target == null) return;
+        if (m_target == null) return;
 
         if (HandlePanInput())
         {
-            _autoFocusActive = false;
+            m_autoFocusActive = false;
         }
 
         float scroll = Input.mouseScrollDelta.y;
         if (Mathf.Abs(scroll) > 0.01f)
         {
-            _targetDistance = Mathf.Clamp(_targetDistance - scroll * zoomSpeed, minDistance, maxDistance);
+            m_targetDistance = Mathf.Clamp(m_targetDistance - scroll * m_zoomSpeed, m_minDistance, m_maxDistance);
         }
 
-        _currentDistance = Mathf.SmoothDamp(
-            _currentDistance,
-            _targetDistance,
-            ref _zoomVelocity,
-            zoomSmoothTime);
+        m_currentDistance = Mathf.SmoothDamp(
+            m_currentDistance,
+            m_targetDistance,
+            ref m_zoomVelocity,
+            m_zoomSmoothTime);
 
-        if (_autoFocusActive)
+        if (m_autoFocusActive)
         {
-            _manualPanOffset = Vector3.SmoothDamp(
-                _manualPanOffset,
+            m_manualPanOffset = Vector3.SmoothDamp(
+                m_manualPanOffset,
                 Vector3.zero,
-                ref _manualPanVelocity,
-                focusReturnSmoothTime);
+                ref m_manualPanVelocity,
+                m_focusReturnSmoothTime);
         }
 
-        Vector3 desiredPosition = target.position + _manualPanOffset + _offsetDirection * _currentDistance;
+        Vector3 desiredPosition = m_target.position + m_manualPanOffset + m_offsetDirection * m_currentDistance;
         transform.position = Vector3.SmoothDamp(
             transform.position,
             desiredPosition,
-            ref _followVelocity,
-            followSmoothTime);
+            ref m_followVelocity,
+            m_followSmoothTime);
 
         ApplyFixedRotation();
     }
@@ -100,9 +100,9 @@ public class CameraController : MonoBehaviour
 
     private void OnValidate()
     {
-        if (maxDistance < minDistance)
+        if (m_maxDistance < m_minDistance)
         {
-            maxDistance = minDistance;
+            m_maxDistance = m_minDistance;
         }
 
         CacheOffset();
@@ -112,38 +112,38 @@ public class CameraController : MonoBehaviour
     {
         if (focusTarget == null) return;
 
-        target = focusTarget;
+        m_target = focusTarget;
         ActivateAutoFocus();
         BindDefaultTargetIfNeeded();
     }
 
     private void BindDefaultTargetIfNeeded()
     {
-        if (target == null)
+        if (m_target == null)
         {
             var player = FindObjectOfType<Player1Controller>();
             if (player != null)
             {
-                target = player.transform;
+                m_target = player.transform;
             }
         }
 
-        var currentPlayer = target != null ? target.GetComponent<Player1Controller>() : null;
-        if (_trackedPlayer == currentPlayer) return;
+        var currentPlayer = m_target != null ? m_target.GetComponent<Player1Controller>() : null;
+        if (m_trackedPlayer == currentPlayer) return;
 
         UnbindTrackedPlayer();
-        _trackedPlayer = currentPlayer;
-        if (_trackedPlayer != null)
+        m_trackedPlayer = currentPlayer;
+        if (m_trackedPlayer != null)
         {
-            _trackedPlayer.MovementStarted += HandleTrackedPlayerMovementStarted;
+            m_trackedPlayer.MovementStarted += HandleTrackedPlayerMovementStarted;
         }
     }
 
     private void UnbindTrackedPlayer()
     {
-        if (_trackedPlayer == null) return;
-        _trackedPlayer.MovementStarted -= HandleTrackedPlayerMovementStarted;
-        _trackedPlayer = null;
+        if (m_trackedPlayer == null) return;
+        m_trackedPlayer.MovementStarted -= HandleTrackedPlayerMovementStarted;
+        m_trackedPlayer = null;
     }
 
     private bool HandlePanInput()
@@ -164,18 +164,18 @@ public class CameraController : MonoBehaviour
 
         if (Mathf.Abs(horizontal) > 0.01f || Mathf.Abs(vertical) > 0.01f)
         {
-            panDelta += (right * horizontal + forward * vertical) * (keyboardPanSpeed * Time.deltaTime);
+            panDelta += (right * horizontal + forward * vertical) * (m_keyboardPanSpeed * Time.deltaTime);
         }
 
         if (Input.GetMouseButtonDown(2))
         {
-            _lastMousePosition = Input.mousePosition;
+            m_lastMousePosition = Input.mousePosition;
         }
         else if (Input.GetMouseButton(2))
         {
-            Vector3 mouseDelta = Input.mousePosition - _lastMousePosition;
-            _lastMousePosition = Input.mousePosition;
-            panDelta += (-right * mouseDelta.x - forward * mouseDelta.y) * dragPanSensitivity;
+            Vector3 mouseDelta = Input.mousePosition - m_lastMousePosition;
+            m_lastMousePosition = Input.mousePosition;
+            panDelta += (-right * mouseDelta.x - forward * mouseDelta.y) * m_dragPanSensitivity;
         }
 
         if (panDelta.sqrMagnitude <= 0.000001f)
@@ -183,7 +183,7 @@ public class CameraController : MonoBehaviour
             return false;
         }
 
-        _manualPanOffset += panDelta;
+        m_manualPanOffset += panDelta;
         return true;
     }
 
@@ -194,19 +194,22 @@ public class CameraController : MonoBehaviour
 
     private void ActivateAutoFocus()
     {
-        _autoFocusActive = true;
-        _manualPanVelocity = Vector3.zero;
+        m_autoFocusActive = true;
+        m_manualPanVelocity = Vector3.zero;
     }
 
     private void CacheOffset()
     {
-        _offsetDirection = offset.sqrMagnitude > 0.0001f
-            ? offset.normalized
+        m_offsetDirection = m_offset.sqrMagnitude > 0.0001f
+            ? m_offset.normalized
             : new Vector3(0f, 10f, -8f).normalized;
     }
 
     private void ApplyFixedRotation()
     {
-        transform.rotation = Quaternion.Euler(fixedEulerAngles);
+        transform.rotation = Quaternion.Euler(m_fixedEulerAngles);
     }
 }
+
+
+

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -12,13 +12,13 @@ namespace MiniChess.GameplayTags
     [CreateAssetMenu(fileName = "GameplayTagRegistry", menuName = "MiniChess/GameplayTag Registry", order = 0)]
     public class TagRegistry : ScriptableObject
     {
-        [SerializeField] private List<TagEntry> _entries = new List<TagEntry>();
+        [SerializeField] private List<TagEntry> m_entries = new List<TagEntry>();
 
-        public IReadOnlyList<TagEntry> Entries => _entries;
+        public IReadOnlyList<TagEntry> Entries => m_entries;
 
         public bool TryGetEntry(GameplayTag tag, out TagEntry entry)
         {
-            foreach (var e in _entries)
+            foreach (var e in m_entries)
             {
                 if (e.Tag == tag)
                 {
@@ -32,7 +32,7 @@ namespace MiniChess.GameplayTags
 
         public bool IsRegistered(GameplayTag tag)
         {
-            foreach (var e in _entries)
+            foreach (var e in m_entries)
                 if (e.Tag == tag) return true;
             return false;
         }
@@ -41,20 +41,21 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public struct TagEntry
     {
-        [SerializeField] private GameplayTagRef _tag;
-        [SerializeField] private string _displayName;
+        [SerializeField] private GameplayTagRef m_tag;
+        [SerializeField] private string m_displayName;
         [SerializeField, TextArea(1, 3)]
-        private string _description;
+        private string m_description;
 
-        public GameplayTag Tag => _tag;
-        public string DisplayName => _displayName;
-        public string Description => _description;
+        public GameplayTag Tag => m_tag;
+        public string DisplayName => m_displayName;
+        public string Description => m_description;
 
         public TagEntry(GameplayTag tag, string displayName, string description)
         {
-            _tag = tag.Value;
-            _displayName = displayName;
-            _description = description;
+            m_tag = tag.Value;
+            m_displayName = displayName;
+            m_description = description;
         }
     }
 }
+

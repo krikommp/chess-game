@@ -1,6 +1,6 @@
-namespace MiniChess.GameplayTags
+﻿namespace MiniChess.GameplayTags
 {
-    public enum TagSourceType
+    public enum ETagSourceType
     {
         Status,
         Skill,
@@ -11,3 +11,4 @@ namespace MiniChess.GameplayTags
         Debug
     }
 }
+

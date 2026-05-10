@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using NUnit.Framework;
 using MiniChess.GameplayTags;
 
@@ -132,64 +132,64 @@ public class GameplayTagTests
     public void Matches_Exact_SameTag_True()
     {
         var tag = new GameplayTag("Status.Burning");
-        Assert.IsTrue(tag.Matches(new GameplayTag("Status.Burning"), TagMatchMode.Exact));
+        Assert.IsTrue(tag.Matches(new GameplayTag("Status.Burning"), ETagMatchMode.Exact));
     }
 
     [Test]
     public void Matches_Exact_DifferentTag_False()
     {
         var tag = new GameplayTag("Status.Burning");
-        Assert.IsFalse(tag.Matches(new GameplayTag("Status.Bleeding"), TagMatchMode.Exact));
+        Assert.IsFalse(tag.Matches(new GameplayTag("Status.Bleeding"), ETagMatchMode.Exact));
     }
 
     [Test]
     public void Matches_Exact_DifferentCase_True()
     {
         var tag = new GameplayTag("Status.Burning");
-        Assert.IsTrue(tag.Matches(new GameplayTag("status.burning"), TagMatchMode.Exact));
+        Assert.IsTrue(tag.Matches(new GameplayTag("status.burning"), ETagMatchMode.Exact));
     }
 
     [Test]
     public void Matches_Prefix_Self_True()
     {
         var tag = new GameplayTag("Combat.Status.Burning");
-        Assert.IsTrue(tag.Matches(new GameplayTag("Combat.Status.Burning"), TagMatchMode.Prefix));
+        Assert.IsTrue(tag.Matches(new GameplayTag("Combat.Status.Burning"), ETagMatchMode.Prefix));
     }
 
     [Test]
     public void Matches_Prefix_ActualPrefix_True()
     {
         var tag = new GameplayTag("Combat.Status.Burning");
-        Assert.IsTrue(tag.Matches(new GameplayTag("Combat.Status"), TagMatchMode.Prefix));
-        Assert.IsTrue(tag.Matches(new GameplayTag("Combat"), TagMatchMode.Prefix));
+        Assert.IsTrue(tag.Matches(new GameplayTag("Combat.Status"), ETagMatchMode.Prefix));
+        Assert.IsTrue(tag.Matches(new GameplayTag("Combat"), ETagMatchMode.Prefix));
     }
 
     [Test]
     public void Matches_Prefix_QueryLongerThanTarget_False()
     {
         var tag = new GameplayTag("Combat.Status");
-        Assert.IsFalse(tag.Matches(new GameplayTag("Combat.Status.Burning"), TagMatchMode.Prefix));
+        Assert.IsFalse(tag.Matches(new GameplayTag("Combat.Status.Burning"), ETagMatchMode.Prefix));
     }
 
     [Test]
     public void Matches_Prefix_WrongRoot_False()
     {
         var tag = new GameplayTag("Combat.Status.Burning");
-        Assert.IsFalse(tag.Matches(new GameplayTag("Effect.Status"), TagMatchMode.Prefix));
+        Assert.IsFalse(tag.Matches(new GameplayTag("Effect.Status"), ETagMatchMode.Prefix));
     }
 
     [Test]
     public void Matches_Prefix_MidSegment_False()
     {
         var tag = new GameplayTag("Combat.Status");
-        Assert.IsFalse(tag.Matches(new GameplayTag("Combat.Stat"), TagMatchMode.Prefix));
+        Assert.IsFalse(tag.Matches(new GameplayTag("Combat.Stat"), ETagMatchMode.Prefix));
     }
 
     [Test]
     public void Matches_Prefix_CaseInsensitive()
     {
         var tag = new GameplayTag("Combat.Status.Burning");
-        Assert.IsTrue(tag.Matches(new GameplayTag("combat.status"), TagMatchMode.Prefix));
+        Assert.IsTrue(tag.Matches(new GameplayTag("combat.status"), ETagMatchMode.Prefix));
     }
 
     // ── Implicit string conversion ─────────────────────────────
@@ -284,9 +284,9 @@ public class GameplayTagTests
     {
         var set = new GameplayTagSet();
         set.Add(new GameplayTag("Combat.Status.Burning"));
-        Assert.IsTrue(set.Has(new GameplayTag("Combat"), TagMatchMode.Prefix));
-        Assert.IsTrue(set.Has(new GameplayTag("Combat.Status"), TagMatchMode.Prefix));
-        Assert.IsFalse(set.Has(new GameplayTag("Effect"), TagMatchMode.Prefix));
+        Assert.IsTrue(set.Has(new GameplayTag("Combat"), ETagMatchMode.Prefix));
+        Assert.IsTrue(set.Has(new GameplayTag("Combat.Status"), ETagMatchMode.Prefix));
+        Assert.IsFalse(set.Has(new GameplayTag("Effect"), ETagMatchMode.Prefix));
     }
 
     [Test]
@@ -493,3 +493,4 @@ public class GameplayTagTests
         Assert.AreEqual("Unit takes fire damage each turn", entry.Description);
     }
 }
+

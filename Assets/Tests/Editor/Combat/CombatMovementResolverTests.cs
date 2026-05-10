@@ -1,4 +1,4 @@
-using MiniChess.Combat;
+﻿using MiniChess.Combat;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -312,16 +312,16 @@ public class CombatMovementResolverTests
         Assert.IsTrue(result.IsAlreadyInRange);
         Assert.IsTrue(result.CanReachRange);
         Assert.IsTrue(result.IsActionable);
-        Assert.AreEqual(CombatMovementResolver.PositioningFailure.None, result.Failure);
+        Assert.AreEqual(CombatMovementResolver.EPositioningFailure.None, result.Failure);
     }
 
     [Test]
     public void Result_Fail_SetsFailureOnly()
     {
         var result = CombatMovementResolver.SkillPositioningResult.Fail(
-            CombatMovementResolver.PositioningFailure.InsufficientAp);
+            CombatMovementResolver.EPositioningFailure.InsufficientAp);
 
-        Assert.AreEqual(CombatMovementResolver.PositioningFailure.InsufficientAp, result.Failure);
+        Assert.AreEqual(CombatMovementResolver.EPositioningFailure.InsufficientAp, result.Failure);
         Assert.IsFalse(result.IsAlreadyInRange);
         Assert.IsFalse(result.CanReachRange);
         Assert.IsFalse(result.HasFallback);
@@ -356,7 +356,7 @@ public class CombatMovementResolverTests
 
         Assert.IsTrue(result.IsAlreadyInRange);
         Assert.IsTrue(result.CanReachRange);
-        Assert.AreEqual(CombatMovementResolver.PositioningFailure.None, result.Failure);
+        Assert.AreEqual(CombatMovementResolver.EPositioningFailure.None, result.Failure);
     }
 
     [Test]
@@ -377,6 +377,7 @@ public class CombatMovementResolverTests
         // If NavMesh exists but AP too low, result is InsufficientAp or NoFallbackPossible.
         Assert.IsFalse(result.IsAlreadyInRange);
         Assert.IsFalse(result.CanReachRange);
-        Assert.AreNotEqual(CombatMovementResolver.PositioningFailure.None, result.Failure);
+        Assert.AreNotEqual(CombatMovementResolver.EPositioningFailure.None, result.Failure);
     }
 }
+
