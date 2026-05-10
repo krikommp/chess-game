@@ -27,6 +27,12 @@ Core constraints:
 - When using temporary values, placeholder art/audio, or prototype-only behavior, add a `TODO` comment that references the relevant `Docs/` section or `Q-XXXX`.
 - When adding or changing system interfaces or design-facing fields, update the corresponding `Docs/0x_*.md` in the same work session.
 
+## Code Style
+
+- All future agents must follow `Docs/10_CODE_STYLE.md` before adding or changing C# code.
+- Unless a local document or existing file pattern explicitly says otherwise, use Microsoft's C# coding conventions as the default style baseline.
+- Prefer consistency with nearby project code when it is stricter or more specific than the baseline.
+
 ## Skill Creation Habit
 
 If a workflow, rule set, domain note, validation checklist, or repeated operation appears reusable across future work:

@@ -41,12 +41,12 @@ Exploration ──(进入战斗触发)──▶ CombatStart
 | `MaxAP` | 6? | 每个单位每回合上限，待平衡 |
 | `CurrentAP` | — | 回合开始时 = MaxAP；回合结束清零 |
 | `MoveSpeed` | 米/AP | 角色属性，决定 1 AP 能走多远 |
-| `BasicAttackCost` | 2 AP? | 基础攻击的固定消耗（占位） |
+| 技能 AP 消耗 | — | 由每个 `SkillDefinition.apCost` 配置；基础攻击也是一个技能 |
 
 公式：
 - **移动**：`canWalkDistance = CurrentAP × MoveSpeed`（实际走的距离按 NavMesh 路径长度算，不按直线）。
 - 移动 AP 扣除按本轮累计实际移动距离结算：单次或多次移动累计每达到 `MoveSpeed` 米扣除 1 AP；未满 1 AP 的距离暂存到本轮后续移动继续累计。
-- **攻击/技能**：消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。
+- **攻击/技能**：AP 消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。当前基础攻击会迁移为 `basic_attack` 技能资产，其 AP 消耗来自 `basic_attack.apCost`。
 - **结束回合**：玩家可主动结束（剩余 AP 不保留 / 是否保留 → OPEN_QUESTIONS）。
 
 ## 4. 单位通用接口（程序约定）
@@ -86,14 +86,26 @@ public interface ICombatUnit {
 - 单位/技能/怪物建议用 **ScriptableObject** 配置（详见各专项文档）。
 - 配置位置：`Assets/Data/{Characters,Monsters,Skills,Maps}/`（目录尚未创建）。
 
+## 7.5 Tag First 原则
+
+GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_TAG_SPEC.md`。后续新增技能、状态、AI 条件、关卡条件、交互物、事件通知或 debug 信息时，应优先判断能否用 Tag 表达，而不是立即新增硬编码枚举、布尔字段或专用事件类型。
+
+约定：
+- 技能、Effect、Status、AIProfile、Scripted Tactic、可交互物和战斗事件都应优先暴露 GameplayTag。
+- 代码中传递游戏语义事件时，应优先携带相关 Tag / TagSet，例如 `Event.Skill.Cast`、`Event.Status.Added`、`Effect.Damage.Physical`。
+- Tag 不替代必要的强类型数据，例如 HP 数值、世界坐标、AP 数量、对象引用；Tag 用于表达“这个数据意味着什么”。
+- 新系统若需要条件判断，应优先复用 Tag 匹配，而不是创建只服务单个系统的特殊判断。
+- Tag 匹配逻辑必须集中封装，禁止各处散落字符串前缀判断。
+
 ## 8. 待办接口清单（占位，后续实现）
 
 - [x] `CombatRoundManager`（MVP 轮次 + initiative turn order + 可控块 + 敌我回合）
 - [x] `ICombatUnit` 接口（`Player1Controller` + `EnemyController` 均实现）
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
+- [ ] `GameplayTagSystem`（Tag First 基础设施：`GameplayTag` + `GameplayTagSet` + 匹配 + 来源追踪，见 `09_GAMEPLAY_TAG_SPEC.md`）
 - [ ] `MovementController`（NavMesh 包装，当前逻辑在 `MoveInputController` 内）
-- [ ] `SkillSystem`（`SkillDefinition` + `Effect` + AP/冷却/目标校验，见 `05_SKILL_SPEC.md`）
+- [ ] `SkillSystem`（`SkillDefinition` + `Effect` + `SkillExecutor` + AP/冷却/目标校验；挂载 `SkillExecutor` 的对象即可成为技能系统目标，见 `05_SKILL_SPEC.md`）
 - [x] `EnemyAISystem`（MVP：`EnemyTurnRunner` 最近玩家 → 移动进基础攻击范围 → 攻击一次；完整 Utility AI 见 `04_MONSTER_SPEC.md` §3）
 - [ ] `CombatTrigger`（探索 → 战斗）
 - [ ] `VictoryConditionEvaluator`
@@ -103,12 +115,13 @@ public interface ICombatUnit {
 当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。
 
 - `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
+- `CombatRoundManager` 提供 `enemyFirstForDebug` 调试开关（默认关闭）：开启时所有敌方单位排在玩家之前，仅用于 AI 测试，不代表正式先攻规则。
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
 - 点击地面按 NavMesh 路径移动；移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
 - 移动 AP 不在下达指令时预扣，而是在角色实际移动距离累计达到 `MoveSpeedMetersPerAp` 时扣除；未满 1 AP 的累计距离会保留到本轮后续移动。
-- 点击敌方单位 = 攻击行为：寻路至攻击范围（默认 1.5m），消耗移动 AP + 1 AP，造成 20 伤害。
+- 点击敌方单位 = 请求释放当前角色的 `basic_attack`：若能用剩余 AP 移动到 `basic_attack.range` 内并支付 `basic_attack.apCost`，则移动后攻击；若不能进入攻击距离，则只用剩余可移动 AP 向目标靠近。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
 - 敌方单位回合由 `EnemyTurnRunner` 执行最小基础 AI：选择最近存活玩家，若能在本回合移动到攻击范围并保留攻击 AP，则移动后攻击；若本回合无法攻击，则沿 NavMesh 路径向目标移动到本回合最大可达点。
 - 敌方 AI 选终点时使用软占位检查：避开其他存活玩家/敌人的当前位置；理想攻击点或追击点被占用时，在附近采样替代 NavMesh 点，避免多个 AI 抢同一个终点。
@@ -130,19 +143,23 @@ public interface ICombatUnit {
 
 ## 11. 基础攻击（MVP 占位）
 
+基础攻击后续会迁移为 `basic_attack` 技能资产。鼠标直接点击敌方单位时，本质上是请求当前角色释放自己的 `basic_attack`，而不是走一套独立硬编码攻击逻辑。
+
 | 参数 | 值 | 说明 |
 |---|---|---|
-| 攻击 AP 消耗 | 1 | 每次点击敌方单位消耗 |
-| 攻击伤害 | 20 | 固定伤害，无属性/防御计算 |
-| 攻击范围 | 1.5m | 玩家导航至距敌方此距离的点后执行攻击 |
+| 攻击 AP 消耗 | 1 | `basic_attack.apCost` 示例配置 |
+| 攻击伤害 | 20 | `basic_attack` 的 `DamageEffect` 示例配置，暂不计算属性/防御 |
+| 攻击范围 | 1.5m | `basic_attack.range` 示例配置 |
 | 敌方 HP | 100 | `EnemyController.maxHP` 默认值 |
 | 玩家 HP | 100 | `Player1Controller.maxHP` 默认值 |
 | 死亡处理 | — | 敌方 `HP ≤ 0` 时 `Destroy(gameObject)`；玩家暂不销毁 |
 
 攻击流程：
 1. 玩家点击敌方单位。
-2. 计算从玩家到敌方的 NavMesh 全路径。
-3. 从路径末端（敌方位置）反向遍历，找到第一个距敌方 ≥ `attackRange` 的 corner 作为目标点。
-4. 若已在范围内 → 直接消耗 1 AP 造成伤害。
-5. 若需移动 → 消耗移动 AP + 1 AP，导航至目标点后造成伤害。
-6. 若 AP 不足以移动 + 攻击，则不执行。
+2. 系统取得当前角色的 `basic_attack` 技能配置。
+3. 使用 `basic_attack.range` 判断当前是否已经在攻击距离内。
+4. 若已在范围内，且 `CurrentAP >= basic_attack.apCost`，则消耗技能 AP 并造成伤害。
+5. 若不在范围内，计算从玩家到敌方的 NavMesh 全路径，并寻找能进入 `basic_attack.range` 的可攻击点。
+6. 若 `CurrentAP >= basic_attack.apCost + 移动所需 AP`，且能走到可攻击点，则先移动到攻击距离内，再消耗 `basic_attack.apCost` 执行攻击。
+7. 若本回合 AP 不足以走到攻击距离内，则不攻击，只使用剩余可移动 AP 沿路径向目标靠近。
+8. 若路径不存在或没有合法可攻击点，则不执行攻击，并输出失败原因。

@@ -43,8 +43,8 @@
 ### Q-0005 MaxAP 与基础攻击 AP 消耗
 - 来源：`02_SYSTEM_SPEC.md` §3
 - 问题：每回合 AP 上限？基础攻击消耗多少 AP？
-- 当前临时假设：`MaxAP = 6`、`BasicAttackCost = 2`。
-- 决议：(空)
+- 当前临时假设：`MaxAP = 6`；技能 AP 消耗由技能配置决定。
+- 决议：**MVP 单位默认 `MaxAP = 6`；不再使用全局 `BasicAttackCost`。基础攻击作为 `basic_attack` 技能资产，其消耗由 `basic_attack.apCost` 配置。当前示例配置为 `basic_attack.apCost = 1`，后续所有技能均通过 `SkillDefinition.apCost` 单独配置。**
 - 影响：所有战斗平衡
 
 ### Q-0006 回合结束时剩余 AP 是否保留
@@ -100,7 +100,7 @@
 - 来源：`05_SKILL_SPEC.md` §11
 - 问题：技能除 AP 外是否还消耗 MP / 怒气 / 充能？
 - 当前临时假设：**只消耗 AP**（用户原话："技能的消耗由技能自己决定"，理解为只消耗 AP）。
-- 决议：(空)
+- 决议：**技能不会消耗 AP 之外的其他资源**。特定技能可以配置冷却时间；冷却由 `SkillDefinition.cooldown` 表达，战斗中按回合计，探索实时状态下按秒刷新，暂定 `1 回合 = 6 秒`。
 
 ### Q-0015 命中是否需要检定
 - 来源：`05_SKILL_SPEC.md` §11
@@ -175,5 +175,26 @@
 - 来源：2026-05-09 用户需求 / `05_SKILL_SPEC.md` §7
 - 问题：MVP 第一阶段是否采用 `basic_attack`、`guarding_shout`、`minor_heal`、`power_strike`、`crippling_hex` 作为技能系统与敌方 AI 的验证技能池？
 - 当前临时假设：**采用这 5 个技能作为草案**，用于验证伤害、治疗、buff、debuff 与 AI 行为倾向；具体数值后续平衡。
-- 决议：(空)
+- 决议：**第一批按 `basic_attack` → `minor_heal` → `guarding_shout` 实现**。`basic_attack` 验证最小技能纵切片；`minor_heal` 验证友方目标和治疗 AI；`guarding_shout` 验证 Status、Tag、buff 和支援型 AI。`power_strike` 与 `crippling_hex` 放到第二批。每个 Effect 必须配置至少一个 GameplayTag。
 - 影响：`Docs/05_SKILL_SPEC.md`、后续 `SkillDefinition` / `AIProfile` / `EnemyAISystem`
+
+### Q-0026 GameplayTag 命名空间与校验来源
+- 来源：2026-05-10 用户需求 / `05_SKILL_SPEC.md` §4.5 / `09_GAMEPLAY_TAG_SPEC.md`
+- 问题：GameplayTag 是先采用自由字符串 + 集中匹配工具，还是马上建立全局 TagRegistry / TagDatabase 来统一命名空间、自动补全和非法 Tag 校验？
+- 当前临时假设：**第一阶段就建立 `GameplayTagRegistry.asset` 与 Combat Config 的 Tags / Validation 入口**；底层序列化可以暂时使用字符串，但配置必须通过 TagRegistry 和集中校验访问。
+- 决议：**Tag 系统优先完成，并包含编辑器第一版**。先实现运行时 Tag 闭环，再实现 TagRegistry 与 Combat Config 的 Tags / Validation 页，之后再进入 SkillDefinition / Effect / SkillExecutor。
+- 影响：`GameplayTag` / `GameplayTagSet` / `SkillDefinition` / `EffectDefinition` / `Status` / `AIProfile` / Combat Config 编辑器
+
+### Q-0027 GameplayTag 运行时注册规则
+- 来源：2026-05-10 用户需求 / `09_GAMEPLAY_TAG_SPEC.md`
+- 问题：运行时是否允许运行时创建未注册 Tag？还是所有 Tag 必须来自 `TagRegistry`？
+- 当前临时假设：**MVP 允许字符串 Tag，但通过配置校验提示未注册 Tag；正式编辑器阶段倾向要求所有长期配置 Tag 注册到 TagRegistry。**
+- 决议：(空)
+- 影响：`GameplayTag` / `GameplayTagSet` / `TagRegistry` / Combat Config 编辑器 / debug 工具
+
+### Q-0028 GameplayTag 多来源叠加规则
+- 来源：2026-05-10 用户需求 / `09_GAMEPLAY_TAG_SPEC.md`
+- 问题：同一个 Tag 来自多个来源时，移除其中一个来源是否保留该 Tag？例如装备和 Status 都提供 `State.Fire.Resistance`。
+- 当前临时假设：**TagSet 追踪来源计数或来源列表；只有所有来源都移除后，该 Tag 才从对象上消失。**
+- 决议：(空)
+- 影响：`GameplayTagSet` / Status / Equipment / Terrain / ScriptedTactic
