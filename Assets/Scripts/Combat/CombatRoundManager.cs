@@ -150,11 +150,10 @@ namespace MiniChess.Combat
                 playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
             }
 
-            _enemyUnits.RemoveAll(e => e == null);
-            if (_enemyUnits.Count == 0)
-            {
-                _enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
-            }
+            // Always re-scan enemies because EnemySpawners may have run their Awake
+            // after our first CacheUnits call (Awake order is non-deterministic).
+            _enemyUnits.Clear();
+            _enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
         }
 
         private void BuildTurnOrder()

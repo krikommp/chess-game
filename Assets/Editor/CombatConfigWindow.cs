@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using MiniChess.Combat.Skills;
 using MiniChess.GameplayTags;
 using UnityEditor;
 using UnityEngine;
@@ -15,11 +16,14 @@ namespace MiniChess.EditorTools
 
         private Tab _currentTab;
         private Vector2 _tagScrollPos;
+        private Vector2 _validationScrollPos;
         private string _tagSearch = string.Empty;
         private string _newTagValue = string.Empty;
         private string _newTagDisplayName = string.Empty;
         private string _newTagDescription = string.Empty;
         private TagRegistry _registry;
+        private List<ValidationIssue> _validationIssues = new List<ValidationIssue>();
+        private bool _validationRun;
 
         [MenuItem("MiniChess/Combat Config")]
         public static void ShowWindow()
@@ -258,36 +262,353 @@ namespace MiniChess.EditorTools
             EditorGUILayout.LabelField("Combat Config Validation", EditorStyles.boldLabel);
             EditorGUILayout.Space(4);
 
-            if (GUILayout.Button("Run All Checks", GUILayout.Height(30)))
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Run All Checks", GUILayout.Height(30), GUILayout.Width(140)))
             {
+                _validationIssues.Clear();
                 RunValidation();
+                _validationRun = true;
+            }
+            if (GUILayout.Button("Clear", GUILayout.Height(30), GUILayout.Width(80)))
+            {
+                _validationIssues.Clear();
+                _validationRun = false;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (!_validationRun)
+            {
+                EditorGUILayout.Space(8);
+                EditorGUILayout.LabelField("Checks performed:", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("• SkillDefinition.id non-empty / unique");
+                EditorGUILayout.LabelField("• apCost, cooldown, range validity");
+                EditorGUILayout.LabelField("• Effect references non-null, Effect tags present");
+                EditorGUILayout.LabelField("• Unregistered tags in Skill/Effect assets");
+                EditorGUILayout.LabelField("• basic_attack skill asset existence");
+                EditorGUILayout.LabelField("• basic_attack references valid DamageEffect");
+                return;
             }
 
-            EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("Checks performed:", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField("• Tag format validity in all assets");
-            EditorGUILayout.LabelField("• Unregistered tags in Skill/Effect/AI assets");
-            EditorGUILayout.LabelField("• Effect assets missing GameplayTag");
-            EditorGUILayout.LabelField("• Duplicate SkillDefinition.id values");
-            EditorGUILayout.LabelField("• basic_attack skill asset existence");
+            EditorGUILayout.Space(4);
+            int errorCount = 0;
+            int warningCount = 0;
+            for (int i = 0; i < _validationIssues.Count; i++)
+            {
+                if (_validationIssues[i].Severity == ValidationSeverity.Error) errorCount++;
+                else if (_validationIssues[i].Severity == ValidationSeverity.Warning) warningCount++;
+            }
+
+            var summaryStyle = new GUIStyle(EditorStyles.boldLabel);
+            summaryStyle.normal.textColor = errorCount > 0 ? Color.red : Color.green;
+            var summary = errorCount > 0
+                ? $"{errorCount} error(s), {warningCount} warning(s)"
+                : "All checks passed";
+            EditorGUILayout.LabelField(summary, summaryStyle);
+            EditorGUILayout.Space(4);
+
+            _validationScrollPos = EditorGUILayout.BeginScrollView(_validationScrollPos);
+            for (int i = 0; i < _validationIssues.Count; i++)
+            {
+                var issue = _validationIssues[i];
+                var icon = issue.Severity == ValidationSeverity.Error ? "✘" : "⚠";
+                var color = issue.Severity == ValidationSeverity.Error ? Color.red : Color.yellow;
+                if (issue.Severity == ValidationSeverity.Info)
+                {
+                    icon = "ℹ";
+                    color = Color.white;
+                }
+
+                var oldColor = GUI.color;
+                GUI.color = color;
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                GUI.color = oldColor;
+                EditorGUILayout.LabelField($"{icon} {issue.Message}", EditorStyles.wordWrappedLabel);
+                if (!string.IsNullOrEmpty(issue.AssetPath))
+                {
+                    EditorGUILayout.LabelField(issue.AssetPath, EditorStyles.miniLabel);
+                    if (GUILayout.Button("Ping Asset", GUILayout.Width(100)))
+                    {
+                        var obj = AssetDatabase.LoadAssetAtPath<Object>(issue.AssetPath);
+                        if (obj != null) EditorGUIUtility.PingObject(obj);
+                    }
+                }
+                EditorGUILayout.EndVertical();
+            }
+            EditorGUILayout.EndScrollView();
         }
 
         private void RunValidation()
         {
             Debug.Log("── Combat Config Validation ──");
-            int errors = 0;
 
+            // 1. TagRegistry check
             if (_registry == null)
             {
-                Debug.LogError("[Validation] TagRegistry not found. Create one via the Tags tab.");
-                errors++;
+                _registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(RegistryAssetPath);
+            }
+            if (_registry == null)
+            {
+                AddIssue(ValidationSeverity.Error, "TagRegistry not found. Create one via the Tags tab.", RegistryAssetPath);
+                Debug.LogError("[Validation] TagRegistry not found.");
             }
 
-            // TODO: add more checks as Skill/Effect/AI systems are implemented
+            var skillGuids = AssetDatabase.FindAssets("t:SkillDefinition");
+            var effectGuids = AssetDatabase.FindAssets("t:EffectDefinition");
+            var skillDefs = new List<SkillDefinition>(skillGuids.Length);
+            var skillIdMap = new Dictionary<string, SkillDefinition>(System.StringComparer.OrdinalIgnoreCase);
 
-            Debug.Log(errors == 0
+            // Collect all SkillDefinitions
+            for (int i = 0; i < skillGuids.Length; i++)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(skillGuids[i]);
+                var skill = AssetDatabase.LoadAssetAtPath<SkillDefinition>(path);
+                if (skill != null) skillDefs.Add(skill);
+            }
+
+            // 2. Check each SkillDefinition
+            for (int i = 0; i < skillDefs.Count; i++)
+            {
+                var skill = skillDefs[i];
+                var path = AssetDatabase.GetAssetPath(skill);
+
+                ValidateSkillDefinition(skill, path, skillIdMap);
+            }
+
+            // 3. Check duplicate SkillDefinition ids
+            foreach (var kvp in skillIdMap)
+            {
+                var id = kvp.Key;
+                // Count by scanning skillDefs for this id
+                int count = 0;
+                for (int i = 0; i < skillDefs.Count; i++)
+                {
+                    if (string.Equals(skillDefs[i].Id, id, System.StringComparison.OrdinalIgnoreCase))
+                        count++;
+                }
+                if (count > 1)
+                {
+                    var path = AssetDatabase.GetAssetPath(kvp.Value);
+                    AddError($"[{id}] Duplicate SkillDefinition.id '{id}' ({count} occurrences)", path);
+                }
+            }
+
+            // 4. Check each EffectDefinition
+            var effectDefs = new Dictionary<string, EffectDefinition>();
+            for (int i = 0; i < effectGuids.Length; i++)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(effectGuids[i]);
+                var effect = AssetDatabase.LoadAssetAtPath<EffectDefinition>(path);
+                if (effect != null) effectDefs[path] = effect;
+            }
+            foreach (var kvp in effectDefs)
+            {
+                ValidateEffectDefinition(kvp.Value, kvp.Key);
+            }
+
+            // 5. basic_attack existence
+            var basicAttack = FindSkillById("basic_attack", skillDefs);
+            if (basicAttack == null)
+            {
+                AddWarning("Skill 'basic_attack' not found. This blocks the basic-attack vertical slice.");
+            }
+            else
+            {
+                var baPath = AssetDatabase.GetAssetPath(basicAttack);
+                var effects = basicAttack.Effects;
+                if (effects.Length == 0)
+                {
+                    AddError("basic_attack has no Effect assigned.", baPath);
+                }
+                else
+                {
+                    bool hasDamage = false;
+                    for (int i = 0; i < effects.Length; i++)
+                    {
+                        if (effects[i] == null)
+                        {
+                            AddError($"basic_attack.effects[{i}] is null.", baPath);
+                        }
+                        else if (effects[i] is DamageEffectDefinition)
+                        {
+                            hasDamage = true;
+                        }
+                    }
+                    if (!hasDamage)
+                    {
+                        AddWarning("basic_attack does not reference a DamageEffectDefinition. It may not deal damage.", baPath);
+                    }
+                }
+            }
+
+            // 6. Unregistered tags in Skills
+            if (_registry != null)
+            {
+                for (int i = 0; i < skillDefs.Count; i++)
+                {
+                    var skill = skillDefs[i];
+                    var path = AssetDatabase.GetAssetPath(skill);
+                    var tags = skill.SkillTags;
+                    for (int j = 0; j < tags.Length; j++)
+                        CheckTagRegistered(tags[j], $"Skill '{skill.Id}' SkillTags[{j}]", path);
+                    var aiTags = skill.AiTags;
+                    for (int j = 0; j < aiTags.Length; j++)
+                        CheckTagRegistered(aiTags[j], $"Skill '{skill.Id}' AiTags[{j}]", path);
+                    var effects = skill.Effects;
+                    for (int j = 0; j < effects.Length; j++)
+                    {
+                        if (effects[j] == null) continue;
+                        var effTags = effects[j].Tags;
+                        for (int k = 0; k < effTags.Length; k++)
+                            CheckTagRegistered(effTags[k], $"Skill '{skill.Id}' Effects[{j}].Tags[{k}]", path);
+                    }
+                }
+                foreach (var kvp in effectDefs)
+                {
+                    var tags = kvp.Value.Tags;
+                    for (int j = 0; j < tags.Length; j++)
+                        CheckTagRegistered(tags[j], $"Effect '{kvp.Value.name}' Tags[{j}]", kvp.Key);
+                }
+            }
+
+            // Summary to Console
+            int errCount = 0;
+            int warnCount = 0;
+            for (int i = 0; i < _validationIssues.Count; i++)
+            {
+                if (_validationIssues[i].Severity == ValidationSeverity.Error) errCount++;
+                else if (_validationIssues[i].Severity == ValidationSeverity.Warning) warnCount++;
+            }
+            Debug.Log(errCount == 0 && warnCount == 0
                 ? "[Validation] All checks passed."
-                : $"[Validation] {errors} issue(s) found.");
+                : $"[Validation] {errCount} error(s), {warnCount} warning(s) found. See the Validation tab for details.");
+        }
+
+        private void ValidateSkillDefinition(SkillDefinition skill, string path,
+            Dictionary<string, SkillDefinition> idMap)
+        {
+            var id = skill.Id;
+
+            // id non-empty
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                AddError("SkillDefinition.id is empty.", path);
+            }
+
+            // Track for uniqueness check (case-insensitive, first-wins for reporting)
+            if (!string.IsNullOrWhiteSpace(id) && !idMap.ContainsKey(id))
+            {
+                idMap[id] = skill;
+            }
+
+            // apCost >= 0
+            if (skill.ApCost < 0)
+            {
+                AddError($"Skill '{id}': apCost = {skill.ApCost} (must be >= 0).", path);
+            }
+
+            // cooldown >= 0
+            if (skill.Cooldown < 0)
+            {
+                AddError($"Skill '{id}': cooldown = {skill.Cooldown} (must be >= 0).", path);
+            }
+
+            // range >= 0
+            if (skill.Range < 0f)
+            {
+                AddError($"Skill '{id}': range = {skill.Range} (must be >= 0).", path);
+            }
+
+            // effects not empty
+            var effects = skill.Effects;
+            if (effects.Length == 0)
+            {
+                AddWarning($"Skill '{id}': effects array is empty.", path);
+            }
+            else
+            {
+                for (int i = 0; i < effects.Length; i++)
+                {
+                    if (effects[i] == null)
+                    {
+                        AddError($"Skill '{id}': effects[{i}] is null.", path);
+                    }
+                    else if (!effects[i].HasAnyTag())
+                    {
+                        AddWarning(
+                            $"Skill '{id}': Effect '{effects[i].name}' has no GameplayTag.",
+                            path);
+                    }
+                }
+            }
+        }
+
+        private void ValidateEffectDefinition(EffectDefinition effect, string path)
+        {
+            if (!effect.HasAnyTag())
+            {
+                AddWarning(
+                    $"Effect '{effect.name}' has no GameplayTag. Every effect should carry at least one tag.",
+                    path);
+            }
+        }
+
+        private void CheckTagRegistered(GameplayTagRef tagRef, string context, string assetPath)
+        {
+            if (!tagRef.IsValid)
+            {
+                AddError($"Invalid tag format in {context}: '{tagRef.Value}'", assetPath);
+                return;
+            }
+            if (_registry != null && !_registry.IsRegistered(tagRef))
+            {
+                AddWarning($"Unregistered tag in {context}: '{tagRef.Value}'", assetPath);
+            }
+        }
+
+        private SkillDefinition FindSkillById(string id, List<SkillDefinition> skills)
+        {
+            for (int i = 0; i < skills.Count; i++)
+            {
+                if (string.Equals(skills[i].Id, id, System.StringComparison.OrdinalIgnoreCase))
+                    return skills[i];
+            }
+            return null;
+        }
+
+        private void AddError(string message, string assetPath = null)
+        {
+            AddIssue(ValidationSeverity.Error, message, assetPath);
+            Debug.LogError($"[Validation] {message}" + (assetPath != null ? $" ({assetPath})" : ""));
+        }
+
+        private void AddWarning(string message, string assetPath = null)
+        {
+            AddIssue(ValidationSeverity.Warning, message, assetPath);
+            Debug.LogWarning($"[Validation] {message}" + (assetPath != null ? $" ({assetPath})" : ""));
+        }
+
+        private void AddIssue(ValidationSeverity severity, string message, string assetPath)
+        {
+            _validationIssues.Add(new ValidationIssue
+            {
+                Severity = severity,
+                Message = message,
+                AssetPath = assetPath ?? string.Empty
+            });
+        }
+
+        private enum ValidationSeverity
+        {
+            Info,
+            Warning,
+            Error
+        }
+
+        private struct ValidationIssue
+        {
+            public ValidationSeverity Severity;
+            public string Message;
+            public string AssetPath;
         }
     }
 }

@@ -331,131 +331,102 @@ namespace MiniChess.Combat
         private void ShowAttackPreview(Player1Controller player, EnemyController enemy)
         {
             float attackRange = combatManager != null ? combatManager.AttackRange : 1.5f;
-            if (!TryGetNavMeshOrigin(out Vector3 origin)) return;
 
-            NavMeshPath fullPath = new NavMeshPath();
-            if (!NavMesh.CalculatePath(origin, enemy.transform.position, NavMesh.AllAreas, fullPath)
-                || fullPath.status != NavMeshPathStatus.PathComplete
-                || fullPath.corners == null || fullPath.corners.Length < 2)
+            var result = CombatMovementResolver.Resolve(
+                casterPosition: player.transform.position,
+                targetPosition: enemy.transform.position,
+                skillRange: attackRange,
+                skillApCost: 1,
+                currentAp: player.CurrentAP,
+                remainingMoveDistance: player.RemainingMoveDistance,
+                moveSpeedMetersPerAp: player.MoveSpeedMetersPerAp,
+                navMeshSnapRadius: originSnapRadius);
+
+            if (result.IsAlreadyInRange)
             {
-                _hasValidTarget = false;
-                _isAttackMode = true;
-                _targetEnemy = enemy;
-                _attackRequiresMove = false;
-                return;
-            }
-
-            Vector3[] corners = fullPath.corners;
-            Vector3 enemyPos = enemy.transform.position;
-
-            // Walk backward from enemy to find the first corner >= attackRange away
-            int stopIndex = -1;
-            for (int i = corners.Length - 1; i >= 0; i--)
-            {
-                if (Vector3.Distance(corners[i], enemyPos) >= attackRange)
-                {
-                    stopIndex = i;
-                    break;
-                }
-            }
-
-            if (stopIndex < 0)
-            {
-                // Already in range, no movement needed
-                _attackDestination = origin;
+                _attackDestination = player.transform.position;
                 _attackRequiresMove = false;
                 _attackMoveApCost = 0;
                 _isAttackMode = true;
                 _targetEnemy = enemy;
                 _hasValidTarget = true;
                 _reachable = true;
-                _previewApCost = 1; // just the attack cost
-                _canMoveOnClick = false; // no movement path needed
+                _previewApCost = 1;
+                _canMoveOnClick = false;
                 preview.Clear();
                 return;
             }
 
-            Vector3 destination = corners[stopIndex];
-
-            // Calculate movement cost to that point
-            float moveLength = 0f;
-            for (int i = 0; i < stopIndex; i++)
+            if (result.CanReachRange)
             {
-                moveLength += Vector3.Distance(corners[i], corners[i + 1]);
-            }
-            int moveApCost = player.PreviewMovementApCost(moveLength);
-
-            // Build sub-path for preview
-            Vector3[] subPath = new Vector3[stopIndex + 1];
-            System.Array.Copy(corners, subPath, stopIndex + 1);
-
-            float maxRange = player.RemainingMoveDistance;
-            int totalCost = moveApCost + 1;
-
-            if (moveLength <= maxRange && totalCost <= player.CurrentAP)
-            {
-                preview.Show(subPath, System.Array.Empty<Vector3>());
+                preview.Show(result.MovePath.corners, System.Array.Empty<Vector3>());
                 _hasValidTarget = true;
                 _reachable = true;
-                _previewApCost = totalCost;
-            }
-            else
-            {
-                PathCostCalculator.Clip(corners, maxRange, out Vector3[] head, out Vector3[] tail);
-                preview.Show(head, tail);
-                _hasValidTarget = true;
-                _reachable = false;
-                _previewApCost = totalCost;
+                _previewApCost = result.TotalApCost;
+                _isAttackMode = true;
+                _targetEnemy = enemy;
+                _attackRequiresMove = true;
+                _attackMoveApCost = result.MoveApCost;
+                _attackDestination = result.Destination;
+                return;
             }
 
+            if (result.HasFallback && result.FallbackPath != null)
+            {
+                // Show partial path: reachable head + unreachable tail
+                PathCostCalculator.Clip(result.FallbackPath.corners, player.RemainingMoveDistance,
+                    out Vector3[] head, out Vector3[] tail);
+
+                // tail is the portion from fallback point toward target
+                preview.Show(head,
+                    tail != null && tail.Length >= 2 ? tail : System.Array.Empty<Vector3>());
+                _hasValidTarget = true;
+                _reachable = false;
+                _previewApCost = result.TotalApCost;
+                _isAttackMode = true;
+                _targetEnemy = enemy;
+                _attackRequiresMove = false;
+                return;
+            }
+
+            // Unreachable
+            _hasValidTarget = false;
             _isAttackMode = true;
             _targetEnemy = enemy;
-            _attackRequiresMove = true;
-            _attackMoveApCost = moveApCost;
-            _attackDestination = destination;
+            _attackRequiresMove = false;
         }
 
         private void ExecuteAttack(Player1Controller player, EnemyController enemy)
         {
-            int totalCost = _attackMoveApCost + 1; // movement + 1 AP for attack
-
             if (_attackRequiresMove)
             {
-                if (!TryGetNavMeshOrigin(out Vector3 origin)) return;
-
-                NavMeshPath movePath = new NavMeshPath();
-                if (NavMesh.CalculatePath(origin, _attackDestination, NavMesh.AllAreas, movePath)
-                    && movePath.status == NavMeshPathStatus.PathComplete
-                    && movePath.corners != null && movePath.corners.Length >= 2)
+                if (!CombatMovementResolver.TryGetNavMeshPosition(player.transform.position, originSnapRadius, out Vector3 origin))
                 {
-                    if (!player.TryMove(movePath, totalCost))
-                    {
-                        preview.Clear();
-                        _hasValidTarget = false;
-                        _isAttackMode = false;
-                        _attackRequiresMove = false;
-                        return;
-                    }
-
-                    StartActiveMovementPath(movePath);
-
-                    if (!player.TrySpendAP(1))
-                    {
-                        return;
-                    }
+                    ClearAttackState();
+                    return;
                 }
-                else
+
+                if (!CombatMovementResolver.TryBuildCompletePath(origin, _attackDestination, out NavMeshPath movePath))
                 {
-                    preview.Clear();
-                    _hasValidTarget = false;
-                    _isAttackMode = false;
-                    _attackRequiresMove = false;
+                    ClearAttackState();
+                    return;
+                }
+
+                if (!player.TryMove(movePath, _attackMoveApCost + 1))
+                {
+                    ClearAttackState();
+                    return;
+                }
+
+                StartActiveMovementPath(movePath);
+
+                if (!player.TrySpendAP(1))
+                {
                     return;
                 }
             }
             else
             {
-                // Already in range, just spend 1 AP for the attack
                 if (!player.TrySpendAP(1))
                 {
                     return;
@@ -465,6 +436,11 @@ namespace MiniChess.Combat
             enemy.TakeDamage(20);
             Debug.Log($"[Combat] {player.DisplayName} attacks {enemy.DisplayName} for 20 damage ({enemy.CurrentHP}/{enemy.MaxHP} HP)");
 
+            ClearAttackState();
+        }
+
+        private void ClearAttackState()
+        {
             preview.Clear();
             _hasValidTarget = false;
             _isAttackMode = false;
