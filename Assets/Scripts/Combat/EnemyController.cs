@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -60,6 +61,8 @@ namespace MiniChess.Combat
             m_currentHP = m_maxHP;
             CurrentAP = m_maxAP;
             m_agent = GetComponent<NavMeshAgent>();
+            if (GetComponent<SkillExecutor>() == null)
+                gameObject.AddComponent<SkillExecutor>();
             m_agent.speed = m_agentSpeed;
             m_agent.stoppingDistance = 0.05f;
             m_agent.autoBraking = true;
@@ -161,6 +164,12 @@ namespace MiniChess.Combat
             {
                 Destroy(gameObject);
             }
+        }
+
+        public void Heal(int amount)
+        {
+            if (!IsAlive || amount <= 0) return;
+            m_currentHP = Mathf.Min(m_maxHP, m_currentHP + amount);
         }
 
         public void SetVisualState(EPlayerVisualState state) { }

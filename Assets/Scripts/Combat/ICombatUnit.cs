@@ -18,7 +18,9 @@ namespace MiniChess.Combat
 
         void BeginRound();
         bool TryEndRound();
+        bool TrySpendAP(int amount);
         void TakeDamage(int damage);
+        void Heal(int amount);
         void SetVisualState(EPlayerVisualState state);
     }
 }

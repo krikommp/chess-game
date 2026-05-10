@@ -1,4 +1,5 @@
 ﻿using System;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -83,6 +84,9 @@ namespace MiniChess.Combat
 
         private void Awake()
         {
+            if (GetComponent<SkillExecutor>() == null)
+                gameObject.AddComponent<SkillExecutor>();
+
             m_agent = GetComponent<NavMeshAgent>();
             m_agent.speed = m_agentSpeed;
             m_agent.stoppingDistance = 0.05f;
@@ -164,6 +168,13 @@ namespace MiniChess.Combat
         {
             if (!IsAlive) return;
             m_currentHP = Mathf.Max(0, m_currentHP - damage);
+            StateChanged?.Invoke();
+        }
+
+        public void Heal(int amount)
+        {
+            if (!IsAlive || amount <= 0) return;
+            m_currentHP = Mathf.Min(m_maxHP, m_currentHP + amount);
             StateChanged?.Invoke();
         }
 

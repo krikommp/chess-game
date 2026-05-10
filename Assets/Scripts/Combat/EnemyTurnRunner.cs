@@ -1,14 +1,11 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
 
 namespace MiniChess.Combat
 {
-    /// <summary>
-    /// MVP enemy turn executor: pick the nearest living player, move into basic
-    /// attack range if possible, then attack once.
-    /// </summary>
     public class EnemyTurnRunner : MonoBehaviour
     {
         [SerializeField, Min(0f)] private float m_turnStartDelay = 0.25f;
@@ -22,16 +19,24 @@ namespace MiniChess.Combat
             EnemyController enemy,
             IReadOnlyList<Player1Controller> players,
             IReadOnlyList<EnemyController> enemies,
-            float attackRange,
-            int attackCost,
-            int attackDamage)
+            SkillDefinition skill)
         {
-            if (enemy == null || !enemy.IsAlive)
+            if (enemy == null || !enemy.IsAlive) yield break;
+
+            yield return new WaitForSeconds(m_turnStartDelay);
+
+            var skillExecutor = enemy.GetComponent<SkillExecutor>();
+            if (skillExecutor == null)
             {
+                Debug.LogWarning($"[EnemyAI] {enemy.DisplayName} has no SkillExecutor.");
                 yield break;
             }
 
-            yield return new WaitForSeconds(m_turnStartDelay);
+            if (skill == null)
+            {
+                Debug.LogWarning($"[EnemyAI] {enemy.DisplayName} has no skill assigned.");
+                yield break;
+            }
 
             Player1Controller target = FindNearestLivingPlayer(enemy, players);
             if (target == null)
@@ -40,9 +45,13 @@ namespace MiniChess.Combat
                 yield break;
             }
 
-            if (!CombatMovementResolver.IsInRange(enemy.transform.position, target.transform.position, attackRange))
+            Vector3 targetPos = target.transform.position;
+            Vector3 enemyPos = enemy.transform.position;
+
+            // 1. Move into range if needed
+            if (!CombatMovementResolver.IsInRange(enemyPos, targetPos, skill.Range))
             {
-                TryMoveTowardTarget(enemy, target, players, enemies, attackRange, attackCost);
+                TryMoveTowardTarget(enemy, target.gameObject, players, enemies, skill);
 
                 float waitStart = Time.time;
                 while (enemy.IsMoving)
@@ -53,21 +62,27 @@ namespace MiniChess.Combat
                         Debug.LogWarning($"[EnemyAI] {enemy.DisplayName} movement timed out.");
                         break;
                     }
-
                     yield return null;
                 }
             }
 
+            // 2. Execute skill if in range
             if (target.IsAlive
-                && CombatMovementResolver.IsInRange(enemy.transform.position, target.transform.position, attackRange)
-                && enemy.TrySpendAP(attackCost))
+                && CombatMovementResolver.IsInRange(enemy.transform.position, targetPos, skill.Range))
             {
-                target.TakeDamage(attackDamage);
-                Debug.Log($"[EnemyAI] {enemy.DisplayName} attacks {target.DisplayName} for {attackDamage} damage ({target.CurrentHP}/{target.MaxHP} HP).");
+                var result = skillExecutor.Execute(skill, target.gameObject);
+                if (result.IsSuccess)
+                {
+                    Debug.Log($"[EnemyAI] {enemy.DisplayName} casts '{skill.DisplayName}' on {target.DisplayName}.");
+                }
+                else
+                {
+                    Debug.Log($"[EnemyAI] {enemy.DisplayName} failed to cast '{skill.DisplayName}': {result.FailureMessage}");
+                }
             }
             else
             {
-                Debug.Log($"[EnemyAI] {enemy.DisplayName} cannot attack {target.DisplayName}; AP {enemy.CurrentAP}/{enemy.MaxAP}.");
+                Debug.Log($"[EnemyAI] {enemy.DisplayName} cannot reach {target.DisplayName} for '{skill.DisplayName}'; AP {enemy.CurrentAP}/{enemy.MaxAP}.");
             }
 
             yield return new WaitForSeconds(m_afterActionDelay);
@@ -97,19 +112,18 @@ namespace MiniChess.Combat
 
         private void TryMoveTowardTarget(
             EnemyController enemy,
-            Player1Controller target,
+            GameObject target,
             IReadOnlyList<Player1Controller> players,
             IReadOnlyList<EnemyController> enemies,
-            float attackRange,
-            int attackCost)
+            SkillDefinition skill)
         {
             if (enemy.CurrentAP <= 0) return;
 
             var positioning = CombatMovementResolver.Resolve(
                 casterPosition: enemy.transform.position,
                 targetPosition: target.transform.position,
-                skillRange: attackRange,
-                skillApCost: attackCost,
+                skillRange: skill.Range,
+                skillApCost: skill.ApCost,
                 currentAp: enemy.CurrentAP,
                 remainingMoveDistance: enemy.RemainingMoveDistance,
                 moveSpeedMetersPerAp: enemy.MoveSpeedMetersPerAp,
@@ -122,15 +136,12 @@ namespace MiniChess.Combat
 
             if (positioning.CanReachRange)
             {
-                // Try the preferred attack destination first, then probe alternatives
                 if (TryFindOpenAttackDestination(enemy, players, enemies, origin,
-                    positioning.Destination, target.transform.position, attackRange, attackCost, out destination))
+                    positioning.Destination, target.transform.position, skill.Range, skill.ApCost, out destination))
                 {
-                    // Found an open attack destination
                 }
                 else
                 {
-                    // Can't find open attack point — fall back to approach
                     if (!TryFindFarthestReachablePoint(enemy, positioning.MovePath.corners, out Vector3 farthest)
                         || !TryFindOpenMoveDestination(enemy, players, enemies, origin, farthest, out destination))
                     {
@@ -140,7 +151,6 @@ namespace MiniChess.Combat
             }
             else if (positioning.HasFallback)
             {
-                // Try fallback approach point
                 if (!TryFindOpenMoveDestination(enemy, players, enemies, origin,
                     positioning.FallbackDestination, out destination))
                 {
@@ -160,7 +170,7 @@ namespace MiniChess.Combat
 
             if (enemy.TryMove(movePath))
             {
-                Debug.Log($"[EnemyAI] {enemy.DisplayName} moves toward {target.DisplayName} ({moveCost} AP movement preview).");
+                Debug.Log($"[EnemyAI] {enemy.DisplayName} moves toward {target.name} ({moveCost} AP movement preview).");
             }
         }
 
@@ -178,7 +188,6 @@ namespace MiniChess.Combat
             if (TryUseDestination(enemy, players, enemies, origin, preferred, attackCost, out destination))
                 return true;
 
-            // Probe a ring around the target at attackRange distance
             Vector3 baseDirection = preferred - targetPosition;
             baseDirection.y = 0f;
             if (baseDirection.sqrMagnitude <= 0.001f)
@@ -265,5 +274,3 @@ namespace MiniChess.Combat
         }
     }
 }
-
-

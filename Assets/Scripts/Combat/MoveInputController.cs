@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -100,10 +101,15 @@ namespace MiniChess.Combat
                     return;
                 }
 
-                if (m_isAttackMode && m_targetEnemy != null && m_targetEnemy.IsAlive && activePlayer.CurrentAP >= m_attackMoveApCost + 1)
+                if (m_isAttackMode && m_targetEnemy != null && m_targetEnemy.IsAlive)
                 {
-                    ExecuteAttack(activePlayer, m_targetEnemy);
-                    return;
+                    var skill = GetBasicAttackSkill(activePlayer);
+                    int skillCost = skill != null ? skill.ApCost : 1;
+                    if (activePlayer.CurrentAP >= m_attackMoveApCost + skillCost)
+                    {
+                        ExecuteAttack(activePlayer, m_targetEnemy);
+                        return;
+                    }
                 }
 
                 if (!m_isAttackMode && m_hasValidTarget && m_canMoveOnClick && activePlayer.TryMove(m_clickMovePath, m_clickMoveApCost))
@@ -328,15 +334,32 @@ namespace MiniChess.Combat
             }
         }
 
+        private SkillDefinition GetBasicAttackSkill(Player1Controller player)
+        {
+            var executor = player != null ? player.GetComponent<SkillExecutor>() : null;
+            if (executor != null)
+            {
+                var skills = executor.AvailableSkills;
+                for (int i = 0; i < skills.Length; i++)
+                {
+                    if (skills[i] != null)
+                        return skills[i];
+                }
+            }
+            return m_combatManager != null ? m_combatManager.BasicAttackSkill : null;
+        }
+
         private void ShowAttackPreview(Player1Controller player, EnemyController enemy)
         {
-            float attackRange = m_combatManager != null ? m_combatManager.AttackRange : 1.5f;
+            var skill = GetBasicAttackSkill(player);
+            float attackRange = skill != null ? skill.Range : 1.5f;
+            int skillApCost = skill != null ? skill.ApCost : 1;
 
             var result = CombatMovementResolver.Resolve(
                 casterPosition: player.transform.position,
                 targetPosition: enemy.transform.position,
                 skillRange: attackRange,
-                skillApCost: 1,
+                skillApCost: skillApCost,
                 currentAp: player.CurrentAP,
                 remainingMoveDistance: player.RemainingMoveDistance,
                 moveSpeedMetersPerAp: player.MoveSpeedMetersPerAp,
@@ -351,7 +374,7 @@ namespace MiniChess.Combat
                 m_targetEnemy = enemy;
                 m_hasValidTarget = true;
                 m_reachable = true;
-                m_previewApCost = 1;
+                m_previewApCost = skillApCost;
                 m_canMoveOnClick = false;
                 m_preview.Clear();
                 return;
@@ -373,11 +396,9 @@ namespace MiniChess.Combat
 
             if (result.HasFallback && result.FallbackPath != null)
             {
-                // Show partial path: reachable head + unreachable tail
                 PathCostCalculator.Clip(result.FallbackPath.corners, player.RemainingMoveDistance,
                     out Vector3[] head, out Vector3[] tail);
 
-                // tail is the portion from fallback point toward target
                 m_preview.Show(head,
                     tail != null && tail.Length >= 2 ? tail : System.Array.Empty<Vector3>());
                 m_hasValidTarget = true;
@@ -389,7 +410,6 @@ namespace MiniChess.Combat
                 return;
             }
 
-            // Unreachable
             m_hasValidTarget = false;
             m_isAttackMode = true;
             m_targetEnemy = enemy;
@@ -398,6 +418,15 @@ namespace MiniChess.Combat
 
         private void ExecuteAttack(Player1Controller player, EnemyController enemy)
         {
+            var skill = GetBasicAttackSkill(player);
+            var executor = player != null ? player.GetComponent<SkillExecutor>() : null;
+
+            if (skill == null || executor == null)
+            {
+                ClearAttackState();
+                return;
+            }
+
             if (m_attackRequiresMove)
             {
                 if (!CombatMovementResolver.TryGetNavMeshPosition(player.transform.position, m_originSnapRadius, out Vector3 origin))
@@ -412,29 +441,25 @@ namespace MiniChess.Combat
                     return;
                 }
 
-                if (!player.TryMove(movePath, m_attackMoveApCost + 1))
+                int totalApCost = m_attackMoveApCost + skill.ApCost;
+                if (!player.TryMove(movePath, totalApCost))
                 {
                     ClearAttackState();
                     return;
                 }
 
                 StartActiveMovementPath(movePath);
+            }
 
-                if (!player.TrySpendAP(1))
-                {
-                    return;
-                }
+            var result = executor.Execute(skill, enemy.gameObject);
+            if (result.IsSuccess)
+            {
+                Debug.Log($"[Combat] {player.DisplayName} casts '{skill.DisplayName}' on {enemy.DisplayName} ({enemy.CurrentHP}/{enemy.MaxHP} HP)");
             }
             else
             {
-                if (!player.TrySpendAP(1))
-                {
-                    return;
-                }
+                Debug.Log($"[Combat] {player.DisplayName} failed to cast '{skill.DisplayName}': {result.FailureMessage}");
             }
-
-            enemy.TakeDamage(20);
-            Debug.Log($"[Combat] {player.DisplayName} attacks {enemy.DisplayName} for 20 damage ({enemy.CurrentHP}/{enemy.MaxHP} HP)");
 
             ClearAttackState();
         }

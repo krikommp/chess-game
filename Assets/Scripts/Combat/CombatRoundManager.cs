@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 
 namespace MiniChess.Combat
@@ -27,9 +28,9 @@ namespace MiniChess.Combat
 
         [Header("Combat")]
         [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
-        [SerializeField] private float m_attackRange = 1.5f;
-        [SerializeField] private int m_basicAttackCost = 1;
-        [SerializeField] private int m_basicAttackDamage = 20;
+        [Header("Skills")]
+        [Tooltip("Optional: assign basic_attack skill. If null, auto-loaded from Assets/Data/Skills/.")]
+        public SkillDefinition basicAttackSkillOverride;
 
         [Header("Debug")]
         [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative. Intended only for AI testing — does not represent formal first-strike rules.")]
@@ -43,7 +44,8 @@ namespace MiniChess.Combat
         public IReadOnlyList<Player1Controller> ControllableBlock => m_controllableBlock;
         public ICombatUnit SelectedUnit { get; private set; }
         public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
-        public float AttackRange => m_attackRange;
+        public float AttackRange => BasicAttackSkill != null ? BasicAttackSkill.Range : 1.5f;
+        public SkillDefinition BasicAttackSkill { get; private set; }
         public int RoundCount { get; private set; }
         public bool IsWaiting { get; private set; }
 
@@ -54,6 +56,35 @@ namespace MiniChess.Combat
             if (m_enemyTurnRunner == null) m_enemyTurnRunner = GetComponent<EnemyTurnRunner>();
             if (m_enemyTurnRunner == null) m_enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
             CacheUnits();
+            ResolveBasicAttackSkill();
+        }
+
+        private void ResolveBasicAttackSkill()
+        {
+            // 1. Inspector override
+            if (basicAttackSkillOverride != null)
+            {
+                BasicAttackSkill = basicAttackSkillOverride;
+                return;
+            }
+
+            // 2. Try load from asset path (Editor only)
+#if UNITY_EDITOR
+            BasicAttackSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>(
+                "Assets/Data/Skills/basic_attack.asset");
+            if (BasicAttackSkill != null)
+            {
+                Debug.Log("[CombatRoundManager] Loaded basic_attack.asset from project.");
+                return;
+            }
+#endif
+            // 3. Try Resources
+            BasicAttackSkill = Resources.Load<SkillDefinition>("Skills/basic_attack");
+            if (BasicAttackSkill == null)
+                BasicAttackSkill = Resources.Load<SkillDefinition>("basic_attack");
+
+            if (BasicAttackSkill == null)
+                Debug.LogWarning("[CombatRoundManager] basic_attack skill not found. Attacks will not work.");
         }
 
         private void Start()
@@ -82,9 +113,33 @@ namespace MiniChess.Combat
         public void StartCombat()
         {
             CacheUnits();
+            DistributeDefaultSkills();
             BuildTurnOrder();
             RoundCount = 0;
             StartNextRound();
+        }
+
+        private void DistributeDefaultSkills()
+        {
+            if (BasicAttackSkill == null) return;
+
+            var defaultSkills = new SkillDefinition[] { BasicAttackSkill };
+
+            foreach (var unit in m_playerUnits)
+            {
+                if (unit == null) continue;
+                var executor = unit.GetComponent<SkillExecutor>();
+                if (executor != null && executor.AvailableSkills.Length == 0)
+                    executor.SetSkills(defaultSkills);
+            }
+
+            foreach (var enemy in m_enemyUnits)
+            {
+                if (enemy == null) continue;
+                var executor = enemy.GetComponent<SkillExecutor>();
+                if (executor != null && executor.AvailableSkills.Length == 0)
+                    executor.SetSkills(defaultSkills);
+            }
         }
 
         public bool TrySelectPlayer(Player1Controller player)
@@ -199,7 +254,7 @@ namespace MiniChess.Combat
             enemy.FlashTurn();
             Debug.Log($"[Combat] Enemy turn starts: {enemy.DisplayName}");
 
-            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits, m_attackRange, m_basicAttackCost, m_basicAttackDamage);
+            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits, BasicAttackSkill);
 
             enemy.TryEndRound();
             m_turnOrder.RemoveAt(0);

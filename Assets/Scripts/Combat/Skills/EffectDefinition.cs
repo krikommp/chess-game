@@ -10,6 +10,10 @@ namespace MiniChess.Combat.Skills
         public GameplayTags.GameplayTagRef[] Tags => m_tags ?? System.Array.Empty<GameplayTags.GameplayTagRef>();
         public string Description => m_description ?? string.Empty;
 
+        public abstract ETargetCapability RequiredCapability { get; }
+
+        public abstract void Apply(EffectContext context);
+
         public bool HasAnyTag()
         {
             var all = Tags;

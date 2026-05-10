@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using MiniChess.Combat;
+using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
@@ -8,6 +9,17 @@ namespace MiniChess.Combat.Skills
         [SerializeField] private int m_amount = 10;
 
         public int Amount => m_amount;
+
+        public override ETargetCapability RequiredCapability => ETargetCapability.Healable;
+
+        public override void Apply(EffectContext context)
+        {
+            if (context.Target == null) return;
+            var unit = context.Target.GetComponent<ICombatUnit>();
+            if (unit != null && unit.IsAlive)
+            {
+                unit.Heal(m_amount);
+            }
+        }
     }
 }
-

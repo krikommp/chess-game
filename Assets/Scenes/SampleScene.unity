@@ -2214,15 +2214,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2eadfd0b4fb89454aa1c45bf86994558, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cam: {fileID: 330585545}
-  player: {fileID: 2067804694}
-  combatManager: {fileID: 0}
-  preview: {fileID: 1339531491}
-  groundMask:
+  m_cam: {fileID: 0}
+  m_player: {fileID: 0}
+  m_combatManager: {fileID: 0}
+  m_preview: {fileID: 0}
+  m_groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  navMeshSnapRadius: 0.5
-  originSnapRadius: 2
+  m_navMeshSnapRadius: 0.5
+  m_originSnapRadius: 2
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -2373,17 +2373,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a520da17fdb5fc248844525212e30051, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 2067804693}
-  offset: {x: 0, y: 10, z: -8}
-  followSmoothTime: 0.18
-  fixedEulerAngles: {x: 51, y: 0, z: 0}
-  focusReturnSmoothTime: 0.18
-  keyboardPanSpeed: 12
-  dragPanSensitivity: 0.03
-  minDistance: 7
-  maxDistance: 18
-  zoomSpeed: 6
-  zoomSmoothTime: 0.12
+  m_target: {fileID: 0}
+  m_offset: {x: 0, y: 10, z: -8}
+  m_followSmoothTime: 0.18
+  m_fixedEulerAngles: {x: 51, y: 0, z: 0}
+  m_focusReturnSmoothTime: 0.18
+  m_keyboardPanSpeed: 12
+  m_dragPanSensitivity: 0.03
+  m_minDistance: 7
+  m_maxDistance: 18
+  m_zoomSpeed: 6
+  m_zoomSmoothTime: 0.12
 --- !u!43 &332250134
 Mesh:
   m_ObjectHideFlags: 0
@@ -3727,9 +3727,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 91aaf200c4da04b48af93f896ff68092, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 2067804694}
-  input: {fileID: 259119425}
-  combatManager: {fileID: 0}
+  m_player: {fileID: 0}
+  m_input: {fileID: 0}
+  m_combatManager: {fileID: 0}
 --- !u!43 &589409250
 Mesh:
   m_ObjectHideFlags: 0
@@ -4869,10 +4869,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99a5a7744a17e934386bf4b5b76041ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyName: Enemy_01
-  initiative: 5
-  hp: 100
-  enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_enemyName: Enemy
+  m_initiative: 5
+  m_hp: 100
+  m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
 --- !u!1 &710093768
 GameObject:
   m_ObjectHideFlags: 0
@@ -8026,19 +8026,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  displayName: Player 2
-  partySlot: 2
-  maxHP: 100
-  currentHP: 100
-  initiative: 12
-  maxAP: 6
-  moveSpeedMetersPerAp: 4
-  agentSpeed: 4
-  allowDebugRefill: 1
-  refillKey: 114
-  defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
-  hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
-  selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
+  m_displayName: Player
+  m_partySlot: 1
+  m_faction: 0
+  m_maxHP: 100
+  m_currentHP: 100
+  m_initiative: 10
+  m_maxAP: 6
+  m_moveSpeedMetersPerAp: 2
+  m_agentSpeed: 4
+  m_allowDebugRefill: 1
+  m_refillKey: 114
+  m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
+  m_hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
+  m_selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
 --- !u!195 &1235925682
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -8841,10 +8842,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99a5a7744a17e934386bf4b5b76041ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyName: Enemy_03
-  initiative: 5
-  hp: 100
-  enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_enemyName: Enemy
+  m_initiative: 5
+  m_hp: 100
+  m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
 --- !u!1 &1339531489
 GameObject:
   m_ObjectHideFlags: 0
@@ -8891,16 +8892,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3cb02e45d222f74991fc3530e328133, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  reachableLine: {fileID: 623563030}
-  unreachableLine: {fileID: 840057365}
-  activeMoveLine: {fileID: 0}
-  reachableColor: {r: 0.3, g: 1, b: 0.4, a: 1}
-  unreachableColor: {r: 1, g: 0.25, b: 0.2, a: 1}
-  activeMoveColor: {r: 0.25, g: 0.75, b: 1, a: 0.95}
-  width: 0.12
-  yLift: 0.05
-  showDistanceLabel: 1
-  labelPixelOffset: {x: 10, y: -28}
+  m_reachableLine: {fileID: 0}
+  m_unreachableLine: {fileID: 0}
+  m_activeMoveLine: {fileID: 0}
+  m_reachableColor: {r: 0.3, g: 1, b: 0.4, a: 1}
+  m_unreachableColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+  m_activeMoveColor: {r: 0.25, g: 0.75, b: 1, a: 0.95}
+  m_width: 0.12
+  m_yLift: 0.05
+  m_showDistanceLabel: 1
+  m_labelPixelOffset: {x: 10, y: -28}
 --- !u!1 &1381118306
 GameObject:
   m_ObjectHideFlags: 0
@@ -8945,12 +8946,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a9291e36951d8734281ac8c732ff0d6b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveInput: {fileID: 0}
-  cameraController: {fileID: 0}
-  playerUnits: []
-  endTurnKey: 32
-  maxPartySize: 4
-  attackRange: 1.5
+  m_moveInput: {fileID: 0}
+  m_cameraController: {fileID: 0}
+  m_enemyTurnRunner: {fileID: 0}
+  m_playerUnits: []
+  m_endTurnKey: 32
+  m_maxPartySize: 4
+  m_attackRange: 1.5
+  m_basicAttackCost: 1
+  m_basicAttackDamage: 20
+  m_enemyFirstForDebug: 0
 --- !u!43 &1417810919
 Mesh:
   m_ObjectHideFlags: 0
@@ -10119,10 +10124,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99a5a7744a17e934386bf4b5b76041ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyName: Enemy_02
-  initiative: 5
-  hp: 100
-  enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
+  m_enemyName: Enemy
+  m_initiative: 5
+  m_hp: 100
+  m_enemyColor: {r: 0.7, g: 0.2, b: 0.2, a: 1}
 --- !u!43 &1570277651
 Mesh:
   m_ObjectHideFlags: 0
@@ -12807,19 +12812,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  displayName: Player 1
-  partySlot: 1
-  maxHP: 100
-  currentHP: 100
-  initiative: 16
-  maxAP: 6
-  moveSpeedMetersPerAp: 4
-  agentSpeed: 4
-  allowDebugRefill: 1
-  refillKey: 114
-  defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
-  hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
-  selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
+  m_displayName: Player
+  m_partySlot: 1
+  m_faction: 0
+  m_maxHP: 100
+  m_currentHP: 100
+  m_initiative: 10
+  m_maxAP: 6
+  m_moveSpeedMetersPerAp: 2
+  m_agentSpeed: 4
+  m_allowDebugRefill: 1
+  m_refillKey: 114
+  m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
+  m_hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
+  m_selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
 --- !u!195 &2067804695
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -13385,19 +13391,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ae39e1ed2f51d04b826b942e524c5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  displayName: Player 3
-  partySlot: 3
-  maxHP: 100
-  currentHP: 100
-  initiative: 9
-  maxAP: 6
-  moveSpeedMetersPerAp: 4
-  agentSpeed: 4
-  allowDebugRefill: 1
-  refillKey: 114
-  defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
-  hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
-  selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
+  m_displayName: Player
+  m_partySlot: 1
+  m_faction: 0
+  m_maxHP: 100
+  m_currentHP: 100
+  m_initiative: 10
+  m_maxAP: 6
+  m_moveSpeedMetersPerAp: 2
+  m_agentSpeed: 4
+  m_allowDebugRefill: 1
+  m_refillKey: 114
+  m_defaultColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
+  m_hoveredColor: {r: 0.9, g: 0.8, b: 0.3, a: 1}
+  m_selectedColor: {r: 0.3, g: 0.8, b: 0.4, a: 1}
 --- !u!195 &2145461751
 NavMeshAgent:
   m_ObjectHideFlags: 0
