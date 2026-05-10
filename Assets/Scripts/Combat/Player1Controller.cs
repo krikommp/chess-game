@@ -1,232 +1,171 @@
 using System;
+using MiniChess.Combat.Skills;
 using UnityEngine;
-using UnityEngine.AI;
 
 namespace MiniChess.Combat
 {
-    public enum PlayerVisualState
-    {
-        Default,
-        Hovered,
-        Selected
-    }
+    public enum EPlayerVisualState { Default, Hovered, Selected }
+    public enum EFaction { Player, Enemy }
 
-    public enum Faction
-    {
-        Player,
-        Enemy
-    }
-
-    /// <summary>
-    /// MVP player combat unit. Owns initiative, AP, per-round done state, and NavMeshAgent movement.
-    /// </summary>
-    [RequireComponent(typeof(NavMeshAgent))]
-    public class Player1Controller : MonoBehaviour, ICombatUnit
+    [RequireComponent(typeof(UnityEngine.AI.NavMeshAgent))]
+    public class Player1Controller : MonoBehaviour
     {
         public event Action MovementStarted;
         public event Action StateChanged;
 
         [Header("Identity")]
-        public string displayName = "Player";
-        public int partySlot = 1;
-        public Faction Faction { get; set; } = Faction.Player;
-
-        [Header("HP")]
-        public int maxHP = 100;
-        public int currentHP = 100;
-
-        [Header("Initiative")]
-        public int initiative = 10;
-
-        [Header("AP")]
-        [Tooltip("Action Points granted per refill (and starting value).")]
-        public int maxAP = 6;
-
-        [Header("Move")]
-        [Tooltip("Meters one AP can buy (path length, not straight line).")]
-        [Min(0.01f)] public float moveSpeedMetersPerAp = 2f;
-
-        [Tooltip("Animation/agent speed (meters/second). Independent from AP.")]
-        [Min(0.1f)] public float agentSpeed = 4f;
+        [SerializeField] private int m_partySlot = 1;
 
         [Header("Debug")]
-        public bool allowDebugRefill = true;
-        public KeyCode refillKey = KeyCode.R;
+        [SerializeField] private bool m_allowDebugRefill = true;
+        [SerializeField] private KeyCode m_refillKey = KeyCode.R;
 
         [Header("Visuals")]
-        [SerializeField] private Color defaultColor = new Color(0.4f, 0.4f, 0.5f);
-        [SerializeField] private Color hoveredColor = new Color(0.9f, 0.8f, 0.3f);
-        [SerializeField] private Color selectedColor = new Color(0.3f, 0.8f, 0.4f);
+        [SerializeField] private Color m_defaultColor = new Color(0.4f, 0.4f, 0.5f);
+        [SerializeField] private Color m_hoveredColor = new Color(0.9f, 0.8f, 0.3f);
+        [SerializeField] private Color m_selectedColor = new Color(0.3f, 0.8f, 0.4f);
 
-        public int CurrentAP { get; private set; }
-        public int Initiative { get => initiative; set => initiative = value; }
-        public int MaxAP { get => maxAP; set => maxAP = Mathf.Max(0, value); }
-        public int PartySlot { get => partySlot; set => partySlot = value; }
-        public string DisplayName { get => string.IsNullOrWhiteSpace(displayName) ? gameObject.name : displayName; set => displayName = value; }
-        public float MoveSpeedMetersPerAp { get => moveSpeedMetersPerAp; set => moveSpeedMetersPerAp = Mathf.Max(0.01f, value); }
-        public bool IsMoving { get; private set; }
-        public bool HasEndedRound { get; private set; }
-        public bool IsAlive => currentHP > 0;
-        public int MaxHP => maxHP;
-        public int CurrentHP { get => currentHP; set => currentHP = Mathf.Clamp(value, 0, maxHP); }
-        public float UnpaidMoveDistance => _unpaidMoveDistance;
-        public float RemainingMoveDistance => Mathf.Max(0f, CurrentAP * MoveSpeedMetersPerAp - _unpaidMoveDistance);
+        private AttributeSet m_attributes;
+        private MovementController m_movement;
+        private MeshRenderer m_meshRenderer;
+        private Material m_materialInstance;
 
-        private NavMeshAgent _agent;
-        private MeshRenderer _meshRenderer;
-        private Material _materialInstance;
-        private Vector3 _lastMovementPosition;
-        private float _unpaidMoveDistance;
+        public int PartySlot => m_partySlot;
 
-        public NavMeshAgent Agent => _agent;
+        // ── Convenience pass-throughs ───────────────────────────────
+
+        public string DisplayName => m_attributes != null ? m_attributes.DisplayName : gameObject.name;
+        public bool IsAlive => m_attributes != null && m_attributes.IsAlive;
+        public bool IsMoving => m_movement != null && m_movement.IsMoving;
+        public int CurrentAP => m_attributes != null ? (int)m_attributes.Get(WellKnownAttributeTags.AP) : 0;
+        public int MaxAP => m_attributes != null ? (int)m_attributes.GetMax(WellKnownAttributeTags.AP) : 0;
+        public int CurrentHP => m_attributes != null ? (int)m_attributes.Get(WellKnownAttributeTags.HP) : 0;
+        public int MaxHP => m_attributes != null ? (int)m_attributes.GetMax(WellKnownAttributeTags.HP) : 0;
+        public int Initiative => m_attributes != null ? (int)m_attributes.Get(WellKnownAttributeTags.Initiative) : 0;
+        public float MoveSpeedMetersPerAp => m_attributes != null ? m_attributes.Get(WellKnownAttributeTags.MoveSpeed) : 2f;
+        public float RemainingMoveDistance => m_movement != null ? m_movement.RemainingMoveDistance : 0f;
+
+        // ── Unity lifecycle ─────────────────────────────────────────
 
         private void Awake()
         {
-            _agent = GetComponent<NavMeshAgent>();
-            _agent.speed = agentSpeed;
-            _agent.stoppingDistance = 0.05f;
-            _agent.autoBraking = true;
-            CurrentAP = maxAP;
+            m_attributes = GetComponent<AttributeSet>();
+            m_movement = GetComponent<MovementController>();
 
-            _meshRenderer = GetComponentInChildren<MeshRenderer>();
-            if (_meshRenderer != null)
+            WireEvents();
+
+            m_meshRenderer = GetComponentInChildren<MeshRenderer>();
+            if (m_meshRenderer != null)
             {
-                _materialInstance = _meshRenderer.material;
-                ApplyColor(defaultColor);
+                m_materialInstance = m_meshRenderer.material;
+                ApplyColor(m_defaultColor);
             }
         }
 
         private void Update()
         {
-            if (allowDebugRefill && Input.GetKeyDown(refillKey))
+            if (m_allowDebugRefill && Input.GetKeyDown(m_refillKey))
             {
-                BeginRound();
-                Debug.Log($"[{DisplayName}] AP refilled to {CurrentAP}");
-            }
-
-            if (!IsMoving) return;
-
-            AccountMovementDistance();
-
-            if (!_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance)
-            {
-                IsMoving = false;
+                m_attributes?.SetToMax(WellKnownAttributeTags.AP);
                 StateChanged?.Invoke();
             }
         }
 
+        private void OnDestroy()
+        {
+            if (m_attributes != null)
+                m_attributes.AttributeDepleted -= OnAttributeDepleted;
+        }
+
+        // ── Public methods ──────────────────────────────────────────
+
         public void BeginRound()
         {
-            CurrentAP = maxAP;
-            HasEndedRound = false;
-            _unpaidMoveDistance = 0f;
+            m_attributes?.SetToMax(WellKnownAttributeTags.AP);
+            m_movement?.ResetUnpaidDistance();
+            GetComponent<SkillExecutor>()?.AdvanceCooldowns();
             StateChanged?.Invoke();
         }
 
         public bool TryEndRound()
         {
             if (IsMoving) return false;
-
-            HasEndedRound = true;
-            CurrentAP = 0;
-            _unpaidMoveDistance = 0f;
+            m_attributes?.Set(WellKnownAttributeTags.AP, 0f);
+            m_movement?.ResetUnpaidDistance();
             StateChanged?.Invoke();
             return true;
         }
 
-        /// <summary>Start or retarget movement. AP is spent as traveled distance crosses each AP threshold.</summary>
-        /// <returns>true if move started.</returns>
-        public bool TryMove(NavMeshPath path, int apCost)
-        {
-            if (HasEndedRound) return false;
-            if (path == null || path.status != NavMeshPathStatus.PathComplete) return false;
-            if (!CanMoveAlong(path)) return false;
-
-            _agent.SetPath(path);
-            IsMoving = true;
-            _lastMovementPosition = transform.position;
-            MovementStarted?.Invoke();
-            StateChanged?.Invoke();
-            return true;
-        }
-
-        /// <summary>Spend AP directly (e.g. for attack cost when already in range).</summary>
         public bool TrySpendAP(int amount)
         {
-            if (amount <= 0 || amount > CurrentAP) return false;
-            CurrentAP -= amount;
-            StateChanged?.Invoke();
-            return true;
+            return m_attributes != null && m_attributes.TrySpend(WellKnownAttributeTags.AP, amount);
         }
 
-        public void TakeDamage(int damage)
+        public bool TryStartMove(UnityEngine.AI.NavMeshPath path)
         {
-            if (!IsAlive) return;
-            currentHP = Mathf.Max(0, currentHP - damage);
-            StateChanged?.Invoke();
+            return m_movement != null && m_movement.TryStartMove(path);
         }
 
-        public void SetVisualState(PlayerVisualState state)
+        public bool TryMove(UnityEngine.AI.NavMeshPath path, int apCost)
         {
-            switch (state)
-            {
-                case PlayerVisualState.Default:
-                    ApplyColor(defaultColor);
-                    break;
-                case PlayerVisualState.Hovered:
-                    ApplyColor(hoveredColor);
-                    break;
-                case PlayerVisualState.Selected:
-                    ApplyColor(selectedColor);
-                    break;
-            }
+            return m_movement != null && m_movement.TryMove(path);
         }
 
-        private void ApplyColor(Color color)
+        public void StopMovement()
         {
-            if (_materialInstance != null) _materialInstance.color = color;
+            m_movement?.StopMovement();
         }
 
         public int PreviewMovementApCost(float pathLength)
         {
-            if (pathLength <= 0f || MoveSpeedMetersPerAp <= 0f) return 0;
-
-            float projectedDistance = _unpaidMoveDistance + pathLength;
-            int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / MoveSpeedMetersPerAp);
-            return Mathf.Clamp(cost, 0, CurrentAP);
+            return m_movement != null ? m_movement.PreviewMovementApCost(pathLength) : 0;
         }
 
-        private bool CanMoveAlong(NavMeshPath path)
+        public void TakeDamage(int damage)
         {
-            if (CurrentAP <= 0) return false;
-            if (path.corners == null || path.corners.Length < 2) return false;
-
-            float pathLength = PathCostCalculator.PathLength(path.corners);
-            return pathLength > 0.001f && pathLength <= RemainingMoveDistance + 0.001f;
+            m_attributes?.Modify(WellKnownAttributeTags.HP, -damage);
+            StateChanged?.Invoke();
         }
 
-        private void AccountMovementDistance()
+        public void Heal(int amount)
         {
-            Vector3 currentPosition = transform.position;
-            float delta = Vector3.Distance(_lastMovementPosition, currentPosition);
-            _lastMovementPosition = currentPosition;
+            m_attributes?.Modify(WellKnownAttributeTags.HP, amount);
+            StateChanged?.Invoke();
+        }
 
-            if (delta <= 0.0001f || MoveSpeedMetersPerAp <= 0f) return;
-
-            _unpaidMoveDistance += delta;
-
-            bool spentAp = false;
-            while (_unpaidMoveDistance + 0.0001f >= MoveSpeedMetersPerAp && CurrentAP > 0)
+        public void SetVisualState(EPlayerVisualState state)
+        {
+            switch (state)
             {
-                _unpaidMoveDistance -= MoveSpeedMetersPerAp;
-                CurrentAP--;
-                spentAp = true;
+                case EPlayerVisualState.Default: ApplyColor(m_defaultColor); break;
+                case EPlayerVisualState.Hovered: ApplyColor(m_hoveredColor); break;
+                case EPlayerVisualState.Selected: ApplyColor(m_selectedColor); break;
+            }
+        }
+
+        // ── Private helpers ─────────────────────────────────────────
+
+        private void WireEvents()
+        {
+            if (m_movement != null)
+            {
+                m_movement.MovementStarted += () => { MovementStarted?.Invoke(); StateChanged?.Invoke(); };
+                m_movement.MovementStopped += () => StateChanged?.Invoke();
+                m_movement.ApDeducted += () => StateChanged?.Invoke();
             }
 
-            if (spentAp)
+            if (m_attributes != null)
             {
-                StateChanged?.Invoke();
+                m_attributes.AttributeChanged += (tag, prev, cur) => StateChanged?.Invoke();
+                m_attributes.AttributeDepleted += OnAttributeDepleted;
             }
+        }
+
+        private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
+
+        private void ApplyColor(Color color)
+        {
+            if (m_materialInstance != null) m_materialInstance.color = color;
         }
     }
 }

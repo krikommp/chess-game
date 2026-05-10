@@ -1,4 +1,6 @@
 using UnityEngine;
+using MiniChess.Combat.Skills;
+
 namespace MiniChess.Combat
 {
     /// <summary>
@@ -8,12 +10,16 @@ namespace MiniChess.Combat
     public class EnemySpawner : MonoBehaviour
     {
         [Header("Enemy Config")]
-        public string enemyName = "Enemy";
-        public int initiative = 5;
-        public int hp = 100;
+        [SerializeField] private string m_enemyName = "Enemy";
+        [SerializeField] private int m_initiative = 5;
+        [SerializeField] private int m_hp = 100;
 
         [Header("Visual")]
-        public Color enemyColor = new Color(0.7f, 0.2f, 0.2f);
+        [SerializeField] private Color m_enemyColor = new Color(0.7f, 0.2f, 0.2f);
+
+        [Header("Skills")]
+        [Tooltip("Skills assigned to the spawned enemy unit. MVP test scenes should assign basic_move here.")]
+        [SerializeField] private SkillDefinition[] m_defaultSkills;
 
         private void Awake()
         {
@@ -24,7 +30,7 @@ namespace MiniChess.Combat
         private void SpawnEnemy()
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = enemyName;
+            go.name = m_enemyName;
             go.transform.position = transform.position;
             go.transform.localScale = new Vector3(0.6f, 1.2f, 0.6f);
 
@@ -32,15 +38,26 @@ namespace MiniChess.Combat
             MeshRenderer renderer = go.GetComponent<MeshRenderer>();
             if (renderer != null)
             {
-                renderer.material.color = enemyColor;
+                renderer.material.color = m_enemyColor;
             }
 
-            // Enemy controller
+            // New component stack: AttributeSet → MovementController → SkillExecutor → EnemyController
+            var attr = go.AddComponent<AttributeSet>();
+            attr.Testing_AddAttribute(WellKnownAttributeTags.HP, m_hp, m_hp);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.AP, 6f, 6f);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.Initiative, m_initiative, 0f);
+            attr.Testing_AddAttribute(WellKnownAttributeTags.MoveSpeed, 2f, 0f);
+            attr.DisplayName = m_enemyName;
+            attr.OverrideFactionForTesting(EFaction.Enemy);
+
+            go.AddComponent<MovementController>();
+
+            SkillExecutor skillExecutor = go.AddComponent<SkillExecutor>();
+            skillExecutor.SetSkills(m_defaultSkills);
+
+            // Enemy controller (bridge phase — syncs from AttributeSet)
             EnemyController enemy = go.AddComponent<EnemyController>();
-            enemy.displayName = enemyName;
-            enemy.initiative = initiative;
-            enemy.maxHP = hp;
-            enemy.defaultColor = enemyColor;
+            enemy.DefaultColor = m_enemyColor;
 
             // TODO(Docs/06_MAP_SPEC.md §2): Revisit dynamic unit blocking once
             // enemy AI movement and obstacle carving share a proper movement layer.

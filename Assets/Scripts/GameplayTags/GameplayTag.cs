@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace MiniChess.GameplayTags
@@ -6,9 +6,9 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public readonly struct GameplayTag : IEquatable<GameplayTag>
     {
-        [SerializeField] private readonly string _value;
+        [SerializeField] private readonly string m_value;
 
-        public string Value => _value ?? string.Empty;
+        public string Value => m_value ?? string.Empty;
 
         public GameplayTag(string value)
         {
@@ -16,7 +16,7 @@ namespace MiniChess.GameplayTags
             {
                 throw new ArgumentException($"Invalid GameplayTag: '{value}'");
             }
-            _value = value;
+            m_value = value;
         }
 
         public bool Equals(GameplayTag other) =>
@@ -52,9 +52,9 @@ namespace MiniChess.GameplayTags
         /// Match this tag against a query tag. Exact: values must be identical.
         /// Prefix: query segments must be a prefix of this tag's segments, on segment boundaries.
         /// </summary>
-        public bool Matches(GameplayTag query, TagMatchMode mode)
+        public bool Matches(GameplayTag query, ETagMatchMode mode)
         {
-            if (mode == TagMatchMode.Exact)
+            if (mode == ETagMatchMode.Exact)
             {
                 return Equals(query);
             }
@@ -74,3 +74,5 @@ namespace MiniChess.GameplayTags
         }
     }
 }
+
+

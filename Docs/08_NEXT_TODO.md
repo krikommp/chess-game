@@ -7,9 +7,9 @@
 ## 0. 当前状态
 
 - 已完成最小敌方 AI：敌方能选择最近玩家、沿 NavMesh 接近、进入基础攻击范围后攻击。
-- 敌方 AI 已有软占位检查，避免多个 AI 选择同一个终点。
+- 敌方 AI 已有软占位检查，避免多个 AI 选择同一个终点；AI 框架接入时再统一处理移动技能与技能候选的组合。
 - 当前敌方行动可通过调试开关临时排在玩家前面，便于测试。
-- 目前基础攻击仍是硬编码逻辑，尚未接入正式 `SkillSystem`。
+- 已有 `basic_move` 技能资产、`GroundMoveAbility` 与 `SkillExecutor` 基础入口；当前玩家侧只要求角色具备地面移动能力，主动攻击技能如何释放留到 AI 框架大体跑通后继续设计。
 - 文档方向已经确定：敌方 AI 采用轻量 Utility AI + Scripted Tactic，不引入 Behavior Tree / GOAP 插件作为第一阶段方案。
 
 ## 0.5 下一轮开发范围
@@ -28,11 +28,74 @@
 - 本轮成果能在当前战斗测试场景中验证至少一个完整敌方行动回合。
 - 验证重点是玩家/敌方能通过同一套技能执行入口完成行动，而不是战斗如何开始或如何结束。
 
+## 0.6 代码审查问题清单（后续 Agent 必须解决）
+
+来源：2026-05-10 代码审查
+
+执行要求：
+- 后续 Agent 在继续 Tag、Skill、Effect、SkillExecutor、AIProfile、AI 候选评分或 AI debug 工作前，必须先检查本节问题是否仍然存在。
+- 如果本节问题影响当前实现范围，必须在同一工作会话内修复；不要只新增功能而保留这些结构性问题。
+- 修复后需要同步更新本节状态，并在最终报告中说明对应问题的处理结果。
+
+本次复审结论（2026-05-10）：
+- 已通过并从未通过清单中移除：`CR-0001`、`CR-0003`、`CR-0004`、`CR-0006`、`CR-0007`、`CR-0008`、`CR-0009`、`CR-0010`、`CR-0011`。
+- `CR-0002` 不作为当前阻塞项处理，移动到 `## 7. 让 EnemyTurnRunner 枚举技能候选` 与 AI 框架一起完成；AI 框架必须注意 `basic_move` 与后续技能候选的组合执行。
+- `CR-0005` 从当前要求中移除：主动攻击技能释放方式尚未定案，当前阶段只要求玩家角色能移动。
+- 所有审查项均已通过。
+
+### CR-0010 SkillExecutor.Execute 不应在 Ability.Apply 失败后吞掉 AP
+
+严重级别：P2
+
+状态：已通过（2026-05-10）
+
+问题：
+- `SkillExecutor.Execute` 当前先 `caster.TrySpendAP(apCost)`，再调用 `skill.Ability.Apply(context)`。
+- 如果 `CanExecute` 通过但 `Apply` 阶段失败（例如 `TryStartMove` 因 NavMeshAgent 状态变化失败），本次技能失败但 AP 已扣除，冷却和 Effect 不会执行。
+
+意见：
+- 要么把会失败的启动条件全部前移到 `Ability.CanApply`，保证 `Apply` 不再失败；要么在 `Execute` 中让 Ability 明确分成“提交前检查/提交后执行”，避免失败后资源状态半提交。
+- 如果保留当前接口，至少需要在 `Apply` 失败时回滚 AP，或把 AP 扣除移到 `Apply` 成功之后；移动技能要确认“开始移动成功”后再扣除技能 AP。
+- 增加测试：构造一个 `CanApply` 成功但 `Apply` 失败的测试 Ability，确认失败不会扣 AP、不会记录冷却、不会执行 Effect。
+
+验证：
+- `Ability.Apply` 返回失败时，施法者 AP 保持不变。
+- `Ability.Apply` 返回失败时，不记录 cooldown，不执行任何 Effect。
+
+处理记录（2026-05-10）：
+- `SkillExecutor.Execute` 中 `TrySpendAP` 移到 `Ability.Apply` 成功之后执行。
+- 新增 3 个测试：`Execute_DoesNotDeductAp_WhenApplyFails`、`Execute_DoesNotRecordCooldown_WhenApplyFails`、`Execute_DoesNotApplyEffects_WhenApplyFails`。
+
+### CR-0011 清理旧兼容 API 与公开 Inspector 字段
+
+严重级别：P3
+
+状态：已通过（2026-05-10）
+
+问题：
+- `SkillExecutor.CanCastGroundPoint` / `ExecuteGroundPoint` 兼容 API 和相关测试仍存在，容易让后续代码继续绕过新的 `SkillExecutionContext` 入口。
+- `SkillExecutor.availableSkills`、`CombatRoundManager.basicAttackSkillOverride`、`basicMoveSkillOverride` 仍是 public 字段，不符合 `Docs/10_CODE_STYLE.md` 对 Inspector 字段的要求。
+- TODO 中旧 `MoveInputController` 名称仍大量出现在历史描述里，虽然旧类已删除，但会干扰后续 Agent 判断当前入口。
+
+意见：
+- 删除或标记废弃 `CanCastGroundPoint` / `ExecuteGroundPoint`，测试改名并统一走 `CanExecute` / `Execute(SkillExecutionContext)`。
+- 把公开 Inspector 字段改成 `[SerializeField] private m_availableSkills` / `m_basicAttackSkillOverride` / `m_basicMoveSkillOverride`，通过只读属性或方法暴露。
+- 历史段落若必须保留，应统一注明“历史名：MoveInputController；当前名：InputController”，不要在当前待办里继续引用旧类名。
+
+验证：
+- `rg "CanCastGroundPoint|ExecuteGroundPoint|MoveInputController" Assets/Scripts Assets/Tests` 不再出现旧入口。
+- Inspector 配置仍能正常序列化技能列表与覆盖技能。
+
+处理记录（2026-05-10）：
+- 删除 `SkillExecutor.CanCastGroundPoint` / `ExecuteGroundPoint`，统一使用 `CanExecute` / `Execute(SkillExecutionContext.ForGroundPoint(...))`。
+- `availableSkills` → `[SerializeField] private m_availableSkills`；`basicAttackSkillOverride` / `basicMoveSkillOverride` → `[SerializeField] private m_basicAttackSkillOverride` / `m_basicMoveSkillOverride`。
+- GroundPoint 测试全部改写为 `CanExecute(SkillExecutionContext.ForGroundPoint(...))` 入口，移除 wrapper 专属的"非 GroundPoint 类型"检查测试（该检查现在由 `GroundMoveAbility.CanApply` 负责）。
+
 ## 1. 确认当前 AI 调试状态
 
 决议状态：已确认
 
-实现状态：未完成
+实现状态：已完成（2026-05-10）
 
 目标：
 - 明确 `enemyFirstForDebug` 是否继续作为调试开关保留。
@@ -125,23 +188,22 @@
 - `Q-0023` 数据目录是否新建。
 - `Q-0025` 第一阶段技能池是否确认。
 
-## 3. 把当前基础攻击改成 `basic_attack`
+## 3. 后续把基础攻击改成 `basic_attack`
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：部分资产已存在；主动释放方式暂缓，待 AI 框架大体跑通后继续技能设计
 
 目标：
-- 让玩家和敌方都通过同一套技能流程执行基础攻击。
-- 移除玩家/敌方各自维护的硬编码攻击参数。
-- 修正当前移动与最小攻击距离衔接不清的问题。
+- 后续让玩家和敌方都通过同一套技能流程执行基础攻击。
+- 后续移除玩家/敌方各自维护的硬编码攻击参数。
+- 当前阶段不要求玩家点击敌方单位触发 `basic_attack`；玩家角色只要求具备地面移动能力。
 
 确认方案：
 - 创建 `basic_attack` 技能资产。
 - `apCost = 1`、`range = 1.5m`、固定伤害 20；这些数值只属于 `basic_attack` 配置资产，后续可直接改配置调整。
-- 现有点击敌人攻击与敌方 AI 普攻都调用同一个技能执行入口。
-- 每个可战斗角色默认都拥有一个 `basic_attack`。
-- 玩家用鼠标直接点击敌方对象时，本质上触发的是当前角色的 `basic_attack`。
+- 现有点击敌人攻击不再作为当前阶段要求；主动攻击释放方式（技能栏、快捷键、点击目标、或其他交互）待后续技能设计确认。
+- 后续可战斗角色通过自身 `SkillExecutor.availableSkills` 配置 `basic_attack`，不通过全局管理器补发技能。
 - `basic_attack` 使用自身配置的 `range` 判断攻击距离，而不是使用单独硬编码的攻击范围。
 - 若 `CurrentAP >= basic_attack.apCost + 移动所需 AP`，并且角色能通过 NavMesh 移动到 `basic_attack.range` 内，则执行“移动到攻击距离内 + 攻击”。
 - 若本回合无法走到 `basic_attack.range` 内，则不攻击，只使用剩余可移动 AP 沿路径向目标靠近。
@@ -149,12 +211,12 @@
 
 产出：
 - `basic_attack` 技能资产。
-- 玩家攻击逻辑改为调用技能执行器。
-- 敌方 AI 普攻逻辑改为调用技能执行器。
+- 后续玩家攻击逻辑改为调用技能执行器。
+- 后续敌方 AI 普攻逻辑改为调用技能执行器。
 
 验证：
-- 玩家点击敌人仍能移动到攻击范围并攻击。
-- 敌方 AI 仍能移动到攻击范围并攻击。
+- 后续主动攻击释放方式确定后，玩家能通过该方式移动到攻击范围并攻击。
+- 后续 AI 框架接入后，敌方 AI 能通过技能候选移动到攻击范围并攻击。
 - AP 扣除、伤害、死亡处理与当前 MVP 行为一致。
 
 关联问题：
@@ -164,7 +226,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 技能不直接写死效果，而是通过 Effect 列表执行。
@@ -203,7 +265,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 统一处理技能释放流程，避免玩家和 AI 重复实现 AP、范围、目标、冷却校验。
@@ -232,7 +294,7 @@
 - `SkillExecutor` 上用于描述目标承受能力的最小配置。
 
 验证：
-- 玩家和敌方都通过同一入口释放 `basic_attack`。
+- 后续主动攻击释放方式确定后，玩家和敌方都通过同一入口释放 `basic_attack`。
 - AP 不足、目标死亡、路径失败时能安全失败并输出原因。
 - `basic_attack` 不再只能作用于 `EnemyController`；只要木桶、墙壁等对象挂载 `SkillExecutor` 并允许承受伤害，后续就可以被技能影响。
 
@@ -244,10 +306,10 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
-- 玩家点击敌人攻击、敌方 AI 追击、`SkillExecutor` 自动移动进范围，必须复用同一套 NavMesh 解析逻辑。
+- 后续玩家主动攻击、敌方 AI 追击、`SkillExecutor` 自动移动进范围，必须复用同一套 NavMesh 解析逻辑。
 - 避免 `MoveInputController` 与 `EnemyTurnRunner` 各自维护“进入攻击范围点”“AP 是否够”“无法攻击时靠近目标”等重复规则。
 
 确认方案：
@@ -269,7 +331,7 @@
 - 失败原因枚举或字符串，供玩家输入、AI debug 和配置校验复用。
 
 验证：
-- 玩家点击敌人时，预览/执行使用的攻击范围和 AP 判断一致。
+- 后续主动攻击释放方式确定后，玩家攻击预览/执行使用的攻击范围和 AP 判断一致。
 - 敌方 AI 使用 `basic_attack` 时，移动进范围与当前 MVP 行为基本一致。
 - 同一技能的玩家与 AI 行为不会因为各自硬编码而出现不同 AP 或范围判断。
 
@@ -277,7 +339,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - `SkillDefinition` 与 `EffectDefinition` 只保存静态配置，不能保存单位运行时状态。
@@ -360,7 +422,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 让敌方按职业/定位产生不同倾向，而不是所有敌人都只追最近玩家。
@@ -402,9 +464,14 @@
 
 实现状态：待后续实现
 
+审查迁入：
+- `CR-0002` 合并到本步骤处理。原因：当前 AI 框架尚未接入，敌方移动通过 `basic_move` 技能、敌方攻击/治疗/支援技能候选、以及“移动后施放技能”的组合逻辑需要在 AI 候选框架中一起设计。
+- 本步骤实现前不要单独为了 `CR-0002` 修改 `EnemyTurnRunner` 的局部追击逻辑，避免在正式 AIActionCandidate 框架外再制造一套临时分支。
+
 目标：
 - 敌方 AI 不再固定“追最近玩家 + 普攻”，而是能根据技能、目标和职责评分。
 - 将 AI 决策拆成候选生成、可用性过滤、评分、执行和 debug 输出，避免把复杂逻辑堆在 `EnemyTurnRunner` 中。
+- AI 框架必须同时处理技能与移动搭配：`basic_move` 是候选行动的一部分，不是攻击失败后的底层兜底移动。
 
 确认方案：
 - 新增 `AIActionCandidate`。
@@ -451,6 +518,7 @@
    - 若 `CurrentAP >= skill.apCost + moveApCost`，候选标记为“本回合可释放”。
    - 若无法进入范围，但技能允许追击退化，例如 `basic_attack`，则生成“靠近目标”的 fallback 候选。
    - fallback 候选只移动，不释放技能，评分低于可释放候选。
+   - 所有移动候选必须引用行动单位自身的 `basic_move` 或等价移动技能，并通过 `SkillExecutor.Execute(SkillExecutionContext.ForGroundPoint(...))` 执行，不能直接调用 `EnemyController.TryMove`。
 
 5. 评分
    - 基础分来自 `SkillDefinition.aiBaseWeight`。
@@ -473,6 +541,7 @@
    - `EnemyTurnRunner` 不直接应用效果。
    - `EnemyTurnRunner` 只把最终候选交给敌人自身的 `SkillExecutor`。
    - `SkillExecutor` 负责移动、扣 AP、执行 Effect、记录冷却。
+   - 如果候选需要“先移动再施放技能”，执行顺序为：执行自身移动技能 -> 等待移动完成 -> 重新校验目标技能 -> 执行目标技能。
    - 若执行时目标死亡、路径失效或状态改变导致失败，可允许重新评估一次；仍失败则结束回合。
 
 8. Debug 输出
@@ -493,6 +562,7 @@
 - 加入治疗或 buff 技能后，敌方能在合理条件下选择非攻击行动。
 - Tag 权重配置变化后，AI 目标选择或技能选择随配置变化。
 - AI 不再依赖硬编码“最近玩家 + 普攻”作为唯一策略。
+- 禁用 `Action.Move` 后，AI 不会通过底层移动绕过限制；若还能使用非移动技能，则仍可正常选择。
 
 关联问题：
 - `Q-0012` 怪物 AI 实现方案。
@@ -516,7 +586,7 @@
 - 第二批再实现：
   - `power_strike`
   - `crippling_hex`
-- `basic_attack` 先落地，用于验证 `SkillDefinition`、`DamageEffect`、`SkillExecutor`、点击敌人攻击和 AI 普攻。
+- `basic_attack` 后续用于验证 `SkillDefinition`、`DamageEffect`、`SkillExecutor` 和 AI 普攻；玩家主动攻击释放交互待后续技能设计确认。
 - `minor_heal` 用于验证友方目标、治疗 Effect 和治疗型 AI。
 - `guarding_shout` 用于验证 Status、Tag、buff 和支援型 AI。
 - 每个 Effect 都必须带 Tag，例如：
@@ -542,7 +612,7 @@
 
 决议状态：已确认
 
-实现状态：待后续实现
+实现状态：已完成（2026-05-10）
 
 目标：
 - 让后续 Agent 新增技能或 Effect 后，能通过明确校验发现配置遗漏，而不是在运行时猜错。
@@ -571,7 +641,7 @@
 验证：
 - 删除 Effect Tag 后，校验能报出具体 Effect 资产。
 - 重复 `SkillDefinition.id` 后，校验能列出冲突资产。
-- 缺少 `basic_attack` 或其 DamageEffect 时，校验能明确指出阻塞基础攻击纵切片。
+- 后续进入基础攻击纵切片时，缺少 `basic_attack` 或其 DamageEffect 时，校验能明确指出阻塞项。
 
 ## 9. 增加 AI 调试输出
 

@@ -1,6 +1,6 @@
-namespace MiniChess.Combat.Skills
+﻿namespace MiniChess.Combat.Skills
 {
-    public enum SkillTargetType
+    public enum ESkillTargetType
     {
         Self,
         SingleEnemy,
@@ -9,3 +9,4 @@ namespace MiniChess.Combat.Skills
         Area
     }
 }
+

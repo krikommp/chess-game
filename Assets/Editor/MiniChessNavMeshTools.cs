@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -9,10 +9,10 @@ namespace MiniChess.EditorTools
 {
     public static class MiniChessNavMeshTools
     {
-        private const string SurfaceObjectName = "[NavMeshSurface]";
-        private const string MenuPath = "MiniChess/NavMesh/Rebuild Surface NavMesh";
+        private const string k_SurfaceObjectName = "[NavMeshSurface]";
+        private const string k_MenuPath = "MiniChess/NavMesh/Rebuild Surface NavMesh";
 
-        [MenuItem(MenuPath)]
+        [MenuItem(k_MenuPath)]
         public static void RebuildSurfaceNavMesh()
         {
             var scene = EditorSceneManager.GetActiveScene();
@@ -50,10 +50,10 @@ namespace MiniChess.EditorTools
 
         private static NavMeshSurface EnsureSurface()
         {
-            var existing = GameObject.Find(SurfaceObjectName);
+            var existing = GameObject.Find(k_SurfaceObjectName);
             if (existing == null)
             {
-                existing = new GameObject(SurfaceObjectName);
+                existing = new GameObject(k_SurfaceObjectName);
                 Undo.RegisterCreatedObjectUndo(existing, "Create NavMeshSurface");
             }
 
@@ -100,7 +100,7 @@ namespace MiniChess.EditorTools
                 Directory.CreateDirectory(targetDirectory);
             }
 
-            var assetPath = $"{targetDirectory}/NavMesh-{SurfaceObjectName}.asset";
+            var assetPath = $"{targetDirectory}/NavMesh-{k_SurfaceObjectName}.asset";
             var existing = AssetDatabase.LoadAssetAtPath<NavMeshData>(assetPath);
             if (existing != null)
             {
@@ -111,3 +111,4 @@ namespace MiniChess.EditorTools
         }
     }
 }
+

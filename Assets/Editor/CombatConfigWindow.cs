@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MiniChess.Combat.Skills;
@@ -10,20 +10,20 @@ namespace MiniChess.EditorTools
 {
     public class CombatConfigWindow : EditorWindow
     {
-        private const string RegistryAssetPath = "Assets/Data/Tags/GameplayTagRegistry.asset";
+        private const string k_RegistryAssetPath = "Assets/Data/Tags/GameplayTagRegistry.asset";
 
-        private enum Tab { Tags, Skills, Effects, Statuses, AIProfiles, Validation }
+        private enum ETab { Tags, Skills, Effects, Statuses, AIProfiles, Validation }
 
-        private Tab _currentTab;
-        private Vector2 _tagScrollPos;
-        private Vector2 _validationScrollPos;
-        private string _tagSearch = string.Empty;
-        private string _newTagValue = string.Empty;
-        private string _newTagDisplayName = string.Empty;
-        private string _newTagDescription = string.Empty;
-        private TagRegistry _registry;
-        private List<ValidationIssue> _validationIssues = new List<ValidationIssue>();
-        private bool _validationRun;
+        private ETab m_currentTab;
+        private Vector2 m_tagScrollPos;
+        private Vector2 m_validationScrollPos;
+        private string m_tagSearch = string.Empty;
+        private string m_newTagValue = string.Empty;
+        private string m_newTagDisplayName = string.Empty;
+        private string m_newTagDescription = string.Empty;
+        private TagRegistry m_registry;
+        private List<ValidationIssue> m_validationIssues = new List<ValidationIssue>();
+        private bool m_validationRun;
 
         [MenuItem("MiniChess/Combat Config")]
         public static void ShowWindow()
@@ -35,40 +35,40 @@ namespace MiniChess.EditorTools
 
         private void OnEnable()
         {
-            _registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(RegistryAssetPath);
+            m_registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(k_RegistryAssetPath);
         }
 
         private void OnGUI()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-            DrawToolbarButton("Tags", Tab.Tags);
-            DrawToolbarButton("Skills", Tab.Skills);
-            DrawToolbarButton("Effects", Tab.Effects);
-            DrawToolbarButton("Status", Tab.Statuses);
-            DrawToolbarButton("AI Profiles", Tab.AIProfiles);
-            DrawToolbarButton("Validation", Tab.Validation);
+            DrawToolbarButton("Tags", ETab.Tags);
+            DrawToolbarButton("Skills", ETab.Skills);
+            DrawToolbarButton("Effects", ETab.Effects);
+            DrawToolbarButton("Status", ETab.Statuses);
+            DrawToolbarButton("AI Profiles", ETab.AIProfiles);
+            DrawToolbarButton("Validation", ETab.Validation);
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(8);
 
-            switch (_currentTab)
+            switch (m_currentTab)
             {
-                case Tab.Tags:
+                case ETab.Tags:
                     DrawTagsTab();
                     break;
-                case Tab.Skills:
+                case ETab.Skills:
                     DrawStubTab("Skills", "SkillDefinition assets will appear here once created.");
                     break;
-                case Tab.Effects:
+                case ETab.Effects:
                     DrawStubTab("Effects", "EffectDefinition assets will appear here once created.");
                     break;
-                case Tab.Statuses:
+                case ETab.Statuses:
                     DrawStubTab("Statuses", "StatusDefinition assets not yet available.");
                     break;
-                case Tab.AIProfiles:
+                case ETab.AIProfiles:
                     DrawStubTab("AI Profiles", "AIProfile assets will appear here once created.");
                     break;
-                case Tab.Validation:
+                case ETab.Validation:
                     DrawValidationTab();
                     break;
             }
@@ -76,29 +76,29 @@ namespace MiniChess.EditorTools
 
         // ── Toolbar ────────────────────────────────────────────
 
-        private void DrawToolbarButton(string label, Tab tab)
+        private void DrawToolbarButton(string label, ETab ETab)
         {
-            var style = _currentTab == tab
+            var style = m_currentTab == ETab
                 ? EditorStyles.toolbarButton
                 : EditorStyles.toolbarButton;
-            GUI.backgroundColor = _currentTab == tab ? Color.cyan * 0.6f : Color.white;
+            GUI.backgroundColor = m_currentTab == ETab ? Color.cyan * 0.6f : Color.white;
             if (GUILayout.Button(label, style))
             {
-                _currentTab = tab;
+                m_currentTab = ETab;
             }
             GUI.backgroundColor = Color.white;
         }
 
-        // ── Tags Tab ───────────────────────────────────────────
+        // ── Tags ETab ───────────────────────────────────────────
 
         private void DrawTagsTab()
         {
             EditorGUILayout.LabelField("Tag Registry", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Path", RegistryAssetPath);
+            EditorGUILayout.LabelField("Path", k_RegistryAssetPath);
             EditorGUILayout.Space(4);
 
             // Ensure registry exists
-            if (_registry == null)
+            if (m_registry == null)
             {
                 EditorGUILayout.HelpBox(
                     "No TagRegistry found. Click 'Create Registry' to create one.",
@@ -112,20 +112,20 @@ namespace MiniChess.EditorTools
 
             // Search
             EditorGUILayout.BeginHorizontal();
-            _tagSearch = EditorGUILayout.TextField("Filter", _tagSearch);
+            m_tagSearch = EditorGUILayout.TextField("Filter", m_tagSearch);
             if (GUILayout.Button("Clear", GUILayout.Width(60)))
             {
-                _tagSearch = string.Empty;
+                m_tagSearch = string.Empty;
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
 
             // Tag list
-            var filtered = string.IsNullOrWhiteSpace(_tagSearch)
-                ? _registry.Entries.ToList()
-                : _registry.Entries
-                    .Where(e => e.Tag.Value.IndexOf(_tagSearch, System.StringComparison.OrdinalIgnoreCase) >= 0
-                             || (e.DisplayName?.IndexOf(_tagSearch, System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
+            var filtered = string.IsNullOrWhiteSpace(m_tagSearch)
+                ? m_registry.Entries.ToList()
+                : m_registry.Entries
+                    .Where(e => e.Tag.Value.IndexOf(m_tagSearch, System.StringComparison.OrdinalIgnoreCase) >= 0
+                             || (e.DisplayName?.IndexOf(m_tagSearch, System.StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
                     .ToList();
 
             // Group by root
@@ -135,7 +135,7 @@ namespace MiniChess.EditorTools
                     : e.Tag.Value)
                 .OrderBy(g => g.Key);
 
-            _tagScrollPos = EditorGUILayout.BeginScrollView(_tagScrollPos);
+            m_tagScrollPos = EditorGUILayout.BeginScrollView(m_tagScrollPos);
 
             foreach (var group in groups)
             {
@@ -162,12 +162,12 @@ namespace MiniChess.EditorTools
 
             // Add tag
             EditorGUILayout.LabelField("Add Tag", EditorStyles.boldLabel);
-            _newTagValue = EditorGUILayout.TextField("Tag (e.g. Element.Fire)", _newTagValue);
-            _newTagDisplayName = EditorGUILayout.TextField("Display Name", _newTagDisplayName);
-            _newTagDescription = EditorGUILayout.TextField("Description", _newTagDescription);
+            m_newTagValue = EditorGUILayout.TextField("Tag (e.g. Element.Fire)", m_newTagValue);
+            m_newTagDisplayName = EditorGUILayout.TextField("Display Name", m_newTagDisplayName);
+            m_newTagDescription = EditorGUILayout.TextField("Description", m_newTagDescription);
 
-            var validNewTag = MiniChess.GameplayTags.GameplayTag.IsValid(_newTagValue);
-            if (!string.IsNullOrWhiteSpace(_newTagValue) && !validNewTag)
+            var validNewTag = MiniChess.GameplayTags.GameplayTag.IsValid(m_newTagValue);
+            if (!string.IsNullOrWhiteSpace(m_newTagValue) && !validNewTag)
             {
                 EditorGUILayout.HelpBox("Invalid tag format. No leading/trailing dots, no spaces, no consecutive dots.", MessageType.Error);
             }
@@ -182,7 +182,7 @@ namespace MiniChess.EditorTools
 
         private void CreateRegistry()
         {
-            var dir = Path.GetDirectoryName(RegistryAssetPath);
+            var dir = Path.GetDirectoryName(k_RegistryAssetPath);
             if (!AssetDatabase.IsValidFolder(dir))
             {
                 Directory.CreateDirectory(dir);
@@ -190,51 +190,51 @@ namespace MiniChess.EditorTools
             }
 
             var registry = ScriptableObject.CreateInstance<TagRegistry>();
-            AssetDatabase.CreateAsset(registry, RegistryAssetPath);
+            AssetDatabase.CreateAsset(registry, k_RegistryAssetPath);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            _registry = registry;
+            m_registry = registry;
         }
 
         private void AddTagEntry()
         {
-            if (_registry == null) return;
+            if (m_registry == null) return;
 
-            var tag = new MiniChess.GameplayTags.GameplayTag(_newTagValue);
-            if (_registry.IsRegistered(tag))
+            var tag = new MiniChess.GameplayTags.GameplayTag(m_newTagValue);
+            if (m_registry.IsRegistered(tag))
             {
-                Debug.LogWarning($"[CombatConfig] Tag '{_newTagValue}' already registered.");
+                Debug.LogWarning($"[CombatConfig] Tag '{m_newTagValue}' already registered.");
                 return;
             }
 
-            var so = new SerializedObject(_registry);
-            var entriesProp = so.FindProperty("_entries");
+            var so = new SerializedObject(m_registry);
+            var entriesProp = so.FindProperty("m_entries");
             var idx = entriesProp.arraySize;
             entriesProp.InsertArrayElementAtIndex(idx);
             var el = entriesProp.GetArrayElementAtIndex(idx);
-            el.FindPropertyRelative("_tag._value").stringValue = _newTagValue;
-            el.FindPropertyRelative("_displayName").stringValue = _newTagDisplayName;
-            el.FindPropertyRelative("_description").stringValue = _newTagDescription;
+            el.FindPropertyRelative("m_tag.m_value").stringValue = m_newTagValue;
+            el.FindPropertyRelative("m_displayName").stringValue = m_newTagDisplayName;
+            el.FindPropertyRelative("m_description").stringValue = m_newTagDescription;
             so.ApplyModifiedProperties();
 
-            EditorUtility.SetDirty(_registry);
+            EditorUtility.SetDirty(m_registry);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            _newTagValue = string.Empty;
-            _newTagDisplayName = string.Empty;
-            _newTagDescription = string.Empty;
+            m_newTagValue = string.Empty;
+            m_newTagDisplayName = string.Empty;
+            m_newTagDescription = string.Empty;
             GUI.FocusControl(null);
         }
 
         private void RemoveTagEntry(TagEntry entry)
         {
-            var so = new SerializedObject(_registry);
-            var entriesProp = so.FindProperty("_entries");
+            var so = new SerializedObject(m_registry);
+            var entriesProp = so.FindProperty("m_entries");
             for (int i = 0; i < entriesProp.arraySize; i++)
             {
                 var el = entriesProp.GetArrayElementAtIndex(i);
-                var val = el.FindPropertyRelative("_tag._value").stringValue;
+                var val = el.FindPropertyRelative("m_tag.m_value").stringValue;
                 if (val == entry.Tag.Value)
                 {
                     entriesProp.DeleteArrayElementAtIndex(i);
@@ -242,12 +242,12 @@ namespace MiniChess.EditorTools
                 }
             }
             so.ApplyModifiedProperties();
-            EditorUtility.SetDirty(_registry);
+            EditorUtility.SetDirty(m_registry);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
 
-        // ── Stub Tab ───────────────────────────────────────────
+        // ── Stub ETab ───────────────────────────────────────────
 
         private void DrawStubTab(string title, string hint)
         {
@@ -255,7 +255,7 @@ namespace MiniChess.EditorTools
             EditorGUILayout.HelpBox(hint, MessageType.Info);
         }
 
-        // ── Validation Tab ─────────────────────────────────────
+        // ── Validation ETab ─────────────────────────────────────
 
         private void DrawValidationTab()
         {
@@ -265,18 +265,18 @@ namespace MiniChess.EditorTools
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Run All Checks", GUILayout.Height(30), GUILayout.Width(140)))
             {
-                _validationIssues.Clear();
+                m_validationIssues.Clear();
                 RunValidation();
-                _validationRun = true;
+                m_validationRun = true;
             }
             if (GUILayout.Button("Clear", GUILayout.Height(30), GUILayout.Width(80)))
             {
-                _validationIssues.Clear();
-                _validationRun = false;
+                m_validationIssues.Clear();
+                m_validationRun = false;
             }
             EditorGUILayout.EndHorizontal();
 
-            if (!_validationRun)
+            if (!m_validationRun)
             {
                 EditorGUILayout.Space(8);
                 EditorGUILayout.LabelField("Checks performed:", EditorStyles.miniLabel);
@@ -292,10 +292,10 @@ namespace MiniChess.EditorTools
             EditorGUILayout.Space(4);
             int errorCount = 0;
             int warningCount = 0;
-            for (int i = 0; i < _validationIssues.Count; i++)
+            for (int i = 0; i < m_validationIssues.Count; i++)
             {
-                if (_validationIssues[i].Severity == ValidationSeverity.Error) errorCount++;
-                else if (_validationIssues[i].Severity == ValidationSeverity.Warning) warningCount++;
+                if (m_validationIssues[i].Severity == EValidationSeverity.Error) errorCount++;
+                else if (m_validationIssues[i].Severity == EValidationSeverity.Warning) warningCount++;
             }
 
             var summaryStyle = new GUIStyle(EditorStyles.boldLabel);
@@ -306,13 +306,13 @@ namespace MiniChess.EditorTools
             EditorGUILayout.LabelField(summary, summaryStyle);
             EditorGUILayout.Space(4);
 
-            _validationScrollPos = EditorGUILayout.BeginScrollView(_validationScrollPos);
-            for (int i = 0; i < _validationIssues.Count; i++)
+            m_validationScrollPos = EditorGUILayout.BeginScrollView(m_validationScrollPos);
+            for (int i = 0; i < m_validationIssues.Count; i++)
             {
-                var issue = _validationIssues[i];
-                var icon = issue.Severity == ValidationSeverity.Error ? "✘" : "⚠";
-                var color = issue.Severity == ValidationSeverity.Error ? Color.red : Color.yellow;
-                if (issue.Severity == ValidationSeverity.Info)
+                var issue = m_validationIssues[i];
+                var icon = issue.Severity == EValidationSeverity.Error ? "✘" : "⚠";
+                var color = issue.Severity == EValidationSeverity.Error ? Color.red : Color.yellow;
+                if (issue.Severity == EValidationSeverity.Info)
                 {
                     icon = "ℹ";
                     color = Color.white;
@@ -342,13 +342,13 @@ namespace MiniChess.EditorTools
             Debug.Log("── Combat Config Validation ──");
 
             // 1. TagRegistry check
-            if (_registry == null)
+            if (m_registry == null)
             {
-                _registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(RegistryAssetPath);
+                m_registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(k_RegistryAssetPath);
             }
-            if (_registry == null)
+            if (m_registry == null)
             {
-                AddIssue(ValidationSeverity.Error, "TagRegistry not found. Create one via the Tags tab.", RegistryAssetPath);
+                AddIssue(EValidationSeverity.Error, "TagRegistry not found. Create one via the Tags ETab.", k_RegistryAssetPath);
                 Debug.LogError("[Validation] TagRegistry not found.");
             }
 
@@ -441,7 +441,7 @@ namespace MiniChess.EditorTools
             }
 
             // 6. Unregistered tags in Skills
-            if (_registry != null)
+            if (m_registry != null)
             {
                 for (int i = 0; i < skillDefs.Count; i++)
                 {
@@ -473,14 +473,14 @@ namespace MiniChess.EditorTools
             // Summary to Console
             int errCount = 0;
             int warnCount = 0;
-            for (int i = 0; i < _validationIssues.Count; i++)
+            for (int i = 0; i < m_validationIssues.Count; i++)
             {
-                if (_validationIssues[i].Severity == ValidationSeverity.Error) errCount++;
-                else if (_validationIssues[i].Severity == ValidationSeverity.Warning) warnCount++;
+                if (m_validationIssues[i].Severity == EValidationSeverity.Error) errCount++;
+                else if (m_validationIssues[i].Severity == EValidationSeverity.Warning) warnCount++;
             }
             Debug.Log(errCount == 0 && warnCount == 0
                 ? "[Validation] All checks passed."
-                : $"[Validation] {errCount} error(s), {warnCount} warning(s) found. See the Validation tab for details.");
+                : $"[Validation] {errCount} error(s), {warnCount} warning(s) found. See the Validation ETab for details.");
         }
 
         private void ValidateSkillDefinition(SkillDefinition skill, string path,
@@ -559,7 +559,7 @@ namespace MiniChess.EditorTools
                 AddError($"Invalid tag format in {context}: '{tagRef.Value}'", assetPath);
                 return;
             }
-            if (_registry != null && !_registry.IsRegistered(tagRef))
+            if (m_registry != null && !m_registry.IsRegistered(tagRef))
             {
                 AddWarning($"Unregistered tag in {context}: '{tagRef.Value}'", assetPath);
             }
@@ -577,19 +577,19 @@ namespace MiniChess.EditorTools
 
         private void AddError(string message, string assetPath = null)
         {
-            AddIssue(ValidationSeverity.Error, message, assetPath);
+            AddIssue(EValidationSeverity.Error, message, assetPath);
             Debug.LogError($"[Validation] {message}" + (assetPath != null ? $" ({assetPath})" : ""));
         }
 
         private void AddWarning(string message, string assetPath = null)
         {
-            AddIssue(ValidationSeverity.Warning, message, assetPath);
+            AddIssue(EValidationSeverity.Warning, message, assetPath);
             Debug.LogWarning($"[Validation] {message}" + (assetPath != null ? $" ({assetPath})" : ""));
         }
 
-        private void AddIssue(ValidationSeverity severity, string message, string assetPath)
+        private void AddIssue(EValidationSeverity severity, string message, string assetPath)
         {
-            _validationIssues.Add(new ValidationIssue
+            m_validationIssues.Add(new ValidationIssue
             {
                 Severity = severity,
                 Message = message,
@@ -597,7 +597,7 @@ namespace MiniChess.EditorTools
             });
         }
 
-        private enum ValidationSeverity
+        private enum EValidationSeverity
         {
             Info,
             Warning,
@@ -606,9 +606,12 @@ namespace MiniChess.EditorTools
 
         private struct ValidationIssue
         {
-            public ValidationSeverity Severity;
-            public string Message;
-            public string AssetPath;
+            public EValidationSeverity Severity { get; set; }
+            public string Message { get; set; }
+            public string AssetPath { get; set; }
         }
     }
 }
+
+
+

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -10,12 +10,12 @@ namespace MiniChess.Combat
     /// </summary>
     public static class CombatMovementResolver
     {
-        public const float DefaultNavMeshSnapRadius = 2f;
-        public const float DefaultOccupiedRadius = 1.0f;
+        public const float k_DefaultNavMeshSnapRadius = 2f;
+        public const float k_DefaultOccupiedRadius = 1.0f;
 
         // ── Result types ────────────────────────────────────────
 
-        public enum PositioningFailure
+        public enum EPositioningFailure
         {
             None = 0,
             NavMeshOriginFailed,
@@ -28,40 +28,40 @@ namespace MiniChess.Combat
         public struct SkillPositioningResult
         {
             /// <summary>Whether the caster is already within skill range (no movement needed).</summary>
-            public bool IsAlreadyInRange;
+            public bool IsAlreadyInRange { get; set; }
 
             /// <summary>Whether the caster can reach skill range this turn.</summary>
-            public bool CanReachRange;
+            public bool CanReachRange { get; set; }
 
             /// <summary>Whether a fallback approach point is available.</summary>
-            public bool HasFallback;
+            public bool HasFallback { get; set; }
 
             /// <summary>Destination to move to before releasing the skill.</summary>
-            public Vector3 Destination;
+            public Vector3 Destination { get; set; }
 
             /// <summary>NavMesh path from origin to Destination.</summary>
-            public NavMeshPath MovePath;
+            public NavMeshPath MovePath { get; set; }
 
             /// <summary>AP cost of the movement portion.</summary>
-            public int MoveApCost;
+            public int MoveApCost { get; set; }
 
             /// <summary>moveApCost + skillApCost.</summary>
-            public int TotalApCost;
+            public int TotalApCost { get; set; }
 
             /// <summary>NavMesh path length of the movement portion.</summary>
-            public float MoveLength;
+            public float MoveLength { get; set; }
 
             /// <summary>Failure reason.</summary>
-            public PositioningFailure Failure;
+            public EPositioningFailure Failure { get; set; }
 
             /// <summary>Farthest reachable approach point when range can't be reached.</summary>
-            public Vector3 FallbackDestination;
+            public Vector3 FallbackDestination { get; set; }
 
             /// <summary>NavMesh path to FallbackDestination.</summary>
-            public NavMeshPath FallbackPath;
+            public NavMeshPath FallbackPath { get; set; }
 
             /// <summary>AP cost for the fallback movement.</summary>
-            public int FallbackMoveApCost;
+            public int FallbackMoveApCost { get; set; }
 
             /// <summary>Whether the primary plan is actionable (in range or can reach).</summary>
             public bool IsActionable => IsAlreadyInRange || CanReachRange;
@@ -75,11 +75,11 @@ namespace MiniChess.Combat
                 {
                     IsAlreadyInRange = true,
                     CanReachRange = true,
-                    Failure = PositioningFailure.None,
+                    Failure = EPositioningFailure.None,
                 };
             }
 
-            public static SkillPositioningResult Fail(PositioningFailure reason)
+            public static SkillPositioningResult Fail(EPositioningFailure reason)
             {
                 return new SkillPositioningResult { Failure = reason };
             }
@@ -161,7 +161,8 @@ namespace MiniChess.Combat
             {
                 foreach (Player1Controller p in players)
                 {
-                    if (p == null || !p.IsAlive) continue;
+                    var pAttr = p != null ? p.GetComponent<AttributeSet>() : null;
+                    if (p == null || (pAttr != null && !pAttr.IsAlive)) continue;
                     if (FlatSqrDistance(p.transform.position, destination) < minSqr) return false;
                 }
             }
@@ -170,7 +171,8 @@ namespace MiniChess.Combat
             {
                 foreach (EnemyController e in enemies)
                 {
-                    if (e == null || e == excludeEnemy || !e.IsAlive) continue;
+                    var eAttr = e != null ? e.GetComponent<AttributeSet>() : null;
+                    if (e == null || e == excludeEnemy || (eAttr != null && !eAttr.IsAlive)) continue;
                     if (FlatSqrDistance(e.transform.position, destination) < minSqr) return false;
                 }
             }
@@ -252,10 +254,11 @@ namespace MiniChess.Combat
         /// Estimate movement AP cost. Uses the same formula as unit controllers
         /// (FloorToInt of projected distance / speed) but without unpaid-distance carryover.
         /// </summary>
-        public static int EstimateMoveApCost(float pathLength, float moveSpeedMetersPerAp, int currentAp)
+        public static int EstimateMoveApCost(float pathLength, float moveSpeedMetersPerAp, int currentAp, float unpaidMoveDistance = 0f)
         {
             if (pathLength <= 0f || moveSpeedMetersPerAp <= 0f) return 0;
-            int cost = Mathf.FloorToInt((pathLength + 0.0001f) / moveSpeedMetersPerAp);
+            float projectedDistance = unpaidMoveDistance + pathLength;
+            int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / moveSpeedMetersPerAp);
             return Mathf.Clamp(cost, 0, currentAp);
         }
 
@@ -282,7 +285,7 @@ namespace MiniChess.Combat
             int currentAp,
             float remainingMoveDistance,
             float moveSpeedMetersPerAp,
-            float navMeshSnapRadius = DefaultNavMeshSnapRadius)
+            float navMeshSnapRadius = k_DefaultNavMeshSnapRadius)
         {
             // 1. Already in range
             if (IsInRange(casterPosition, targetPosition, skillRange))
@@ -293,13 +296,17 @@ namespace MiniChess.Combat
             // 2. Sample NavMesh origin
             if (!TryGetNavMeshPosition(casterPosition, navMeshSnapRadius, out Vector3 origin))
             {
-                return SkillPositioningResult.Fail(PositioningFailure.NavMeshOriginFailed);
+                return SkillPositioningResult.Fail(EPositioningFailure.NavMeshOriginFailed);
             }
+
+            // Compute unpaid distance for accurate AP estimation
+            float maxPossibleDistance = currentAp * moveSpeedMetersPerAp;
+            float unpaidDistance = Mathf.Max(0f, maxPossibleDistance - remainingMoveDistance);
 
             // 3. Full path to target
             if (!TryBuildCompletePath(origin, targetPosition, out NavMeshPath fullPath))
             {
-                return SkillPositioningResult.Fail(PositioningFailure.NavMeshTargetUnreachable);
+                return SkillPositioningResult.Fail(EPositioningFailure.NavMeshTargetUnreachable);
             }
 
             // 4. Find attack destination on path at skillRange distance from target
@@ -318,7 +325,7 @@ namespace MiniChess.Combat
 
             // 6. Calculate costs
             float moveLength = PathCostCalculator.PathLength(movePath.corners);
-            int moveApCost = EstimateMoveApCost(moveLength, moveSpeedMetersPerAp, currentAp);
+            int moveApCost = EstimateMoveApCost(moveLength, moveSpeedMetersPerAp, currentAp, unpaidDistance);
             int totalCost = moveApCost + skillApCost;
 
             // 7. Affordability check
@@ -333,7 +340,7 @@ namespace MiniChess.Combat
                     MoveApCost = moveApCost,
                     TotalApCost = totalCost,
                     MoveLength = moveLength,
-                    Failure = PositioningFailure.None,
+                    Failure = EPositioningFailure.None,
                 };
             }
 
@@ -352,16 +359,18 @@ namespace MiniChess.Combat
         {
             if (!TryFindFarthestReachablePoint(fullCorners, remainingMoveDistance, out Vector3 fallbackDest))
             {
-                return SkillPositioningResult.Fail(PositioningFailure.NoFallbackPossible);
+                return SkillPositioningResult.Fail(EPositioningFailure.NoFallbackPossible);
             }
 
             if (!TryBuildCompletePath(origin, fallbackDest, out NavMeshPath fallbackPath))
             {
-                return SkillPositioningResult.Fail(PositioningFailure.NoFallbackPossible);
+                return SkillPositioningResult.Fail(EPositioningFailure.NoFallbackPossible);
             }
 
+            float maxPossibleDist = currentAp * moveSpeedMetersPerAp;
+            float unpaidDist = Mathf.Max(0f, maxPossibleDist - remainingMoveDistance);
             float fallbackLength = PathCostCalculator.PathLength(fallbackPath.corners);
-            int fallbackApCost = EstimateMoveApCost(fallbackLength, moveSpeedMetersPerAp, currentAp);
+            int fallbackApCost = EstimateMoveApCost(fallbackLength, moveSpeedMetersPerAp, currentAp, unpaidDist);
 
             return new SkillPositioningResult
             {
@@ -372,8 +381,11 @@ namespace MiniChess.Combat
                 FallbackPath = fallbackPath,
                 FallbackMoveApCost = fallbackApCost,
                 MoveLength = fallbackLength,
-                Failure = PositioningFailure.InsufficientAp,
+                Failure = EPositioningFailure.InsufficientAp,
             };
         }
     }
 }
+
+
+

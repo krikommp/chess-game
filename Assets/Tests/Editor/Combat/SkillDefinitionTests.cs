@@ -1,4 +1,4 @@
-using MiniChess.Combat.Skills;
+﻿using MiniChess.Combat.Skills;
 using MiniChess.GameplayTags;
 using NUnit.Framework;
 using UnityEditor;
@@ -7,16 +7,16 @@ using UnityEngine;
 [TestFixture]
 public class SkillDefinitionTests
 {
-    // ── SkillTargetType ────────────────────────────────────────
+    // ── ESkillTargetType ────────────────────────────────────────
 
     [Test]
     public void TargetType_HasAllValues()
     {
-        Assert.AreEqual(0, (int)SkillTargetType.Self);
-        Assert.AreEqual(1, (int)SkillTargetType.SingleEnemy);
-        Assert.AreEqual(2, (int)SkillTargetType.SingleAlly);
-        Assert.AreEqual(3, (int)SkillTargetType.GroundPoint);
-        Assert.AreEqual(4, (int)SkillTargetType.Area);
+        Assert.AreEqual(0, (int)ESkillTargetType.Self);
+        Assert.AreEqual(1, (int)ESkillTargetType.SingleEnemy);
+        Assert.AreEqual(2, (int)ESkillTargetType.SingleAlly);
+        Assert.AreEqual(3, (int)ESkillTargetType.GroundPoint);
+        Assert.AreEqual(4, (int)ESkillTargetType.Area);
     }
 
     // ── EffectDefinition ───────────────────────────────────────
@@ -63,7 +63,7 @@ public class SkillDefinitionTests
     {
         var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
         var so = new SerializedObject(fx);
-        so.FindProperty("_amount").intValue = 50;
+        so.FindProperty("m_amount").intValue = 50;
         so.ApplyModifiedProperties();
         Assert.AreEqual(50, fx.Amount);
         Object.DestroyImmediate(fx);
@@ -101,7 +101,7 @@ public class SkillDefinitionTests
         Assert.AreEqual(1, skill.ApCost);
         Assert.AreEqual(0, skill.Cooldown);
         Assert.AreEqual(1.5f, skill.Range, 0.001f);
-        Assert.AreEqual(SkillTargetType.SingleEnemy, skill.TargetType);
+        Assert.AreEqual(ESkillTargetType.SingleEnemy, skill.TargetType);
         Assert.AreEqual(0, skill.Effects.Length);
         Assert.AreEqual(0, skill.SkillTags.Length);
         Assert.AreEqual(0, skill.AiTags.Length);
@@ -114,13 +114,13 @@ public class SkillDefinitionTests
     {
         var skill = ScriptableObject.CreateInstance<SkillDefinition>();
         var so = new SerializedObject(skill);
-        so.FindProperty("_id").stringValue = "basic_attack";
-        so.FindProperty("_displayName").stringValue = "Basic Attack";
-        so.FindProperty("_apCost").intValue = 2;
-        so.FindProperty("_cooldown").intValue = 1;
-        so.FindProperty("_range").floatValue = 3f;
-        so.FindProperty("_targetType").enumValueIndex = (int)SkillTargetType.Self;
-        so.FindProperty("_aiBaseWeight").floatValue = 25f;
+        so.FindProperty("m_id").stringValue = "basic_attack";
+        so.FindProperty("m_displayName").stringValue = "Basic Attack";
+        so.FindProperty("m_apCost").intValue = 2;
+        so.FindProperty("m_cooldown").intValue = 1;
+        so.FindProperty("m_range").floatValue = 3f;
+        so.FindProperty("m_targetType").enumValueIndex = (int)ESkillTargetType.Self;
+        so.FindProperty("m_aiBaseWeight").floatValue = 25f;
         so.ApplyModifiedProperties();
 
         Assert.AreEqual("basic_attack", skill.Id);
@@ -128,7 +128,7 @@ public class SkillDefinitionTests
         Assert.AreEqual(2, skill.ApCost);
         Assert.AreEqual(1, skill.Cooldown);
         Assert.AreEqual(3f, skill.Range, 0.001f);
-        Assert.AreEqual(SkillTargetType.Self, skill.TargetType);
+        Assert.AreEqual(ESkillTargetType.Self, skill.TargetType);
         Assert.AreEqual(25f, skill.AiBaseWeight, 0.001f);
         Object.DestroyImmediate(skill);
     }
@@ -174,20 +174,20 @@ public class SkillDefinitionTests
     [Test]
     public void AISkillTag_AllConstants_AreValid()
     {
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Damage.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Heal.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Buff.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Debuff.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Mobility.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Control.Value));
-        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.Protect.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Damage.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Heal.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Buff.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Debuff.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Mobility.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Control.Value));
+        Assert.IsTrue(GameplayTag.IsValid(AISkillTag.k_Protect.Value));
     }
 
     [Test]
     public void AISkillTag_Damage_HasCorrectValue()
     {
-        Assert.AreEqual("AI.Skill.Damage", AISkillTag.Damage.Value);
-        Assert.AreEqual("AI.Skill.Heal", AISkillTag.Heal.Value);
+        Assert.AreEqual("AI.Skill.Damage", AISkillTag.k_Damage.Value);
+        Assert.AreEqual("AI.Skill.Heal", AISkillTag.k_Heal.Value);
     }
 
     // ── Helpers ────────────────────────────────────────────────
@@ -195,19 +195,21 @@ public class SkillDefinitionTests
     private static void SetTagsOnEffect(EffectDefinition fx, string tagValue)
     {
         var so = new SerializedObject(fx);
-        var prop = so.FindProperty("_tags");
+        var prop = so.FindProperty("m_tags");
         prop.arraySize = 1;
-        prop.GetArrayElementAtIndex(0).FindPropertyRelative("_value").stringValue = tagValue;
+        prop.GetArrayElementAtIndex(0).FindPropertyRelative("m_value").stringValue = tagValue;
         so.ApplyModifiedProperties();
     }
 
     private static void SetEffectsOnSkill(SkillDefinition skill, EffectDefinition fx)
     {
         var so = new SerializedObject(skill);
-        var prop = so.FindProperty("_effects");
+        var prop = so.FindProperty("m_effects");
         prop.arraySize = 1;
         prop.GetArrayElementAtIndex(0).objectReferenceValue = fx;
         so.ApplyModifiedProperties();
     }
 }
+
+
 

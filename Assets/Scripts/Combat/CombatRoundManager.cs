@@ -2,190 +2,273 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MiniChess.Combat.Skills;
 using UnityEngine;
 
 namespace MiniChess.Combat
 {
-    /// <summary>
-    /// Round loop with initiative-based turn order.
-    /// Consecutive player units form a "controllable block" where the player
-    /// can freely switch. Enemy units block the front and auto-skip their turn.
-    /// </summary>
     public class CombatRoundManager : MonoBehaviour
     {
         public event Action SelectedPlayerChanged;
         public event Action RoundChanged;
 
         [Header("Refs")]
-        [SerializeField] private MoveInputController moveInput;
-        [SerializeField] private CameraController cameraController;
-        [SerializeField] private EnemyTurnRunner enemyTurnRunner;
-        [SerializeField] private List<Player1Controller> playerUnits = new List<Player1Controller>();
+        [SerializeField] private InputController m_inputController;
+        [SerializeField] private CameraController m_cameraController;
+        [SerializeField] private EnemyTurnRunner m_enemyTurnRunner;
+        [SerializeField] private List<Player1Controller> m_playerUnits = new List<Player1Controller>();
 
         [Header("Controls")]
-        [SerializeField] private KeyCode endTurnKey = KeyCode.Space;
+        [SerializeField] private KeyCode m_endTurnKey = KeyCode.Space;
 
         [Header("Combat")]
-        [SerializeField, Range(1, 4)] private int maxPartySize = 4;
-        [SerializeField] private float attackRange = 1.5f;
-        [SerializeField] private int basicAttackCost = 1;
-        [SerializeField] private int basicAttackDamage = 20;
+        [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
+
+        [Header("Skills")]
+        [Tooltip("Optional: assign basic_attack skill. If null, auto-loaded from Assets/Data/Skills/.")]
+        [SerializeField] private SkillDefinition m_basicAttackSkillOverride;
+        [SerializeField] private SkillDefinition m_basicMoveSkillOverride;
 
         [Header("Debug")]
-        [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative. Intended only for AI testing — does not represent formal first-strike rules.")]
-        [SerializeField] private bool enemyFirstForDebug = false;
+        [Tooltip("When enabled, all enemy units act before any player unit regardless of Initiative.")]
+        [SerializeField] private bool m_enemyFirstForDebug = false;
 
-        private readonly List<ICombatUnit> _turnOrder = new List<ICombatUnit>();
-        private readonly List<EnemyController> _enemyUnits = new List<EnemyController>();
-        private readonly List<Player1Controller> _controllableBlock = new List<Player1Controller>();
+        private readonly List<GameObject> m_turnOrder = new List<GameObject>();
+        private readonly List<EnemyController> m_enemyUnits = new List<EnemyController>();
+        private readonly List<Player1Controller> m_controllableBlock = new List<Player1Controller>();
+        private readonly HashSet<GameObject> m_hasEndedRound = new HashSet<GameObject>();
 
-        public IReadOnlyList<ICombatUnit> TurnOrder => _turnOrder;
-        public IReadOnlyList<Player1Controller> ControllableBlock => _controllableBlock;
-        public ICombatUnit SelectedUnit { get; private set; }
-        public Player1Controller SelectedPlayer => SelectedUnit as Player1Controller;
-        public float AttackRange => attackRange;
+        public IReadOnlyList<GameObject> TurnOrder => m_turnOrder;
+        public IReadOnlyList<Player1Controller> ControllableBlock => m_controllableBlock;
+        public GameObject SelectedUnit { get; private set; }
+        public Player1Controller SelectedPlayer => SelectedUnit != null ? SelectedUnit.GetComponent<Player1Controller>() : null;
+        public float AttackRange => BasicAttackSkill != null ? BasicAttackSkill.Range : 1.5f;
+        public SkillDefinition BasicAttackSkill { get; private set; }
+        public SkillDefinition BasicMoveSkill { get; private set; }
         public int RoundCount { get; private set; }
         public bool IsWaiting { get; private set; }
 
+        public bool HasEndedRound(GameObject unitGO) => unitGO != null && m_hasEndedRound.Contains(unitGO);
+
         private void Awake()
         {
-            if (moveInput == null) moveInput = FindObjectOfType<MoveInputController>();
-            if (cameraController == null) cameraController = FindObjectOfType<CameraController>();
-            if (enemyTurnRunner == null) enemyTurnRunner = GetComponent<EnemyTurnRunner>();
-            if (enemyTurnRunner == null) enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
+            if (m_inputController == null) m_inputController = FindObjectOfType<InputController>();
+            if (m_cameraController == null) m_cameraController = FindObjectOfType<CameraController>();
+            if (m_enemyTurnRunner == null) m_enemyTurnRunner = GetComponent<EnemyTurnRunner>();
+            if (m_enemyTurnRunner == null) m_enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
+            if (m_inputController != null) m_inputController.InputReceived += HandleInputReceived;
             CacheUnits();
+            ResolveBasicAttackSkill();
+            ResolveBasicMoveSkill();
         }
 
-        private void Start()
+        private void OnDestroy()
         {
-            StartCombat();
+            if (m_inputController != null) m_inputController.InputReceived -= HandleInputReceived;
         }
+
+        private void ResolveBasicAttackSkill()
+        {
+            if (m_basicAttackSkillOverride != null) { BasicAttackSkill = m_basicAttackSkillOverride; return; }
+#if UNITY_EDITOR
+            BasicAttackSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>("Assets/Data/Skills/basic_attack.asset");
+            if (BasicAttackSkill != null) return;
+#endif
+            BasicAttackSkill = Resources.Load<SkillDefinition>("Skills/basic_attack");
+            if (BasicAttackSkill == null) BasicAttackSkill = Resources.Load<SkillDefinition>("basic_attack");
+            if (BasicAttackSkill == null)
+                Debug.LogWarning("[CombatRoundManager] basic_attack skill not found.");
+        }
+
+        private void ResolveBasicMoveSkill()
+        {
+            if (m_basicMoveSkillOverride != null) { BasicMoveSkill = m_basicMoveSkillOverride; return; }
+#if UNITY_EDITOR
+            BasicMoveSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>("Assets/Data/Skills/basic_move.asset");
+            if (BasicMoveSkill != null) return;
+#endif
+            BasicMoveSkill = Resources.Load<SkillDefinition>("Skills/basic_move");
+            if (BasicMoveSkill == null) BasicMoveSkill = Resources.Load<SkillDefinition>("basic_move");
+            if (BasicMoveSkill == null)
+                Debug.LogWarning("[CombatRoundManager] basic_move skill not found.");
+        }
+
+        private void Start() { StartCombat(); }
 
         private void Update()
         {
             if (IsWaiting) return;
 
-            if (Input.GetKeyDown(endTurnKey))
-            {
+            if (Input.GetKeyDown(m_endTurnKey))
                 TryEndSelectedPlayerRound();
-            }
 
-            for (int i = 0; i < _controllableBlock.Count && i < 4; i++)
+            for (int i = 0; i < m_controllableBlock.Count && i < 4; i++)
             {
                 if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i)))
-                {
-                    TrySelectPlayer(_controllableBlock[i]);
-                }
+                    TrySelectPlayer(m_controllableBlock[i]);
             }
         }
 
         public void StartCombat()
         {
             CacheUnits();
+            ValidateUnitSkillComponents();
             BuildTurnOrder();
             RoundCount = 0;
+            m_hasEndedRound.Clear();
             StartNextRound();
+        }
+
+        private void ValidateUnitSkillComponents()
+        {
+            foreach (var unit in m_playerUnits)
+            {
+                if (unit == null) continue;
+                var executor = unit.GetComponent<SkillExecutor>();
+                if (executor == null)
+                    Debug.LogWarning($"[CombatRoundManager] {GetDisplayName(unit.gameObject)} has no SkillExecutor.");
+                else if (executor.FindSkill("basic_move") == null)
+                    Debug.LogWarning($"[CombatRoundManager] {GetDisplayName(unit.gameObject)} has no basic_move skill.");
+            }
+
+            foreach (var enemy in m_enemyUnits)
+            {
+                if (enemy == null) continue;
+                var executor = enemy.GetComponent<SkillExecutor>();
+                if (executor == null)
+                    Debug.LogWarning($"[CombatRoundManager] {GetDisplayName(enemy.gameObject)} has no SkillExecutor.");
+            }
         }
 
         public bool TrySelectPlayer(Player1Controller player)
         {
-            if (player == null || !_controllableBlock.Contains(player) || player.HasEndedRound)
-            {
+            if (player == null || !m_controllableBlock.Contains(player) || HasEndedRound(player.gameObject))
                 return false;
-            }
 
             if (SelectedPlayer != null && SelectedPlayer != player)
+                SelectedPlayer.SetVisualState(EPlayerVisualState.Default);
+
+            SelectedUnit = player.gameObject;
+            player.SetVisualState(EPlayerVisualState.Selected);
+
+            if (m_inputController != null)
             {
-                SelectedPlayer.SetVisualState(PlayerVisualState.Default);
+                var executor = player.GetComponent<SkillExecutor>();
+                var moveSkill = executor != null ? executor.FindSkill("basic_move") : null;
+                if (moveSkill == null)
+                {
+                    Debug.LogWarning($"[CombatRoundManager] {GetDisplayName(player.gameObject)} has no basic_move skill.");
+                    executor?.ClearActiveSkill();
+                }
+                else
+                {
+                    executor.ActivateSkill(moveSkill);
+                }
             }
 
-            SelectedUnit = player;
-            player.SetVisualState(PlayerVisualState.Selected);
-
-            if (moveInput != null)
-            {
-                moveInput.SetPlayer(player);
-            }
-
-            FocusCameraOnUnit(player);
-
+            FocusCameraOnUnit(player.gameObject);
             SelectedPlayerChanged?.Invoke();
             return true;
         }
 
-        public bool TryEndSelectedPlayerRound()
+        private void HandleInputReceived(SkillInputRequest request)
         {
-            if (SelectedPlayer == null || !SelectedPlayer.TryEndRound())
+            if (IsWaiting) return;
+
+            if (request.IsSignal(SkillInputTag.k_PrimaryPressed)
+                && request.IsTarget(SkillInputTag.k_TargetPlayer)
+                && request.TargetObject != null)
             {
-                return false;
+                var player = request.TargetObject.GetComponent<Player1Controller>();
+                if (player != null && TrySelectPlayer(player)) return;
             }
 
+            var selectedPlayer = SelectedPlayer;
+            if (selectedPlayer == null || HasEndedRound(selectedPlayer.gameObject)) return;
+
+            var executor = selectedPlayer.GetComponent<SkillExecutor>();
+            executor?.HandleInput(request);
+        }
+
+        public bool TryEndSelectedPlayerRound()
+        {
+            if (SelectedPlayer == null || !TryEndUnitRound(SelectedPlayer.gameObject))
+                return false;
             AdvanceTurn();
+            return true;
+        }
+
+        public bool TryEndUnitRound(GameObject unitGO)
+        {
+            if (unitGO == null) return false;
+
+            var movement = unitGO.GetComponent<MovementController>();
+            if (movement != null && movement.IsMoving) return false;
+
+            m_hasEndedRound.Add(unitGO);
+
+            var attr = unitGO.GetComponent<AttributeSet>();
+            attr?.Set(WellKnownAttributeTags.AP, 0f);
+
+            movement?.ResetUnpaidDistance();
             return true;
         }
 
         public EnemyController GetEnemyUnderAttack(Player1Controller attacker)
         {
-            // Find the nearest alive enemy
             EnemyController best = null;
             float bestDist = float.MaxValue;
-            foreach (var enemy in _enemyUnits)
+            foreach (var enemy in m_enemyUnits)
             {
                 if (enemy == null || !enemy.IsAlive) continue;
                 float dist = Vector3.Distance(attacker.transform.position, enemy.transform.position);
-                if (dist < bestDist)
-                {
-                    bestDist = dist;
-                    best = enemy;
-                }
+                if (dist < bestDist) { bestDist = dist; best = enemy; }
             }
             return best;
         }
 
         private void CacheUnits()
         {
-            playerUnits.RemoveAll(p => p == null);
-            if (playerUnits.Count == 0)
-            {
-                playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
-            }
+            m_playerUnits.RemoveAll(p => p == null);
+            if (m_playerUnits.Count == 0)
+                m_playerUnits.AddRange(FindObjectsOfType<Player1Controller>());
 
-            // Always re-scan enemies because EnemySpawners may have run their Awake
-            // after our first CacheUnits call (Awake order is non-deterministic).
-            _enemyUnits.Clear();
-            _enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
+            m_enemyUnits.Clear();
+            m_enemyUnits.AddRange(FindObjectsOfType<EnemyController>());
         }
 
         private void BuildTurnOrder()
         {
-            _turnOrder.Clear();
+            m_turnOrder.Clear();
 
-            var allUnits = new List<ICombatUnit>();
-            allUnits.AddRange(playerUnits.Where(p => p != null && p.gameObject.activeInHierarchy).Take(maxPartySize));
-            allUnits.AddRange(_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy));
+            var allGOs = new List<GameObject>();
+            allGOs.AddRange(m_playerUnits.Where(p => p != null && p.gameObject.activeInHierarchy).Take(m_maxPartySize).Select(p => p.gameObject));
+            allGOs.AddRange(m_enemyUnits.Where(e => e != null && e.gameObject.activeInHierarchy).Select(e => e.gameObject));
 
-            _turnOrder.AddRange(allUnits
-                .OrderBy(u => enemyFirstForDebug && u is EnemyController ? 0 : 1)
-                .ThenByDescending(u => u.Initiative)
-                .ThenBy(u => u is Player1Controller p ? p.PartySlot : 99));
+            m_turnOrder.AddRange(allGOs
+                .OrderBy(go => m_enemyFirstForDebug && go.GetComponent<EnemyController>() != null ? 0 : 1)
+                .ThenByDescending(go => GetInitiative(go))
+                .ThenBy(go => go.GetComponent<Player1Controller>()?.PartySlot ?? 99));
         }
 
         private void StartNextRound()
         {
             RoundCount++;
-
-            // Rebuild turn order for the new round (old one was consumed)
             CacheUnits();
             BuildTurnOrder();
 
-            foreach (var unit in _turnOrder)
+            foreach (var go in m_turnOrder)
             {
-                if (unit.IsAlive)
+                var attr = go.GetComponent<AttributeSet>();
+                if (attr != null && attr.IsAlive)
                 {
-                    unit.BeginRound();
+                    attr.SetToMax(WellKnownAttributeTags.AP);
+                    go.GetComponent<MovementController>()?.ResetUnpaidDistance();
+                    go.GetComponent<SkillExecutor>()?.AdvanceCooldowns();
                 }
             }
 
+            m_hasEndedRound.Clear();
             RoundChanged?.Invoke();
             RefreshControllableBlock();
             AdvanceTurn();
@@ -194,15 +277,15 @@ namespace MiniChess.Combat
         private IEnumerator EnemyTurnCoroutine(EnemyController enemy)
         {
             IsWaiting = true;
-            SelectedUnit = enemy;
-            FocusCameraOnUnit(enemy);
+            SelectedUnit = enemy.gameObject;
+            FocusCameraOnUnit(enemy.gameObject);
             enemy.FlashTurn();
-            Debug.Log($"[Combat] Enemy turn starts: {enemy.DisplayName}");
+            Debug.Log($"[Combat] Enemy turn starts: {GetDisplayName(enemy.gameObject)}");
 
-            yield return enemyTurnRunner.RunTurn(enemy, playerUnits, _enemyUnits, attackRange, basicAttackCost, basicAttackDamage);
+            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits, BasicAttackSkill);
 
-            enemy.TryEndRound();
-            _turnOrder.RemoveAt(0);
+            TryEndUnitRound(enemy.gameObject);
+            m_turnOrder.Remove(enemy.gameObject);
             SelectedUnit = null;
             IsWaiting = false;
 
@@ -211,78 +294,92 @@ namespace MiniChess.Combat
 
         private void RefreshControllableBlock()
         {
-            _controllableBlock.Clear();
-            foreach (var unit in _turnOrder)
+            m_controllableBlock.Clear();
+            foreach (var go in m_turnOrder)
             {
-                if (unit == null || !unit.IsAlive) continue;
-                if (unit.HasEndedRound) continue;
+                if (go == null || !IsAlive(go)) continue;
+                if (HasEndedRound(go)) continue;
 
-                if (unit is Player1Controller player)
-                {
-                    _controllableBlock.Add(player);
-                }
+                var player = go.GetComponent<Player1Controller>();
+                if (player != null)
+                    m_controllableBlock.Add(player);
                 else
-                {
-                    break; // enemy blocks the front
-                }
+                    break;
             }
         }
 
         private void AdvanceTurn()
         {
-            // Skip finished/dead units at the front
-            while (_turnOrder.Count > 0)
+            while (m_turnOrder.Count > 0)
             {
-                var front = _turnOrder[0];
-                if (front == null || !front.IsAlive)
+                var front = m_turnOrder[0];
+                if (front == null || !IsAlive(front))
                 {
-                    _turnOrder.RemoveAt(0);
+                    m_turnOrder.RemoveAt(0);
                     continue;
                 }
-                if (front.HasEndedRound)
+                if (HasEndedRound(front))
                 {
-                    _turnOrder.RemoveAt(0);
+                    m_turnOrder.RemoveAt(0);
                     continue;
                 }
                 break;
             }
 
-            if (_turnOrder.Count == 0)
+            if (m_turnOrder.Count == 0)
             {
                 StartNextRound();
                 return;
             }
 
-            var next = _turnOrder[0];
+            var next = m_turnOrder[0];
+            var player = next.GetComponent<Player1Controller>();
 
-            if (next is Player1Controller player)
+            if (player != null)
             {
-                // Player unit → refresh block and select
                 RefreshControllableBlock();
-                if (!TrySelectPlayer(_controllableBlock.FirstOrDefault(p => !p.HasEndedRound)))
+                var nextPlayer = m_controllableBlock.FirstOrDefault(p => !HasEndedRound(p.gameObject));
+                if (!TrySelectPlayer(nextPlayer))
                 {
-                    // No selectable player in block → all ended, advance past them
-                    foreach (var p in _controllableBlock)
+                    foreach (var p in m_controllableBlock)
                     {
-                        if (!p.HasEndedRound) p.TryEndRound();
+                        if (!HasEndedRound(p.gameObject))
+                            TryEndUnitRound(p.gameObject);
                     }
-                    _turnOrder.RemoveAll(u => u is Player1Controller pc && _controllableBlock.Contains(pc));
+                    m_turnOrder.RemoveAll(go => go.GetComponent<Player1Controller>() != null && m_controllableBlock.Any(p => p.gameObject == go));
                     AdvanceTurn();
                 }
             }
-            else if (next is EnemyController enemy)
+            else if (next.GetComponent<EnemyController>() is EnemyController enemy)
             {
-                // Enemy unit → flash highlight then auto-end
                 StartCoroutine(EnemyTurnCoroutine(enemy));
             }
         }
 
-        private void FocusCameraOnUnit(ICombatUnit unit)
+        private void FocusCameraOnUnit(GameObject unitGO)
         {
-            if (cameraController == null) return;
-            if (!(unit is Component component)) return;
+            if (m_cameraController == null || unitGO == null) return;
+            m_cameraController.FocusOn(unitGO.transform);
+        }
 
-            cameraController.FocusOn(component.transform);
+        // ── Helpers ─────────────────────────────────────────────────
+
+        private static bool IsAlive(GameObject go)
+        {
+            var attr = go.GetComponent<AttributeSet>();
+            return attr != null && attr.IsAlive;
+        }
+
+        private static float GetInitiative(GameObject go)
+        {
+            var attr = go.GetComponent<AttributeSet>();
+            return attr != null ? attr.Get(WellKnownAttributeTags.Initiative) : 0f;
+        }
+
+        private static string GetDisplayName(GameObject go)
+        {
+            var attr = go.GetComponent<AttributeSet>();
+            return attr != null ? attr.DisplayName : go.name;
         }
     }
 }

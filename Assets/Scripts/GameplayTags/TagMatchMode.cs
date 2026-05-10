@@ -1,8 +1,9 @@
-namespace MiniChess.GameplayTags
+﻿namespace MiniChess.GameplayTags
 {
-    public enum TagMatchMode
+    public enum ETagMatchMode
     {
         Exact,
         Prefix
     }
 }
+

@@ -104,7 +104,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
 - [ ] `GameplayTagSystem`（Tag First 基础设施：`GameplayTag` + `GameplayTagSet` + 匹配 + 来源追踪，见 `09_GAMEPLAY_TAG_SPEC.md`）
-- [ ] `MovementController`（NavMesh 包装，当前逻辑在 `MoveInputController` 内）
+- [ ] `MovementController`（NavMesh 包装；玩家输入已由 `InputController` 纯输入路由，移动解释逻辑临时在 `GroundMoveAbility` 内）
 - [ ] `SkillSystem`（`SkillDefinition` + `Effect` + `SkillExecutor` + AP/冷却/目标校验；挂载 `SkillExecutor` 的对象即可成为技能系统目标，见 `05_SKILL_SPEC.md`）
 - [x] `EnemyAISystem`（MVP：`EnemyTurnRunner` 最近玩家 → 移动进基础攻击范围 → 攻击一次；完整 Utility AI 见 `04_MONSTER_SPEC.md` §3）
 - [ ] `CombatTrigger`（探索 → 战斗）
@@ -119,9 +119,13 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
-- 点击地面按 NavMesh 路径移动；移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
+- 选中玩家角色后，系统自动激活该角色自身 `SkillExecutor` 上配置的 `basic_move` 技能作为当前默认行为。若该角色没有配置 `basic_move`，该角色不能执行地面移动，并输出明确警告。
+- `InputController` 是纯输入接收器，只把鼠标 hover / 主键点击翻译成 `SkillInputRequest`，其中包含输入信号 Tag、目标语义 Tag、命中对象和世界坐标参数。
+- 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 `SkillExecutor` 统一执行。输入层不能直接调用 `Player1Controller.TryMove` 绕过技能系统。
+- 角色必须通过自身 `SkillExecutor.availableSkills` 配置可用技能资产。`CombatRoundManager` 只做缺失技能的警告，不再启动时向角色自动注入 `basic_move` 或其他默认技能；运行时生成敌人由 `EnemySpawner.m_defaultSkills` 写入生成对象的 `SkillExecutor`。
+- 移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
 - 移动 AP 不在下达指令时预扣，而是在角色实际移动距离累计达到 `MoveSpeedMetersPerAp` 时扣除；未满 1 AP 的累计距离会保留到本轮后续移动。
-- 点击敌方单位 = 请求释放当前角色的 `basic_attack`：若能用剩余 AP 移动到 `basic_attack.range` 内并支付 `basic_attack.apCost`，则移动后攻击；若不能进入攻击距离，则只用剩余可移动 AP 向目标靠近。
+- 当前玩家输入只要求支持点击地面移动。主动攻击技能如何释放（点击敌人、技能栏选择、快捷键等）待 AI 框架大体跑通后继续设计。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
 - 敌方单位回合由 `EnemyTurnRunner` 执行最小基础 AI：选择最近存活玩家，若能在本回合移动到攻击范围并保留攻击 AP，则移动后攻击；若本回合无法攻击，则沿 NavMesh 路径向目标移动到本回合最大可达点。
 - 敌方 AI 选终点时使用软占位检查：避开其他存活玩家/敌人的当前位置；理想攻击点或追击点被占用时，在附近采样替代 NavMesh 点，避免多个 AI 抢同一个终点。
@@ -143,7 +147,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 
 ## 11. 基础攻击（MVP 占位）
 
-基础攻击后续会迁移为 `basic_attack` 技能资产。鼠标直接点击敌方单位时，本质上是请求当前角色释放自己的 `basic_attack`，而不是走一套独立硬编码攻击逻辑。
+基础攻击后续会迁移为 `basic_attack` 技能资产。当前阶段不要求鼠标直接点击敌方单位触发攻击；主动攻击释放交互待后续技能设计确认。无论最终交互如何，攻击本身不应走独立硬编码逻辑。
 
 | 参数 | 值 | 说明 |
 |---|---|---|
@@ -154,12 +158,12 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 | 玩家 HP | 100 | `Player1Controller.maxHP` 默认值 |
 | 死亡处理 | — | 敌方 `HP ≤ 0` 时 `Destroy(gameObject)`；玩家暂不销毁 |
 
-攻击流程：
-1. 玩家点击敌方单位。
-2. 系统取得当前角色的 `basic_attack` 技能配置。
-3. 使用 `basic_attack.range` 判断当前是否已经在攻击距离内。
-4. 若已在范围内，且 `CurrentAP >= basic_attack.apCost`，则消耗技能 AP 并造成伤害。
-5. 若不在范围内，计算从玩家到敌方的 NavMesh 全路径，并寻找能进入 `basic_attack.range` 的可攻击点。
-6. 若 `CurrentAP >= basic_attack.apCost + 移动所需 AP`，且能走到可攻击点，则先移动到攻击距离内，再消耗 `basic_attack.apCost` 执行攻击。
-7. 若本回合 AP 不足以走到攻击距离内，则不攻击，只使用剩余可移动 AP 沿路径向目标靠近。
-8. 若路径不存在或没有合法可攻击点，则不执行攻击，并输出失败原因。
+后续攻击流程草案：
+1. 玩家通过待定交互选择主动攻击技能与目标。
+2. 系统取得当前角色自身配置的 `basic_attack` 或其他攻击技能配置。
+3. 使用技能自身 `range` 判断当前是否已经在攻击距离内。
+4. 若已在范围内，且 `CurrentAP >= skill.apCost`，则消耗技能 AP 并造成效果。
+5. 若不在范围内，AI/技能计划系统可计算从施法者到目标的 NavMesh 全路径，并寻找能进入 `skill.range` 的可施放点。
+6. 若 `CurrentAP >= skill.apCost + 移动所需 AP`，且能走到可施放点，则先移动到技能范围内，再消耗 `skill.apCost` 执行技能。
+7. 若本回合 AP 不足以抵达技能范围，则是否只移动靠近由 AI 候选评分或玩家交互规则决定。
+8. 若路径不存在或没有合法可施放点，则不执行技能，并输出失败原因。

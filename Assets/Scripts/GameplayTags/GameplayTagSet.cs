@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,28 +6,28 @@ namespace MiniChess.GameplayTags
 {
     public sealed class GameplayTagSet
     {
-        private readonly Dictionary<GameplayTag, HashSet<object>> _entries =
+        private readonly Dictionary<GameplayTag, HashSet<object>> m_entries =
             new Dictionary<GameplayTag, HashSet<object>>();
 
-        public int Count => _entries.Count;
-        public IEnumerable<GameplayTag> Tags => _entries.Keys;
+        public int Count => m_entries.Count;
+        public IEnumerable<GameplayTag> Tags => m_entries.Keys;
 
         // ── Query ──────────────────────────────────────────────
 
-        public bool Has(GameplayTag tag, TagMatchMode mode = TagMatchMode.Exact)
+        public bool Has(GameplayTag tag, ETagMatchMode mode = ETagMatchMode.Exact)
         {
-            if (mode == TagMatchMode.Exact)
-                return _entries.ContainsKey(tag);
+            if (mode == ETagMatchMode.Exact)
+                return m_entries.ContainsKey(tag);
 
-            foreach (var key in _entries.Keys)
+            foreach (var key in m_entries.Keys)
             {
-                if (key.Matches(tag, TagMatchMode.Prefix))
+                if (key.Matches(tag, ETagMatchMode.Prefix))
                     return true;
             }
             return false;
         }
 
-        public bool HasAny(IEnumerable<GameplayTag> tags, TagMatchMode mode = TagMatchMode.Exact)
+        public bool HasAny(IEnumerable<GameplayTag> tags, ETagMatchMode mode = ETagMatchMode.Exact)
         {
             foreach (var tag in tags)
             {
@@ -36,7 +36,7 @@ namespace MiniChess.GameplayTags
             return false;
         }
 
-        public bool HasAll(IEnumerable<GameplayTag> tags, TagMatchMode mode = TagMatchMode.Exact)
+        public bool HasAll(IEnumerable<GameplayTag> tags, ETagMatchMode mode = ETagMatchMode.Exact)
         {
             foreach (var tag in tags)
             {
@@ -52,30 +52,30 @@ namespace MiniChess.GameplayTags
             if (!GameplayTag.IsValid(tag.Value))
                 throw new ArgumentException($"Cannot add invalid tag to GameplayTagSet: '{tag.Value}'");
 
-            source ??= TagSourceType.Debug; // default source if none provided
+            source ??= ETagSourceType.Debug; // default source if none provided
 
-            if (!_entries.TryGetValue(tag, out var sources))
+            if (!m_entries.TryGetValue(tag, out var sources))
             {
                 sources = new HashSet<object>();
-                _entries[tag] = sources;
+                m_entries[tag] = sources;
             }
             sources.Add(source);
         }
 
         public void Remove(GameplayTag tag, object source = null)
         {
-            if (!_entries.TryGetValue(tag, out var sources)) return;
+            if (!m_entries.TryGetValue(tag, out var sources)) return;
 
             if (source != null)
             {
                 sources.Remove(source);
                 if (sources.Count == 0)
-                    _entries.Remove(tag);
+                    m_entries.Remove(tag);
             }
             else
             {
                 // Remove all sources for this tag
-                _entries.Remove(tag);
+                m_entries.Remove(tag);
             }
         }
 
@@ -87,7 +87,7 @@ namespace MiniChess.GameplayTags
             if (source == null) return;
 
             var toRemove = new List<GameplayTag>();
-            foreach (var kvp in _entries)
+            foreach (var kvp in m_entries)
             {
                 kvp.Value.Remove(source);
                 if (kvp.Value.Count == 0)
@@ -95,15 +95,17 @@ namespace MiniChess.GameplayTags
             }
             foreach (var tag in toRemove)
             {
-                _entries.Remove(tag);
+                m_entries.Remove(tag);
             }
         }
 
-        public void Clear() => _entries.Clear();
+        public void Clear() => m_entries.Clear();
 
         // ── Debug ──────────────────────────────────────────────
 
         public override string ToString() =>
-            Count == 0 ? "[empty]" : string.Join(", ", _entries.Keys.Select(t => t.Value));
+            Count == 0 ? "[empty]" : string.Join(", ", m_entries.Keys.Select(t => t.Value));
     }
 }
+
+
