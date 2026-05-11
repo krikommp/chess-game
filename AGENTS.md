@@ -10,7 +10,7 @@ Core constraints:
 - Camera may zoom in/out only; do not add rotation, first-person, or free-fly camera controls.
 - Movement is no-grid click-to-ground movement using NavMesh.
 - Combat happens in the same scene, without battle scene switching.
-- Player party supports up to 4 characters.
+- Player party size is not hard-capped by design; prototype UI shortcuts may expose only a subset of quick-select keys.
 - Turn order is based on initiative, higher value first.
 - Initiative is determined on combat entry and does not dynamically change during combat unless `Docs/OPEN_QUESTIONS.md` records a resolved decision allowing it.
 - AP is the action resource for movement, attacks, and skills.
@@ -74,7 +74,7 @@ If a workflow, rule set, domain note, validation checklist, or repeated operatio
 
 1. Lock camera rotation and keep zoom only.
 2. Add click-to-ground movement in exploration.
-3. Add party selection for up to 4 characters.
+3. Add party selection for player-controlled characters.
 4. Add `CombatManager` state machine: `Exploration -> InitiativeRoll -> TurnLoop -> End`.
 5. Add AP reset and AP movement spending.
 6. Add basic attack.

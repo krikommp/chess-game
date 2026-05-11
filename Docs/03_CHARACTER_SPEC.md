@@ -54,5 +54,5 @@ public class CharacterDefinition : ScriptableObject {
 
 ## 6. 队伍
 
-- 上限：**4 人**（来自 `01`）。
+- 队伍人数：不设固定 4 人硬上限；由关卡/场景配置和后续 UI 承载能力决定。
 - 队伍组织 UI / 切换队伍 / 离队入队规则：**待定**。

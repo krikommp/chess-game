@@ -42,7 +42,7 @@ Use the existing `OPEN_QUESTIONS.md` format:
 - Keep camera fixed at 45 degrees. Allow zoom only. Do not add rotation, first-person, or free-fly controls.
 - Use click-to-ground movement with NavMesh.
 - Keep combat in the same scene; do not switch to a separate battle scene.
-- Support up to 4 player characters.
+- Player party size is not hard-capped by design; prototype UI shortcuts may expose only a subset of quick-select keys.
 - Sort turn order by initiative, higher first.
 - Determine initiative when combat starts and keep it stable during combat unless an open question is resolved otherwise.
 - Use AP for movement, attacks, and skills.
@@ -84,7 +84,7 @@ Preferred MVP order:
 
 1. Camera zoom-only lock.
 2. Exploration click-to-ground movement.
-3. Party selection for up to 4 characters.
+3. Party selection for player-controlled characters.
 4. `CombatManager` state machine: `Exploration -> InitiativeRoll -> TurnLoop -> End`.
 5. AP reset and AP movement spending.
 6. Basic attack.

@@ -28,7 +28,6 @@ namespace MiniChess.Combat
 
         // ── Inspector ───────────────────────────────────────────────
 
-        [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
         [SerializeField] private bool m_enemyFirstForDebug = false;
 
         // ── State ───────────────────────────────────────────────────

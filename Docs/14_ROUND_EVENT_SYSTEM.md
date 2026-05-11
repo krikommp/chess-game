@@ -81,7 +81,7 @@ SampleScene
 ├── Systems/
 │   └── [CombatSystems]                          ← 挂载所有战斗管理器
 │       ├── CombatRoundManager (MB)               ← 回合状态机
-│       │   └── (Inspector: maxPartySize=4, enemyFirst=false)
+│       │   └── (Inspector: enemyFirst=false)
 │       │
 │       ├── RoundPhaseManager (MB)                ← 回合事件 → 系统技能
 │       │   ├── m_roundStartSkills: [sys_round_start]           ← Inspector拖入
@@ -508,7 +508,6 @@ public class CombatRoundManager : MonoBehaviour
 
     // ── Inspector ──
 
-    [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
     [SerializeField] private bool m_enemyFirstForDebug = false;
 
     // ── 状态 ──

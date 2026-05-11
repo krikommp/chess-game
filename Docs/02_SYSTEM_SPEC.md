@@ -112,13 +112,13 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 
 ## 9. MVP 回合模拟（玩家 + 敌方单位）
 
-当前实现范围：场景内最多 4 个 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。
+当前实现范围：场景内若干 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。队伍人数不设硬性 4 人上限；具体可操作数量由场景配置和 UI/输入支持决定。
 
 - `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
 - `CombatRoundManager` 提供 `enemyFirstForDebug` 调试开关（默认关闭）：开启时所有敌方单位排在玩家之前，仅用于 AI 测试，不代表正式先攻规则。
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
-- 玩家可用数字键 `1-4`（映射到可控块内角色）或点击角色在本块内切换。
+- 玩家可用数字键快捷选择可控块内角色，也可点击角色在本块内切换；当前数字键支持数量是输入方案限制，不代表队伍人数上限。
 - 选中玩家角色后，系统自动激活该角色自身 `SkillExecutor` 上配置的 `basic_move` 技能作为当前默认行为。若该角色没有配置 `basic_move`，该角色不能执行地面移动，并输出明确警告。
 - `InputController` 是纯输入接收器，只把鼠标 hover / 主键点击翻译成 `SkillInputRequest`，其中包含输入信号 Tag、目标语义 Tag、命中对象和世界坐标参数。
 - 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 `SkillExecutor` 统一执行。输入层不能直接调用 `Player1Controller.TryMove` 绕过技能系统。
