@@ -769,6 +769,129 @@
     - 验证治疗、Status、Tag、支援型 AI。
 14. 根据测试结果再决定是否实现 `power_strike` 与 `crippling_hex`。
 
+## 14.5 代码审查补充 TODO（2026-05-11）
+
+来源：`Docs/11_FRAMEWORK_REVIEW.md` + `Docs/12_ISSUES.md` + `Docs/14_ROUND_EVENT_SYSTEM.md`
+
+执行要求：以下各项按优先级穿插到推荐执行顺序中。每个项目修复后需在对应 IS 条目中更新状态。
+
+### CR-0012 GroundMoveAbility.DefaultInstance 移除 + 显式资产引用
+
+严重级别：P0
+
+对应问题：`IS-0004`
+
+目标：
+- 所有 `basic_move` 资产通过 Editor 显式挂载 `GroundMoveAbility` 引用
+- 移除 `GroundMoveAbility.DefaultInstance` 和 `CreateInstance` 运行时构造
+- 移除 `SkillDefinition.Ability` getter 中的 DefaultInstance fallback
+- Config Validation 检查 GroundPoint 技能必须配置 Ability
+
+### CR-0013 Status 系统完整实现
+
+严重级别：P0（阻塞治疗/buff/debuff）
+
+对应问题：`IS-0001`
+
+设计参考：`Docs/13_FUTURE_DESIGN.md` §1
+
+### CR-0014 AI Action Candidate 框架 + EnemyTurnRunner 重构
+
+严重级别：P0
+
+对应问题：`IS-0002`
+
+设计参考：`Docs/13_FUTURE_DESIGN.md` §2
+
+### CR-0015 CombatRoundManager 精简 + 回合事件系统
+
+严重级别：P0
+
+对应问题：`IS-0003`，`Docs/14_ROUND_EVENT_SYSTEM.md`
+
+目标：
+- CombatRoundManager 精简到 ~120 行纯事件广播器
+- 创建 `RoundPhaseManager`（系统技能执行）
+- 创建 `UnitTurnHandler`（玩家侧）
+- 创建 `AITurnRunner`（敌方侧，替代 EnemyTurnRunner）
+- 创建 `CombatUnit` 标记组件
+
+### CR-0016 场景预置单位废弃 EnemySpawner
+
+严重级别：P1
+
+对应问题：`IS-0008`
+
+目标：
+- 敌方单位在场景中预置，Inspector 配置完整组件栈
+- 废弃 `EnemySpawner.cs`
+- 单位通过 `CombatUnit` 标记组件被发现
+
+### CR-0017 EnemyTurnRunner 新旧 API 桥接清理
+
+严重级别：P1
+
+对应问题：`IS-0005`
+
+### CR-0018 AssetDatabase / Resources.Load 隐式加载清理
+
+严重级别：P1
+
+对应问题：`IS-0006`，`AGENTS.md` Explicit Configuration Rule
+
+目标：
+- 移除所有 `Resources.Load`、`AssetDatabase.LoadAssetAtPath`
+- 移除所有 `#if UNITY_EDITOR` 资产加载分支
+- 所有资产引用改为 Inspector 显式配置
+
+### CR-0019 完整配置校验工具
+
+严重级别：P2
+
+对应问题：`IS-0010`
+
+设计参考：`Docs/13_FUTURE_DESIGN.md` §5
+
+### CR-0020 战斗事件总线
+
+严重级别：P3
+
+对应问题：`IS-0016`
+
+设计参考：`Docs/13_FUTURE_DESIGN.md` §4
+
+### CR-0021 TagRegistry 改用 Dictionary 索引
+
+严重级别：P2
+
+对应问题：`IS-0012`
+
+### CR-0022 SkillExecutor.CollectTags 移除重复 Faction 同步
+
+严重级别：P1
+
+对应问题：`IS-0007`
+
+### CR-0023 CombatTrigger + VictoryConditionEvaluator
+
+严重级别：P2
+
+对应问题：`IS-0009`
+
+设计参考：`Docs/13_FUTURE_DESIGN.md` §3
+
+### CR-0024 创建系统技能资产（sys_round_start / sys_turn_end）
+
+严重级别：P0
+
+对应问题：`Docs/14_ROUND_EVENT_SYSTEM.md` §4
+
+目标：
+- 通过 Unity Editor 创建 `sys_round_start` 技能资产（RestoreAP + ResetMovement + AdvanceCooldowns + StatusTick）
+- 创建 `sys_turn_end` 技能资产
+- 创建配套 Effect 资产：`RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`
+- 资产全部拖入 `RoundPhaseManager` Inspector
+
 ## 暂不进入下一阶段的内容
 
 - 战斗触发方式与正式 `CombatTrigger`。

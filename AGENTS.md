@@ -27,6 +27,32 @@ Core constraints:
 - When using temporary values, placeholder art/audio, or prototype-only behavior, add a `TODO` comment that references the relevant `Docs/` section or `Q-XXXX`.
 - When adding or changing system interfaces or design-facing fields, update the corresponding `Docs/0x_*.md` in the same work session.
 
+### Explicit Configuration Rule
+
+**代码中禁止隐式加载资产。** 所有 ScriptableObject 资产（Skill、Effect、Status、AIProfile、AttributeSetDef 等）必须通过 Inspector `[SerializeField]` 显式配置，不得在运行时代码中通过路径字符串加载。
+
+**禁止的模式：**
+- `Resources.Load<T>("Skills/basic_attack")` — 字符串路径隐式加载
+- `AssetDatabase.LoadAssetAtPath<T>("Assets/Data/...")` — 仅 Editor 可用，Build 中失效
+- `CreateInstance<T>()` 运行时动态构造 ScriptableObject — 破坏 SO 资产约定
+- 通过类名/字符串 ID 反射查找技能
+
+**要求的模式：**
+- 所有资产引用通过 `[SerializeField] private T m_xxx;` 在 Inspector 中拖入配置
+- 场景单例（如 `CombatRoundManager`、`RoundPhaseManager`、`InputController`）挂载在场景 GameObject 上，依赖通过 Inspector 拖入
+- 技能资产挂在单位自身的 `SkillExecutor.availableSkills[]` 上
+- 系统技能（`sys_round_start` 等）挂在 `RoundPhaseManager` 的 Inspector 字段上
+
+**场景单例约定：**
+- 场景根 `Systems/` 下放置管理器 GameObject，挂载所有战斗相关管理器
+- 管理器之间的引用通过 Inspector `[SerializeField]` 拖拽配置，不使用 `FindObjectOfType` 作为主要获取方式
+- `FindObjectOfType` 仅允许在 `Awake` 中作为 fallback（未配置时自动查找），并输出警告
+
+**后期统一配置面板：**
+- 当前阶段手动在 Inspector 中配置各对象的资产引用
+- 后期所有战斗配置统一到 `MiniChess/Combat Config` 编辑器窗口管理
+- 编辑器窗口负责创建、校验和快速定位资产，不承载运行时逻辑
+
 ## Code Style
 
 - All future agents must follow `Docs/10_CODE_STYLE.md` before adding or changing C# code.

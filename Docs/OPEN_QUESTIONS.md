@@ -198,3 +198,45 @@
 - 当前临时假设：**TagSet 追踪来源计数或来源列表；只有所有来源都移除后，该 Tag 才从对象上消失。**
 - 决议：(空)
 - 影响：`GameplayTagSet` / Status / Equipment / Terrain / ScriptedTactic
+
+### Q-0029 Status 属性修正值追踪方式
+- 来源：2026-05-11 代码审查 / `Docs/13_FUTURE_DESIGN.md` §1.2
+- 问题：Status 的属性修正（StatModifier，如 Attack+5）是直接修改 AttributeSet 的值（Add/Remove 配对），还是维护独立的"修正值快照"在查询时动态计算？
+- 当前临时假设：**直接修改 AttributeSet（Add/Remove 配对）**。添加 Status 时 `Modify(attr, +delta)`，移除时 `Modify(attr, -delta)`。
+- 决议：(空)
+- 影响：`StatusComponent`、`AttributeSet`、`StatModifier`
+
+### Q-0030 AI 评分公式参数是否策划可配置
+- 来源：2026-05-11 代码审查 / `Docs/13_FUTURE_DESIGN.md` §2.3
+- 问题：AI 候选评分的各分项（距离分、AP 效率分、HP 紧迫度阈值等）权重是写死在 `AIActionEvaluator` 中，还是作为 `AIProfile` 或 `CombatConfig` 的可配置字段？
+- 当前临时假设：**部分可配置**。`AIProfile` 中已有的字段可配置；距离/AP 效率等通用参数暂时硬编码，后续提升到 `CombatConfig`。
+- 决议：(空)
+- 影响：`AIActionEvaluator`、`AIProfile`、`CombatConfig`
+
+### Q-0031 战斗事件是否需要附带属性快照
+- 来源：2026-05-11 代码审查 / `Docs/13_FUTURE_DESIGN.md` §4
+- 问题：`CombatEvent` 中是否附带事件前后 HP/AP 快照？UI 动效可能需要前后值计算动画。
+- 当前临时假设：**附带变化前后值**。`CombatEvent` 包含 `ValueBefore` 和 `ValueAfter` 字段。
+- 决议：(空)
+- 影响：`CombatEventBus`、`CombatEvent`、`AttributeSet.Modify`
+
+### Q-0032 ScriptedTactic 配置方式
+- 来源：2026-05-11 代码审查 / `Docs/13_FUTURE_DESIGN.md` §2.5
+- 问题：ScriptedTactic 配置方式：独立 ScriptableObject 资产 vs 关卡数据内嵌 vs 在 CombatTrigger 上直接配置？
+- 当前临时假设：**独立 ScriptableObject 资产 + CombatTrigger 引用**，可被多个战斗复用。
+- 决议：(空)
+- 影响：`ScriptedTactic`、`CombatTrigger`、关卡数据格式
+
+### Q-0033 同一 Status 多次叠加时属性修正回滚
+- 来源：2026-05-11 代码审查 / `Docs/13_FUTURE_DESIGN.md` §1
+- 问题：若同一 Status 多次叠加（StackValue 规则），移除一层时需精确回退一层修正值。Add/Remove 配对方案是否够用？
+- 当前临时假设：**每层独立追踪修正量**。`StatusComponent` 记录每层修正快照，移除时精确回退。
+- 决议：(空)
+- 影响：`StatusComponent`、`StatusInstance`、属性修正回退逻辑
+
+### Q-0034 basic_move 是否必须显式挂载 Ability 资产
+- 来源：2026-05-11 代码审查 / IS-0004
+- 问题：修复 IS-0004 后是否要求所有 `basic_move` 资产必须通过 Unity Editor 显式挂载 Ability？
+- 当前临时假设：**要求显式配置**。移除 `DefaultInstance` fallback；Config Validation 检查 GroundPoint 技能是否配置了 Ability。
+- 决议：(空)
+- 影响：`SkillDefinition.Ability` getter、`GroundMoveAbility.DefaultInstance`、Config Validation
