@@ -101,8 +101,14 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 
 - [x] `CombatRoundManager`（MVP 轮次 + initiative turn order + 可控块 + 敌我回合）
 - [x] `ICombatUnit` 接口（`Player1Controller` + `EnemyController` 均实现）
+> ⚠️ 迁移决议(2026-05-11): ICombatUnit + Player1Controller + EnemyController 已决议删除。
+> 单位属性通过 AttributeSet 访问，阵营通过 GameplayTagComponent 的 Faction Tag，
+> 控制权通过 Control.Human / Control.AI Tag。见 Docs/15 §控制权标识。
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
+> ⚠️ 同上迁移决议。AP 现在由 AttributeSet 通过 GameplayTag("Attribute.AP") 管理，
+> MovementController 负责按移动距离实时扣 AP。
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
+> ⚠️ 同上迁移决议。Initiative 现在由 AttributeSet.Get(WellKnownAttributeTags.Initiative) 读取。
 - [ ] `GameplayTagSystem`（Tag First 基础设施：`GameplayTag` + `GameplayTagSet` + 匹配 + 来源追踪，见 `09_GAMEPLAY_TAG_SPEC.md`）
 - [ ] `MovementController`（NavMesh 包装；玩家输入已由 `InputController` 纯输入路由，移动解释逻辑临时在 `GroundMoveAbility` 内）
 - [ ] `SkillSystem`（`SkillDefinition` + `Effect` + `SkillExecutor` + AP/冷却/目标校验；挂载 `SkillExecutor` 的对象即可成为技能系统目标，见 `05_SKILL_SPEC.md`）
@@ -112,7 +118,8 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 
 ## 9. MVP 回合模拟（玩家 + 敌方单位）
 
-当前实现范围：场景内若干 `Player1Controller` + 任意数量 `EnemyController`，有最小敌方基础 AI，无胜负判定。队伍人数不设硬性 4 人上限；具体可操作数量由场景配置和 UI/输入支持决定。
+当前实现范围：场景内若干参战单位（通过 `CombatUnit` 标记发现），有最小敌方基础 AI，无胜负判定。队伍人数不设硬性 4 人上限；具体可操作数量由场景配置和 UI/输入支持决定。
+> ⚠️ 迁移决议(2026-05-11): Player1Controller/EnemyController 已决议删除。单位统一通过 CombatUnit + AttributeSet + SkillExecutor + MovementController + GameplayTagComponent 组件栈表达。控制权由 Control.Human / Control.AI Tag 标记。
 
 - `CombatRoundManager` 启动时收集所有 `ICombatUnit`，按 `Initiative` 降序排序。
 - `CombatRoundManager` 提供 `enemyFirstForDebug` 调试开关（默认关闭）：开启时所有敌方单位排在玩家之前，仅用于 AI 测试，不代表正式先攻规则。
@@ -131,6 +138,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - 敌方 AI 选终点时使用软占位检查：避开其他存活玩家/敌人的当前位置；理想攻击点或追击点被占用时，在附近采样替代 NavMesh 点，避免多个 AI 抢同一个终点。
 - 当所有存活单位本轮结束后，自动进入下一轮。
 - 敌方 HP 归零时自动 `Destroy(gameObject)`。
+> ⚠️ 迁移决议(2026-05-11): 死亡改为技能化。HP 归零 → AttributeDepleted 事件 → `sys_on_death` 系统技能（注销 + 死亡 VFX + Destroy）。不再由 EnemyController 直接 Destroy。
 
 ## 10. 玩家可控块规则（Q-0024 已决议，已实现）
 
@@ -154,9 +162,9 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 | 攻击 AP 消耗 | 1 | `basic_attack.apCost` 示例配置 |
 | 攻击伤害 | 20 | `basic_attack` 的 `DamageEffect` 示例配置，暂不计算属性/防御 |
 | 攻击范围 | 1.5m | `basic_attack.range` 示例配置 |
-| 敌方 HP | 100 | `EnemyController.maxHP` 默认值 |
-| 玩家 HP | 100 | `Player1Controller.maxHP` 默认值 |
-| 死亡处理 | — | 敌方 `HP ≤ 0` 时 `Destroy(gameObject)`；玩家暂不销毁 |
+| 敌方 HP | 100 | `AttributeSet.GetMax(HP)` 默认值（通过 `AttributeSetDef` 配置） |
+| 玩家 HP | 100 | 同上 |
+| 死亡处理 | — | `HP ≤ 0` → `AttributeDepleted` 事件 → `sys_on_death` 系统技能（统一处理，不再区分玩家/敌方） |
 
 后续攻击流程草案：
 1. 玩家通过待定交互选择主动攻击技能与目标。

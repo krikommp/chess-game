@@ -408,16 +408,30 @@ public bool TryGetEntry(GameplayTag tag, out TagEntry entry)
 
 ### IS-0017 Player1Controller.OnAttributeDepleted 为空实现
 
+**严重级别：** ~~P3~~ → P0（已决议：死亡技能化）
+
+**状态：** 已决议（2026-05-11），待实现
+
 **现状：**
 ```csharp
 // Player1Controller.cs:164
 private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 ```
 
-敌方 HP 归零时自动 `Destroy(gameObject)`（`EnemyController.OnAttributeDepleted`），但玩家 HP 归零时没有任何处理。
+敌方 HP 归零时 `EnemyController.OnAttributeDepleted` 直接 `Destroy(gameObject)`，但玩家 HP 归零时没有任何处理。
+
+**决议：**
+不分别修复玩家和敌方，而是统一走 `sys_on_death` 系统技能：
+- `AttributeSet.HP <= 0` → `AttributeDepleted` 事件 → `SkillExecutor.Execute(sys_on_death)`
+- `sys_on_death` 的 Effect：注销 CombatRoundManager → 死亡动画/VFX → Destroy
+- 删除 `EnemyController.OnAttributeDepleted` 的硬编码 Destroy
+- 删除 `Player1Controller.OnAttributeDepleted` 的空实现
+- 设计参考：`Docs/14_ROUND_EVENT_SYSTEM.md` §4.2.5
 
 **涉及文件：**
 - `Assets/Scripts/Combat/Player1Controller.cs:164`
+- `Assets/Scripts/Combat/EnemyController.cs`（OnAttributeDepleted）
+- 待创建：`sys_on_death` 技能资产 + `DeregisterFromCombatEffect` + `DeathVisualEffect` + `DestroyGameObjectEffect`
 
 ---
 
@@ -562,7 +576,7 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 | IS-0014 | EffectDefinition 空 Tag 检查不一致 | P3 | 待处理 |
 | IS-0015 | turnOrder 使用 GameObject 而非组件引用 | P3 | 待处理 |
 | IS-0016 | 缺少战斗日志/事件总线 | P3 | 待处理 |
-| IS-0017 | Player1Controller.OnAttributeDepleted 为空 | P3 | 待处理 |
+| IS-0017 | Player1Controller.OnAttributeDepleted 为空 | P0 | 已决议，待实现 |
 | IS-0018 | APDebugHUD 直接访问内部字段 | P3 | 待处理 |
 | IS-0019 | 场景未迁移到 CombatUnit / UnitTurnHandler / EnemyTurnRunner 新架构 | P0 | 待处理 |
 | IS-0020 | 回合开始 AP 恢复与移动预算重置丢失 | P0 | 待处理 |

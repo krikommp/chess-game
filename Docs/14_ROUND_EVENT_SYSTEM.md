@@ -114,6 +114,8 @@ SampleScene
 │       │   │   └── m_availableSkills: [basic_move, basic_attack, power_strike] ← Inspector拖入
 │       │   ├── GameplayTagComponent (MB)
 │       │   └── Player1Controller (MB)            ← 视觉 + UI
+│       │                                           ⚠️ 迁移决议(2026-05-11): 删除Player1Controller,
+│       │                                               视觉状态提取到UnitVisualController
 │       │
 │       ├── Enemy_Goblin_Melee                    ← 场景预置单位
 │       │   ├── CombatUnit (MB)
@@ -125,11 +127,14 @@ SampleScene
 │       │   ├── GameplayTagComponent (MB)
 │       │   └── EnemyController (MB)
 │       │       └── m_aiProfile: Aggressive_Profile  ← Inspector拖入
+│       │       ⚠️ 迁移决议(2026-05-11): 删除EnemyController,
+│       │            AIProfile改挂AIUnitConfig组件
 │       │
 │       └── Enemy_Shaman_Support                  ← 场景预置单位
 │           ├── ... (同上)
 │           └── EnemyController (MB)
 │               └── m_aiProfile: Support_Profile  ← 支援型AI
+│               ⚠️ 同§2.5迁移决议
 ```
 
 ### 关键原则
@@ -257,6 +262,28 @@ SkillDefinition: sys_turn_end
 │   └── DecrementStatusDurationEffect
 │       └── (所有 Status 的 remainingRounds -= 1)
 ```
+
+### 4.2.5 sys_on_death（迁移决议 2026-05-11）
+
+> ⚠️ 死亡技能化设计决议。Player1Controller/EnemyController 删除后，HP 归零不再由控制器直接 `Destroy(gameObject)`，改为触发系统技能。
+
+```
+SkillDefinition: sys_on_death
+├── id: "sys_on_death"
+├── apCost: 0
+├── targetType: Self
+├── effects:
+│   ├── DeregisterFromCombatEffect
+│   │   └── (从 CombatRoundManager 的 turnOrder 中移除)
+│   │
+│   ├── DeathVisualEffect (可选)
+│   │   └── (播放死亡动画 / VFX)
+│   │
+│   └── DestroyGameObjectEffect
+│       └── (延迟 Destroy)
+```
+
+触发：`AttributeSet.HP <= 0` → `AttributeDepleted.HP` 事件 → `RoundPhaseManager` 或单位自身 `SkillExecutor.Execute(sys_on_death)`。
 
 ### 4.3 如何实现 debuff "阻止 AP 恢复"
 

@@ -889,7 +889,10 @@
 目标：
 - 通过 Unity Editor 创建 `sys_round_start` 技能资产（RestoreAP + ResetMovement + AdvanceCooldowns + StatusTick）
 - 创建 `sys_turn_end` 技能资产
-- 创建配套 Effect 资产：`RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`
+- 创建 `sys_on_death` 技能资产（DeregisterFromCombat + DeathVisual + Destroy）
+  > ⚠️ 迁移决议(2026-05-11): 死亡技能化。`sys_on_death` 新增到系统技能列表，
+  > 设计见 `Docs/14_ROUND_EVENT_SYSTEM.md` §4.2.5。
+- 创建配套 Effect 资产：`RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`、`DeregisterFromCombatEffect`、`DeathVisualEffect`、`DestroyGameObjectEffect`
 - 资产全部拖入 `RoundPhaseManager` Inspector
 
 ### CR-0025 场景迁移到新回合架构

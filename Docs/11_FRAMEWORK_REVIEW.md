@@ -279,12 +279,17 @@ LineRenderer 路径预览：
 流程:
 1. 从摄像机做射线检测
 2. 根据碰撞对象解析目标 Tag:
-   - Player1Controller → k_TargetPlayer
-   - EnemyController → k_TargetEnemy
+   - 读 GameplayTagComponent: Control.Human → k_TargetHuman
+   - 读 GameplayTagComponent: Control.AI → k_TargetAI
    - Ground Layer → k_TargetGround
    - 其他 → k_TargetUnknown
 3. 将信号 Tag (Hover/PrimaryPressed) + 目标 Tag + 命中信息 打包为 SkillInputRequest
 4. 通过 InputReceived 事件分发
+
+> **迁移决议 (2026-05-11):** 原实现通过 `GetComponent<Player1Controller>()` / `GetComponent<EnemyController>()`
+> 类型判断。已决议改为读 `GameplayTagComponent` 上的 `Control.Human` / `Control.AI` Tag。
+> 这消除了对 Player1Controller/EnemyController 的类型依赖，且天然兼容心控、Charm、托管自动战斗等
+> 控制权转移场景。
 ```
 
 #### SkillInputRequest (readonly struct)
@@ -292,7 +297,7 @@ LineRenderer 路径预览：
 ```
 字段:
 - SignalTag: 输入信号 (Input.Pointer.Hover / Input.Pointer.PrimaryPressed)
-- TargetTag: 命中语义 (Input.Target.Ground / Unit.Player / Unit.Enemy / Unknown)
+- TargetTag: 命中语义 (Input.Target.Ground / Control.Human / Control.AI / Unknown)
 - TargetObject: 命中的 GameObject
 - WorldPosition: 命中世界坐标
 - HasWorldPosition: 是否有有效世界坐标
@@ -309,8 +314,8 @@ LineRenderer 路径预览：
 | `k_PointerHover` | `Input.Pointer.Hover` |
 | `k_PrimaryPressed` | `Input.Pointer.PrimaryPressed` |
 | `k_TargetGround` | `Input.Target.Ground` |
-| `k_TargetPlayer` | `Input.Target.Unit.Player` |
-| `k_TargetEnemy` | `Input.Target.Unit.Enemy` |
+| `k_TargetHuman` | `Control.Human` |
+| `k_TargetAI` | `Control.AI` |
 | `k_TargetUnknown` | `Input.Target.Unknown` |
 
 ### 2.5 技能层 — Skill 系统
