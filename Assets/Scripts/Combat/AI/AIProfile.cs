@@ -8,12 +8,12 @@ namespace MiniChess.Combat.AI
     public struct TagWeightEntry
     {
         [Tooltip("Tag to match against.")]
-        [SerializeField] private GameplayTagRef m_tag;
+        [SerializeField] private GameplayTag m_tag;
 
         [Tooltip("Score multiplier when this tag matches.")]
         [SerializeField] private float m_weight;
 
-        public GameplayTagRef Tag => m_tag;
+        public GameplayTag Tag => m_tag;
         public float Weight => m_weight;
     }
 
@@ -64,7 +64,7 @@ namespace MiniChess.Combat.AI
             var entries = SkillTagWeights;
             for (int i = 0; i < entries.Length; i++)
             {
-                if (entries[i].Tag.TryGetTag(out var t) && t == tag)
+                if (entries[i].Tag == tag)
                     return entries[i].Weight;
             }
             return 1f;
@@ -76,7 +76,7 @@ namespace MiniChess.Combat.AI
             var entries = TargetTagWeights;
             for (int i = 0; i < entries.Length; i++)
             {
-                if (entries[i].Tag.TryGetTag(out var t) && t == tag)
+                if (entries[i].Tag == tag)
                     return entries[i].Weight;
             }
             return 1f;
@@ -88,7 +88,7 @@ namespace MiniChess.Combat.AI
             var entries = StatusTagWeights;
             for (int i = 0; i < entries.Length; i++)
             {
-                if (entries[i].Tag.TryGetTag(out var t) && t == tag)
+                if (entries[i].Tag == tag)
                     return entries[i].Weight;
             }
             return 1f;

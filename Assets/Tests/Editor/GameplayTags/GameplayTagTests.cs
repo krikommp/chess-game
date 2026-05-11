@@ -210,53 +210,41 @@ public class GameplayTagTests
         });
     }
 
-    // ── GameplayTagRef ─────────────────────────────────────────
+    // ── GameplayTag serialization ────────────────────────────
 
     [Test]
-    public void TagRef_ValidValue_IsValid()
+    public void SerializedTag_Default_HasEmptyValue()
     {
-        var tagRef = new GameplayTagRef("Status.Burning");
-        Assert.IsTrue(tagRef.IsValid);
-        Assert.IsTrue(tagRef.TryGetTag(out var tag));
+        var tag = default(GameplayTag);
+        Assert.AreEqual(string.Empty, tag.Value);
+        Assert.IsFalse(GameplayTag.IsValid(tag.Value));
+    }
+
+    [Test]
+    public void SerializedTag_IdFallback_WhenIdIsZero()
+    {
+        // Simulate deserialized tag (m_id=0, m_value set)
+        var tag = default(GameplayTag);
+        Assert.AreEqual(0, tag.GetHashCode()); // default tag has hash 0
+
+        var validTag = new GameplayTag("Status.Burning");
+        Assert.AreNotEqual(0, validTag.GetHashCode()); // proper tag has non-zero hash
+    }
+
+    [Test]
+    public void SerializedTag_ImplicitFromString_Works()
+    {
+        GameplayTag tag = "Status.Burning";
         Assert.AreEqual("Status.Burning", tag.Value);
     }
 
     [Test]
-    public void TagRef_InvalidValue_IsNotValid()
+    public void SerializedTag_SameValue_Equal()
     {
-        var tagRef = new GameplayTagRef(".Bad");
-        Assert.IsFalse(tagRef.IsValid);
-        Assert.IsFalse(tagRef.TryGetTag(out _));
-    }
-
-    [Test]
-    public void TagRef_Default_IsNotValid()
-    {
-        var tagRef = default(GameplayTagRef);
-        Assert.IsFalse(tagRef.IsValid);
-        Assert.AreEqual(string.Empty, tagRef.Value);
-    }
-
-    [Test]
-    public void TagRef_InvalidToTag_Throws()
-    {
-        var tagRef = new GameplayTagRef("");
-        Assert.Throws<InvalidOperationException>(() => tagRef.ToTag());
-    }
-
-    [Test]
-    public void TagRef_ImplicitToString_Works()
-    {
-        GameplayTagRef tagRef = "Status.Burning";
-        Assert.AreEqual("Status.Burning", tagRef.Value);
-    }
-
-    [Test]
-    public void TagRef_ImplicitToTag_Works()
-    {
-        var tagRef = new GameplayTagRef("Status.Burning");
-        GameplayTag tag = tagRef; // implicit conversion
-        Assert.AreEqual("Status.Burning", tag.Value);
+        var a = new GameplayTag("Status.Burning");
+        var b = new GameplayTag("Status.Burning");
+        Assert.IsTrue(a == b);
+        Assert.AreEqual(a.GetHashCode(), b.GetHashCode());
     }
 
     // ── GameplayTagSet ─────────────────────────────────────────
@@ -417,7 +405,7 @@ public class GameplayTagTests
         set.Add(new GameplayTag("Combat.Flanking"));
 
         var query = new TagQuery(
-            requiredAll: new[] { new GameplayTagRef("Status.Burning"), new GameplayTagRef("Combat.Flanking") }
+            requiredAll: new[] { new GameplayTag("Status.Burning"), new GameplayTag("Combat.Flanking") }
         );
         Assert.IsTrue(query.Evaluate(set));
     }
@@ -429,7 +417,7 @@ public class GameplayTagTests
         set.Add(new GameplayTag("Status.Burning"));
 
         var query = new TagQuery(
-            requiredAll: new[] { new GameplayTagRef("Status.Burning"), new GameplayTagRef("Combat.Flanking") }
+            requiredAll: new[] { new GameplayTag("Status.Burning"), new GameplayTag("Combat.Flanking") }
         );
         Assert.IsFalse(query.Evaluate(set));
     }
@@ -441,8 +429,8 @@ public class GameplayTagTests
         set.Add(new GameplayTag("Status.Immune"));
 
         var query = new TagQuery(
-            requiredAll: new[] { new GameplayTagRef("Status.Burning") },
-            blockedAny: new[] { new GameplayTagRef("Status.Immune") }
+            requiredAll: new[] { new GameplayTag("Status.Burning") },
+            blockedAny: new[] { new GameplayTag("Status.Immune") }
         );
         Assert.IsFalse(query.Evaluate(set));
     }
@@ -454,7 +442,7 @@ public class GameplayTagTests
         set.Add(new GameplayTag("Status.Burning"));
 
         var query = new TagQuery(
-            requiredAny: new[] { new GameplayTagRef("Status.Burning"), new GameplayTagRef("Status.Stunned") }
+            requiredAny: new[] { new GameplayTag("Status.Burning"), new GameplayTag("Status.Stunned") }
         );
         Assert.IsTrue(query.Evaluate(set));
     }
@@ -466,7 +454,7 @@ public class GameplayTagTests
         set.Add(new GameplayTag("Status.Bleeding"));
 
         var query = new TagQuery(
-            requiredAny: new[] { new GameplayTagRef("Status.Burning"), new GameplayTagRef("Status.Stunned") }
+            requiredAny: new[] { new GameplayTag("Status.Burning"), new GameplayTag("Status.Stunned") }
         );
         Assert.IsFalse(query.Evaluate(set));
     }
@@ -474,7 +462,7 @@ public class GameplayTagTests
     [Test]
     public void TagQuery_Evaluate_NullSet_ReturnsFalse()
     {
-        var query = new TagQuery(requiredAll: new[] { new GameplayTagRef("A") });
+        var query = new TagQuery(requiredAll: new[] { new GameplayTag("A") });
         Assert.IsFalse(query.Evaluate(null));
     }
 

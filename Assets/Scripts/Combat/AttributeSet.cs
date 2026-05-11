@@ -67,7 +67,8 @@ namespace MiniChess.Combat
             var entries = m_definition.Entries;
             for (int i = 0; i < entries.Length; i++)
             {
-                if (!entries[i].Tag.TryGetTag(out var tag)) continue;
+                var tag = entries[i].Tag;
+                if (string.IsNullOrEmpty(tag.Value)) continue;
                 m_currentValues[tag] = entries[i].BaseValue;
                 m_maxValues[tag] = entries[i].MaxValue;
             }

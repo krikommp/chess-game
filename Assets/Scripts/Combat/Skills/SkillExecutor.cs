@@ -320,7 +320,7 @@ namespace MiniChess.Combat.Skills
             var requiredCaster = skill.RequiredCasterTags;
             for (int i = 0; i < requiredCaster.Length; i++)
             {
-                if (!requiredCaster[i].IsValid) continue;
+                if (string.IsNullOrEmpty(requiredCaster[i].Value)) continue;
                 if (!casterTags.Has(requiredCaster[i], ETagMatchMode.Exact))
                     return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
                         $"Caster lacks required tag '{requiredCaster[i].Value}'.");
@@ -329,7 +329,7 @@ namespace MiniChess.Combat.Skills
             var blockedCaster = skill.BlockedCasterTags;
             for (int i = 0; i < blockedCaster.Length; i++)
             {
-                if (!blockedCaster[i].IsValid) continue;
+                if (string.IsNullOrEmpty(blockedCaster[i].Value)) continue;
                 if (casterTags.Has(blockedCaster[i], ETagMatchMode.Exact))
                     return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
                         $"Caster is blocked by tag '{blockedCaster[i].Value}'.");
@@ -344,7 +344,7 @@ namespace MiniChess.Combat.Skills
             var requiredTarget = skill.RequiredTargetTags;
             for (int i = 0; i < requiredTarget.Length; i++)
             {
-                if (!requiredTarget[i].IsValid) continue;
+                if (string.IsNullOrEmpty(requiredTarget[i].Value)) continue;
                 if (!targetTags.Has(requiredTarget[i], ETagMatchMode.Exact))
                     return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
                         $"Target lacks required tag '{requiredTarget[i].Value}'.");
@@ -353,7 +353,7 @@ namespace MiniChess.Combat.Skills
             var blockedTarget = skill.BlockedTargetTags;
             for (int i = 0; i < blockedTarget.Length; i++)
             {
-                if (!blockedTarget[i].IsValid) continue;
+                if (string.IsNullOrEmpty(blockedTarget[i].Value)) continue;
                 if (targetTags.Has(blockedTarget[i], ETagMatchMode.Exact))
                     return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
                         $"Target is blocked by tag '{blockedTarget[i].Value}'.");

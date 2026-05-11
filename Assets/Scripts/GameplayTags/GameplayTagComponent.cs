@@ -8,15 +8,15 @@ namespace MiniChess.GameplayTags
     /// </summary>
     public class GameplayTagComponent : MonoBehaviour
     {
-        [SerializeField] private GameplayTagRef[] m_initialTags;
+        [SerializeField] private GameplayTag[] m_initialTags;
 
         public GameplayTagSet TagSet { get; private set; } = new GameplayTagSet();
 
         private void Awake()
         {
-            foreach (var tagRef in m_initialTags)
+            foreach (var tag in m_initialTags)
             {
-                if (tagRef.TryGetTag(out var tag))
+                if (!string.IsNullOrEmpty(tag.Value))
                 {
                     TagSet.Add(tag, ETagSourceType.Debug);
                 }

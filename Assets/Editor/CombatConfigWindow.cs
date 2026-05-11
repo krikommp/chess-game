@@ -97,6 +97,15 @@ namespace MiniChess.EditorTools
             EditorGUILayout.LabelField("Path", k_RegistryAssetPath);
             EditorGUILayout.Space(4);
 
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Regenerate Code", GUILayout.Width(130)))
+            {
+                TagCodeGenerator.Regenerate();
+            }
+            EditorGUILayout.HelpBox("Auto-generates GameplayTagConstants.g.cs from this registry.", MessageType.None);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(4);
+
             // Ensure registry exists
             if (m_registry == null)
             {
@@ -213,6 +222,7 @@ namespace MiniChess.EditorTools
             entriesProp.InsertArrayElementAtIndex(idx);
             var el = entriesProp.GetArrayElementAtIndex(idx);
             el.FindPropertyRelative("m_tag.m_value").stringValue = m_newTagValue;
+            el.FindPropertyRelative("m_tag.m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash(m_newTagValue);
             el.FindPropertyRelative("m_displayName").stringValue = m_newTagDisplayName;
             el.FindPropertyRelative("m_description").stringValue = m_newTagDescription;
             so.ApplyModifiedProperties();
@@ -552,16 +562,16 @@ namespace MiniChess.EditorTools
             }
         }
 
-        private void CheckTagRegistered(GameplayTagRef tagRef, string context, string assetPath)
+        private void CheckTagRegistered(GameplayTag tag, string context, string assetPath)
         {
-            if (!tagRef.IsValid)
+            if (string.IsNullOrEmpty(tag.Value) || !GameplayTag.IsValid(tag.Value))
             {
-                AddError($"Invalid tag format in {context}: '{tagRef.Value}'", assetPath);
+                AddError($"Invalid tag format in {context}: '{tag.Value}'", assetPath);
                 return;
             }
-            if (m_registry != null && !m_registry.IsRegistered(tagRef))
+            if (m_registry != null && !m_registry.IsRegistered(tag))
             {
-                AddWarning($"Unregistered tag in {context}: '{tagRef.Value}'", assetPath);
+                AddWarning($"Unregistered tag in {context}: '{tag.Value}'", assetPath);
             }
         }
 

@@ -15,7 +15,7 @@ namespace MiniChess.Combat
         public struct Entry
         {
             [Tooltip("Tag identifying this attribute, e.g. Attribute.HP, Attribute.AP, Attribute.MoveSpeed.")]
-            public GameplayTagRef Tag;
+            public GameplayTag Tag;
 
             [Tooltip("Starting value when the unit is initialized or respawned.")]
             public float BaseValue;

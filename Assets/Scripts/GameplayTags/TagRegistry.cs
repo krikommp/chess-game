@@ -41,7 +41,7 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public struct TagEntry
     {
-        [SerializeField] private GameplayTagRef m_tag;
+        [SerializeField] private GameplayTag m_tag;
         [SerializeField] private string m_displayName;
         [SerializeField, TextArea(1, 3)]
         private string m_description;
@@ -52,7 +52,7 @@ namespace MiniChess.GameplayTags
 
         public TagEntry(GameplayTag tag, string displayName, string description)
         {
-            m_tag = tag.Value;
+            m_tag = tag;
             m_displayName = displayName;
             m_description = description;
         }

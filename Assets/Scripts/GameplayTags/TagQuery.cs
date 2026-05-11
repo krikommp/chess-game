@@ -12,20 +12,20 @@ namespace MiniChess.GameplayTags
     [Serializable]
     public struct TagQuery
     {
-        [SerializeField] private GameplayTagRef[] m_requiredAll;
-        [SerializeField] private GameplayTagRef[] m_requiredAny;
-        [SerializeField] private GameplayTagRef[] m_blockedAny;
+        [SerializeField] private GameplayTag[] m_requiredAll;
+        [SerializeField] private GameplayTag[] m_requiredAny;
+        [SerializeField] private GameplayTag[] m_blockedAny;
         [SerializeField] private ETagMatchMode m_matchMode;
 
-        public IReadOnlyList<GameplayTagRef> RequiredAll => m_requiredAll ?? Array.Empty<GameplayTagRef>();
-        public IReadOnlyList<GameplayTagRef> RequiredAny => m_requiredAny ?? Array.Empty<GameplayTagRef>();
-        public IReadOnlyList<GameplayTagRef> BlockedAny => m_blockedAny ?? Array.Empty<GameplayTagRef>();
+        public IReadOnlyList<GameplayTag> RequiredAll => m_requiredAll ?? Array.Empty<GameplayTag>();
+        public IReadOnlyList<GameplayTag> RequiredAny => m_requiredAny ?? Array.Empty<GameplayTag>();
+        public IReadOnlyList<GameplayTag> BlockedAny => m_blockedAny ?? Array.Empty<GameplayTag>();
         public ETagMatchMode MatchMode => m_matchMode;
 
         public TagQuery(
-            GameplayTagRef[] requiredAll = null,
-            GameplayTagRef[] requiredAny = null,
-            GameplayTagRef[] blockedAny = null,
+            GameplayTag[] requiredAll = null,
+            GameplayTag[] requiredAny = null,
+            GameplayTag[] blockedAny = null,
             ETagMatchMode matchMode = ETagMatchMode.Exact)
         {
             m_requiredAll = requiredAll;
@@ -44,18 +44,15 @@ namespace MiniChess.GameplayTags
             // Blocked: if target has any blocked tag, fail immediately
             if (BlockedAny.Count > 0)
             {
-                var blocked = BlockedAny
-                    .Where(r => r.IsValid)
-                    .Select(r => (GameplayTag)r)
-                    .ToList();
-                if (blocked.Count > 0 && tagSet.HasAny(blocked, MatchMode))
+                var blocked = BlockedAny.Where(t => !string.IsNullOrEmpty(t.Value)).ToArray();
+                if (blocked.Length > 0 && tagSet.HasAny(blocked, MatchMode))
                     return false;
             }
 
             // RequiredAll: all must be present
             foreach (var required in RequiredAll)
             {
-                if (!required.IsValid) continue;
+                if (string.IsNullOrEmpty(required.Value)) continue;
                 if (!tagSet.Has(required, MatchMode))
                     return false;
             }
@@ -63,11 +60,8 @@ namespace MiniChess.GameplayTags
             // RequiredAny: at least one must be present (if any specified)
             if (RequiredAny.Count > 0)
             {
-                var any = RequiredAny
-                    .Where(r => r.IsValid)
-                    .Select(r => (GameplayTag)r)
-                    .ToList();
-                if (any.Count == 0) return true; // no valid requirements → pass
+                var any = RequiredAny.Where(t => !string.IsNullOrEmpty(t.Value)).ToArray();
+                if (any.Length == 0) return true;
                 if (!tagSet.HasAny(any, MatchMode))
                     return false;
             }
