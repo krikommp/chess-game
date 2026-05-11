@@ -138,7 +138,7 @@ namespace MiniChess.Combat
             if (!CombatMovementResolver.TryFindFarthestReachablePoint(fullPath.corners, maxMoveDist, out var farthestPoint))
                 yield break;
 
-            if (!NavMesh.SamplePosition(farthestPoint, m_navMeshSnapRadius, NavMesh.AllAreas, out var destHit))
+            if (!NavMesh.SamplePosition(farthestPoint, out var destHit, m_navMeshSnapRadius, NavMesh.AllAreas))
                 yield break;
 
             if (!CombatMovementResolver.TryBuildCompletePath(origin, destHit.position, out var movePath))
