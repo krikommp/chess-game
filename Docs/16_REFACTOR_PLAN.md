@@ -110,36 +110,44 @@ if (attr != null)
 
 #### 3a. 创建 Effect 类（`Assets/Scripts/Combat/Skills/`，菜单路径 `MiniChess/Effects/`）
 
-**RestoreAttributeEffect** (EffectDefinition 派生):
+> **设计决议 (2026-05-11):** 所有 Effect 使用统一接口 `Compute(ctx)→EffectResult` + `Apply(ctx, result)` + `EEffectDuration`。详见 `OPEN_QUESTIONS.md` §Ability-Effect 设计决议。
+
+**RestoreAttributeEffect** (EffectDefinition 派生, Instant):
 - `[SerializeField] private GameplayTag m_attributeTag;` — 要恢复的属性（如 `Attribute.AP`）
 - `[SerializeField] private ERestoreMode m_mode;` — `ToMax` / `ByValue`
 - `[SerializeField] private float m_value;` — ByValue 模式下的恢复量
 - `RequiredCapability` → `Statusable`（所有单位都应能接受系统维护）
 - `Apply()` → 根据 mode 调用 `attr.SetToMax(tag)` 或 `attr.Modify(tag, +value)`
 
-**ResetMovementEffect** (EffectDefinition 派生):
+**ResetMovementEffect** (EffectDefinition 派生, Instant):
 - `RequiredCapability` → `Movable`
+- `Compute()` → 总是返回成功
 - `Apply()` → `movement?.ResetUnpaidDistance()`
 
-**AdvanceCooldownsEffect** (EffectDefinition 派生):
+**AdvanceCooldownsEffect** (EffectDefinition 派生, Instant):
 - `RequiredCapability` → `Statusable`
+- `Compute()` → 总是返回成功
 - `Apply()` → `executor?.AdvanceCooldowns()`
 
-**TriggerStatusTickEffect** (EffectDefinition 派生):
+**TriggerStatusTickEffect** (EffectDefinition 派生, Instant):
 - `[SerializeField] private EStatusTickPhase m_phase;` — `TurnStart` / `TurnEnd`
 - `RequiredCapability` → `Statusable`
+- `Compute()` → 总是返回成功
 - `Apply()` → 遍历 `executor.ActiveEffects`，对匹配 phase 的 tick
 
-**DecrementStatusDurationEffect** (EffectDefinition 派生):
+**DecrementStatusDurationEffect** (EffectDefinition 派生, Instant):
 - `RequiredCapability` → `Statusable`
+- `Compute()` → 总是返回成功
 - `Apply()` → 遍历 `executor.ActiveEffects`，`remainingRounds -= 1`，归零的移除
 
-**DeregisterFromCombatEffect** (EffectDefinition 派生):
+**DeregisterFromCombatEffect** (EffectDefinition 派生, Instant):
 - `RequiredCapability` → `Statusable`
+- `Compute()` → 总是返回成功
 - `Apply()` → `CombatRoundManager` 实例从 turnOrder 移除 `context.Target`
 
-**DeathVisualEffect** (EffectDefinition 派生):
+**DeathVisualEffect** (EffectDefinition 派生, Instant):
 - `RequiredCapability` → `Statusable`
+- `Compute()` → 总是返回成功
 - `Apply()` → Phase 1 用 `Debug.Log` + 可选 Material 颜色变化；后续接正式动画
 
 **DestroyGameObjectEffect** (EffectDefinition 派生):

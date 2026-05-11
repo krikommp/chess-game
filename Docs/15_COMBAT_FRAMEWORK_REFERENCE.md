@@ -100,7 +100,7 @@
 | 资产 | 路径 | 用途 |
 |------|------|------|
 | **SkillDefinition** | `Assets/Data/Skills/` | 技能数据：id/apCost/cooldown/range/targetType/effects[]/skillTags/aiTags/aiBaseWeight/requiredTargetTags/blockedTargetTags |
-| **EffectDefinition** (抽象) | `Assets/Data/Effects/` | 效果基类：Tags/DurationRounds/StackRule/GrantedTags/GrantedAbilities/StatModifiers/TickPerRound。派生：`DamageEffectDefinition` / `HealEffectDefinition` / `AddStatusEffectDefinition` / `MoveEffectDefinition` |
+| **EffectDefinition** (抽象) | `Assets/Data/Effects/` | 效果基类。**Tag 互作：** IdentityTags/GrantTags/RemoveTags/RequiredTags/BlockedTags。**生命周期：** DurationRounds(isPersistent)/StackRule/TickPerRound。**数据：** StatModifiers/GrantedAbilities。**接口：** Compute(ctx)→Result / Apply(ctx,result)。派生：`DamageEffectDefinition` / `HealEffectDefinition` / `AddStatusEffectDefinition` / `MoveEffectDefinition` / `SpendAPEffect` / `SetCooldownEffect` / `RestoreAttributeEffect` 等 |
 | **SkillAbility** (抽象) | `Assets/Data/` | 技能行为基类：`CanApply(ctx)` / `Apply(ctx)` / `HandleInput(ctx, input)`。当前唯一实现：`GroundMoveAbility`（地面移动的路径预览+执行） |
 | **AttributeSetDef** | `Assets/Data/` | 属性模板：定义单位有哪些属性(HP/AP/Initiative/MoveSpeed)，初始值和最大值 |
 | **AIProfile** | `Assets/Data/` | AI 行为档案：Role(Aggressive/Support/Healer)、healHpThreshold、skillTagWeights、targetTagWeights、statusTagWeights（数据结构完整，但 EnemyTurnRunner 尚未使用） |

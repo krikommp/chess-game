@@ -24,25 +24,19 @@
 
 ### 1.1 SkillAbility
 
-从 CR-0002 Phase 2 起，`SkillDefinition` 必须持有一个可选的 `SkillAbility`，用于承载该技能自己的行为逻辑。`SkillExecutor` 仍是所有技能合法性与执行的统一入口，但不再直接实现移动、等待输入、特殊选点等具体技能行为。
+> **迁移决议 (2026-05-11):** SkillAbility 接口从 `GetApCost+CanApply+Apply+HandleInput` 精简为单一 `Execute(context, fireEffect)`。新增 Costs/Cooldowns/Effects/BlockedTags 四个槽位。HandleInput 职责移出到 UnitTurnHandler。详见 `OPEN_QUESTIONS.md` §Ability-Effect 设计决议。
 
 职责划分：
 
-- `SkillExecutor`：通用入口，负责施法者存活、AP、冷却、Tag、目标类型、目标能力、阵营、射程等通用校验；执行成功后记录冷却并按顺序施加 `effects`。
-- `SkillAbility`：技能自己的具体行为，提供 `GetApCost(context)`、`CanApply(context)`、`Apply(context)`。例如 `GroundMoveAbility` 负责校验 NavMesh 路径、剩余移动距离，并请求单位移动组件执行移动。
-- `EffectDefinition`：Ability 成功后产生的效果结果，例如伤害、治疗、添加状态。Effect 不负责等待玩家输入或发起 NavMesh 移动。
-
-执行顺序固定为：
-
-1. 输入层、AI 或脚本化战术构造 `SkillExecutionContext` 并提交给施法者自己的 `SkillExecutor`。
-2. `SkillExecutor` 执行通用校验。
-3. `SkillExecutor` 调用 `SkillDefinition.Ability.CanApply(context)`。
-4. 校验通过后，`SkillExecutor` 扣除 `Ability.GetApCost(context)` 返回的 AP。
-5. `SkillExecutor` 调用 `Ability.Apply(context)`。
-6. Ability 成功完成后，`SkillExecutor` 根据 `SkillDefinition.effects` 对解析后的目标施加效果。
-7. 如有冷却，`SkillExecutor` 记录该单位自己的运行时冷却。
-
-`basic_move` 的 Ability 是 `GroundMoveAbility`，必须通过 Unity Editor / Unity Skills 显式挂到 `basic_move.asset` 上。运行时默认 Ability 只作为测试兼容兜底，不能作为正式角色配置依据。
+- `SkillExecutor`：通用入口，负责施法者存活、冷却、目标类型、目标能力、阵营、射程等通用校验。
+- `SkillAbility`：流程驱动器。决定何时、以什么顺序触发 Effect。结构：
+  ```
+  ├── BlockedTags[]    ← 释放者命中任一 → 不能释放
+  ├── Costs: Effect[]  ← Compute(算消耗)→Execute时Apply(扣)
+  ├── Cooldowns: Effect[] ← Compute(在冷却?)→Execute时Apply(设冷却)
+  └── Effects: Effect[]   ← 实际游戏效果
+  ```
+- `EffectDefinition`：纯数据载体 + 简单计算。Ability 在合适时机通过 `fireEffect` 回调触发 Effect 的 `Compute` / `Apply`。
 
 ### 1.2 输入请求与技能激活
 
@@ -60,32 +54,50 @@
 
 ## 2. 效果 (Effect) 结构
 
+> **迁移决议 (2026-05-11):** Effect 接口从单步 `Apply` 改为 `Compute(ctx)→EffectResult` + `Apply(ctx, result)` 两步。新增 `EEffectDuration`（Instant/Persistent）、RemoveTags/RequiredTags/BlockedTags 字段。详见 `OPEN_QUESTIONS.md` §Ability-Effect 设计决议。
+
+### 2.1 基本接口
+
 ```csharp
-public abstract class Effect : ScriptableObject {
-    public abstract void Apply(ICombatUnit caster, ICombatUnit target);
+public abstract class EffectDefinition : ScriptableObject
+{
+    public abstract EffectResult Compute(EffectContext context);
+    public abstract void Apply(EffectContext context, EffectResult computed);
+    public virtual void OnRemove(EffectContext context) { }
+    public abstract EEffectDuration Duration { get; }
+    public abstract ETargetCapability RequiredCapability { get; }
 }
 ```
 
-`SkillDefinition` 可以持有多个 `Effect`，并按配置顺序依次执行。技能负责描述消耗、目标、范围、冷却和 AI 标签；Effect 负责实际产生结果，例如伤害、治疗、添加状态或位移。
+### 2.2 Tag 互作用字段
 
-Effect 使用独立 ScriptableObject 资产保存静态配置，存放在 `Assets/Data/Effects/`。`SkillDefinition.effects[]` 引用这些独立 Effect 资产；同一个 Effect 资产可以被多个技能复用。运行时状态、冷却、临时禁用、施放次数等不得写回 Effect 或 SkillDefinition 资产。
+每个 Effect 自身携带四个 Tag 字段，表达它对目标 Tag 的交互：
 
-每个 Effect 必须配置至少一个 GameplayTag，用于标记自身效果类型。这个 Tag 用于查询、免疫判断、AI 决策、debug 输出和后续编辑器筛选。没有 Tag 的 Effect 视为非法配置。
+| 字段 | 作用 | 示例 |
+|------|------|------|
+| **Identity Tags** (`m_tags`) | Effect 的身份标记 | `Effect.Damage.Physical`，用于免疫判断、AI 决策、debug |
+| **GrantTags** (`m_grantedTags`) | Apply 时给目标添加 Tag。Persistent Effect 过期时自动清理 | `GuardingShout` 添加 `State.Guarded` |
+| **RemoveTags** | Apply 时从目标移除匹配的 Tag | `MoveEffect` 移除 `State.Rooted` |
+| **RequiredTags** | Compute 时检查目标必须拥有的 Tag | `ExecuteSkill` 要求目标有 `State.Weakened` |
+| **BlockedTags** | Compute 时检查目标不能有的 Tag | `FireballDamage` 被 `State.Immune.Fire` 阻断 |
 
-预期子类（占位）：
-- `DamageEffect`（物理 / 魔法 / 真实）
-- `HealEffect`
-- `StatusEffect`（buff/debuff，附带持续轮数）
-- `MoveEffect`（推 / 拉 / 传送）
+### 2.3 瞬时 vs 持久
 
-效果执行规则：
+| 类型 | 枚举值 | 生命周期 | 示例 |
+|------|--------|---------|------|
+| **Instant** | `EEffectDuration.Instant` | 执行后立即完成，不追踪 | `DamageEffect`、`HealEffect` |
+| **Persistent** | `EEffectDuration.Persistent` | 注册到目标 `SkillExecutor` 定时器，每回合 tick，过期自动 Remove | `BurningStatus`、`GuardingBuff` |
 
-1. 技能先检查可用性：AP、冷却、目标阵营、范围、路径/视线条件。
-2. 通过检查后消耗 AP，并记录冷却。
-3. 对命中的目标依次执行 `effects`。
-4. 若任一效果触发死亡、状态变化或位移，由战斗系统广播状态变化。
+`IsPersistent` 判定：`m_durationRounds > 0` 或 `GrantedAbilities.Length > 0` 或 `GrantedTags.Length > 0`。
 
-同一个技能可以包含多个效果，例如“造成伤害 + 降低防御 1 回合”。
+### 2.4 预期子类
+
+- **Costs:** `SpendAPEffect`、`SpendHPEffect`
+- **Cooldowns:** `SetCooldownEffect`
+- **属性修改:** `DamageEffect`、`HealEffect`、`RestoreAttributeEffect`
+- **Status:** `AddStatusEffect`、`RemoveStatusEffect`
+- **位移:** `MoveEffect`
+- **系统:** `ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`、`DeregisterFromCombatEffect`、`DeathVisualEffect`、`DestroyGameObjectEffect`
 
 ## 3. 状态 (Status) 结构
 
