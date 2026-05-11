@@ -44,7 +44,7 @@
 - 来源：`02_SYSTEM_SPEC.md` §3
 - 问题：每回合 AP 上限？基础攻击消耗多少 AP？
 - 当前临时假设：`MaxAP = 6`；技能 AP 消耗由技能配置决定。
-- 决议：**MVP 单位默认 `MaxAP = 6`；不再使用全局 `BasicAttackCost`。基础攻击作为 `basic_attack` 技能资产，其消耗由 `basic_attack.apCost` 配置。当前示例配置为 `basic_attack.apCost = 1`，后续所有技能均通过 `SkillDefinition.apCost` 单独配置。**
+- 决议：**MVP 单位默认 `MaxAP = 6`；不再使用全局 `BasicAttackCost`。`SkillDefinition.apCost` 不保留为设计字段，基础攻击作为 `basic_attack` 技能资产，其 AP 消耗由 Ability 的 `Costs` 槽位中的 `SpendAPEffect` 配置，例如 `SpendAPEffect(amount=1)`。后续所有技能均通过 Cost Effect 单独配置消耗。**
 - 影响：所有战斗平衡
 
 ### Q-0006 回合结束时剩余 AP 是否保留
@@ -100,7 +100,7 @@
 - 来源：`05_SKILL_SPEC.md` §11
 - 问题：技能除 AP 外是否还消耗 MP / 怒气 / 充能？
 - 当前临时假设：**只消耗 AP**（用户原话："技能的消耗由技能自己决定"，理解为只消耗 AP）。
-- 决议：**技能不会消耗 AP 之外的其他资源**。特定技能可以配置冷却时间；冷却由 `SkillDefinition.cooldown` 表达，战斗中按回合计，探索实时状态下按秒刷新，暂定 `1 回合 = 6 秒`。
+- 决议：**技能不会消耗 AP 之外的其他资源**。AP 消耗通过 Ability 的 `Costs` 槽位配置 `SpendAPEffect`；特定技能可以配置冷却时间，冷却通过 Ability 的 `Cooldowns` 槽位配置 `SetCooldownEffect`，由 Persistent Status + `Cooldown.{skillId}` Tag 表达。`SkillDefinition.apCost` 与 `SkillDefinition.cooldown` 不保留为设计字段。战斗中冷却按回合计，探索实时状态下按秒刷新，暂定 `1 回合 = 6 秒`。
 
 ### Q-0015 命中是否需要检定
 - 来源：`05_SKILL_SPEC.md` §11
@@ -256,20 +256,38 @@
 | Effect Instant vs Persistent (`EEffectDuration`) | ✅ 已确认 |
 | Effect Tag 互作用：GrantTags / RemoveTags / RequiredTags / BlockedTags | ✅ 已确认 |
 | Ability 四个槽位：Costs / Cooldowns / Effects / BlockedTags | ✅ 已确认 |
-| Ability 唯一方法：`Execute(context, fireEffect)` | ✅ 已确认 |
-| AP 消耗迁移到 Costs: Effect[]，不设独立 `GetApCost` | ✅ 已确认 |
+| Costs / Cooldowns / Effects 是否强制由基类自动执行 | ✅ 不自动执行；它们是基类标准槽位，具体 Ability 可选择性显式使用（2026-05-12） |
+| 是否需要 `HasIntrinsicFlow` / 槽位全空声明 | ✅ 不需要；是否空槽位合理交给 Ability 作者/使用者判断（2026-05-12） |
+| Ability 唯一方法：`Execute(context)` | ✅ 已确认 |
+| Ability 是否开放给用户编写流程 | ✅ 开放；基类只提供通用 Tag / Cost / Cooldown / Effect helper，具体 Ability 显式调用（2026-05-12） |
+| 所有可释放技能是否必须显式配置 Ability | ✅ 必须显式配置，不允许 Ability=null 默认流程（2026-05-12） |
+| Effect 是否允许用户继承子类 | ✅ 不允许；Effect 是纯数据配置，行为由配置的静态 EffectFunction 完成（2026-05-12） |
+| Effect 执行模型 | ✅ Effect 配置一个静态 EffectFunction；该函数同时提供 Compute 与 Apply，参数通过 Effect 数据传入（2026-05-12） |
+| 普通 Effect Compute 失败是否阻塞技能 | ✅ 当前不阻塞，只影响该 Effect 自身；FailurePolicy 延后设计（2026-05-12） |
+| AP 消耗迁移到 Costs: Effect[]，不设独立 `GetApCost`，并删除 `SkillDefinition.apCost` | ✅ 已确认（2026-05-12） |
 | 冷却 = Persistent Status + `Cooldown.{id}` Tag + BlockedTags 检查 | ✅ 已确认 |
+| `SkillDefinition.cooldown` 旧字段是否保留 | ✅ 不保留，删除旧字段（2026-05-12） |
 | HandleInput 从 Ability 移出，输入解析由 UnitTurnHandler 负责 | ✅ 已确认 |
 | MovementController 删除 AP 扣除，变为纯移动工具 | ✅ 已确认 |
-| GroundMoveAbility 复用 CombatMovementResolver | ✅ 已确认 |
-| SkillDefinition 层 Tag 条件字段是否保留 | ⬜ 待讨论 |
+| GroundMoveAbility 复用 CombatMovementResolver | ✅ 已确认；主动移动由 Ability 直接调用 MovementController，不再需要 MoveEffect（2026-05-12） |
+| SkillDefinition 层 Tag 条件字段是否保留 | ✅ 保留，用于技能级全局判断（2026-05-12） |
+| Ability 与 CostEffect 条件边界 | ✅ Ability 管流程权限，CostEffect 管资源支付规则；重复 Tag 警告，冲突 Tag 报错（2026-05-12） |
 | Player1Controller/EnemyController 删除后的 Control.Human/AI Tag 方案 | ✅ 已确认（之前讨论） |
 | 死亡技能化 `sys_on_death` | ✅ 已确认（之前讨论） |
 
+### 当前进度摘要（2026-05-12）
+
+- `SkillDefinition.apCost` / `SkillDefinition.cooldown` 不再保留为设计字段；AP 与冷却都通过 Ability 标准槽位表达。
+- `SkillAbility` 是开放给用户编写的流程类，基类只提供 Tag / Cost / Cooldown / Effect helper；当前由具体 Ability 显式调用，后续如流程稳定再提取自动模板。
+- `Costs` / `Cooldowns` / `Effects` 是 Ability 基类标准槽位，但不是强制执行规则；是否为空合理交给 Ability 作者/使用者判断。
+- `EffectDefinition` 是纯数据资产，不允许用户派生 Effect 子类；行为由配置的静态 `EffectFunction` 完成，函数类同时提供 `Compute` 与 `Apply`。
+- 主动移动由 `GroundMoveAbility` 直接调用 `CombatMovementResolver` / `MovementController`，不再额外建 `MoveEffect`；强制位移、拉拽、击退、传送仍可作为普通 EffectFunction。
+- 下一轮优先讨论：Effect 参数结构、EffectFunction 注册方式、`SkillExecutionContext` 标准字段、Cost Compute 结果传递、Cooldown 细节、AI 如何调用 Ability 预览。
+
 ### 核心原则
 
-1. **Effect 是纯数据载体 + 简单计算逻辑**。Effect 不驱动流程，只"被触发"。
-2. **Ability 是流程驱动器**。Ability 决定何时、以什么顺序触发 Effect。
+1. **Effect 是纯数据配置**。Effect 不驱动流程，也不通过用户继承子类扩展行为；它只保存静态 EffectFunction 引用、参数、数值、Tag、条件、目标映射等配置。
+2. **Ability 是可扩展流程类**。Ability 开放给用户编写具体技能流程；基类只提供通用 Tag / Cost / Cooldown / Effect 检查与应用 helper。
 3. **MovementController 是纯移动工具**。不负责 AP 扣除、校验等业务逻辑。
 4. **HandleInput 从 Ability 移出**。输入解析由 UnitTurnHandler 负责。
 
@@ -283,19 +301,72 @@ SkillAbility (ScriptableObject)
 └── Effects: Effect[]      ← 实际游戏效果（伤害、治疗、移动、加Status）
 ```
 
-唯一抽象方法：`Execute(context, fireEffect)`
+`Costs` / `Cooldowns` / `Effects` 是 `SkillAbility` 基类的标准槽位，但不是强制执行规则。具体 Ability 可以选择性使用它们，也可以完全不用某个槽位：
+
+- 普通攻击：使用 `Costs` + `Effects`。
+- 主动移动：使用 `Costs`，不需要 `Effects`。
+- 系统技能：可能只使用 `Effects`。
+- 纯流程 Ability：可以不使用这些槽位；是否合理交给 Ability 作者/使用者判断。
+
+核心抽象方法：`Execute(context)`。`SkillAbility` 基类提供通用 helper，例如：
+
+```
+CheckAbilityTags(context)
+ComputeCosts(context)
+ApplyCosts(context)
+ComputeCooldowns(context)
+ApplyCooldowns(context)
+ComputeEffect(context, effect)
+ApplyEffect(context, effect, result)
+ApplyEffects(context, effects)
+```
+
+当前阶段由具体 Ability **显式调用**这些 helper，自行编排“检查 → Ability 流程 → 应用”的顺序；暂不做基类自动调用模板。后续如果发现多数 Ability 都共享同一流程，再提取为可复用的自动流程。
+
+所有可释放 `SkillDefinition` 必须显式配置 Ability。`basic_attack` 也应挂载类似 `SimpleTargetAbility` / `MeleeAttackAbility` 的显式 Ability，不允许 `Ability == null` 时由 `SkillExecutor` 走隐藏默认流程。
+
+### Ability 与 CostEffect 条件边界（2026-05-12）
+
+Ability 条件描述**动作流程权限**，CostEffect 条件描述**资源支付规则**。同一语义不应同时配置在 Ability 和 CostEffect 上。
+
+示例：
+- `GroundMoveAbility.BlockedTags = [State.Rooted]`：表示移动流程不能启动。
+- `SpendAPEffect.BlockedTags = [State.APBlocked]`：表示 AP 支付被阻断。
+- `SpendAPEffect.RequiredTags` / `BlockedTags` 可用于 `State.FreeMove`、`State.FreeCast`、`State.Exhausted` 等资源支付变体。
+
+不推荐：
+```
+GroundMoveAbility.BlockedTags: [State.Rooted]
+SpendAPEffect.BlockedTags:    [State.Rooted]
+```
+
+这种重复配置功能上可能仍失败，但会导致失败原因不稳定、预览与执行分叉、配置维护重复。配置校验规则：
+- Ability 与 CostEffect 出现相同 Required/Blocked Tag：Warning，提示语义重复。
+- 同一作用域内 RequiredTags 与 BlockedTags 出现相同 Tag：Error，视为配置冲突。
+- 如果一个状态同时影响流程权限和资源支付，应拆成更明确的 Tag，例如 `State.Rooted`、`State.APBlocked`、`State.FreeMove`。
 
 ### Effect 统一接口
 
 ```
-EffectDefinition (ScriptableObject)
-├── Compute(context) → EffectResult   ← 纯计算，不改状态
-├── Apply(context, result) → void     ← 真实执行
+EffectDefinition (ScriptableObject, data-only)
+├── EffectFunction                   ← 静态函数类，如 SpendAP / Damage / AddStatus / Move
+├── Parameters                       ← 该函数需要的参数；由函数签名/参数定义决定
+├── Tags / GrantTags / RemoveTags / RequiredTags / BlockedTags
 └── EEffectDuration                  ← Instant（瞬时） / Persistent（持久）
 ```
 
-- **Instant Effect**：执行后不追踪生命周期，即使它有 Tag（如 DamageEffect 带 `Effect.Damage.Physical`）
+- 不引入 `EffectRunner`、`EffectOperation`、`HandlerId` 或额外注册分发层。Ability 仍然是流程驱动器，按 `Costs` / `Cooldowns` / `Effects` 的阶段顺序直接调用 Effect 配置的 `EffectFunction`。
+- 一个 `EffectFunction` 同时提供 `Compute(context, effectData, parameters)` 与 `Apply(context, effectData, parameters, result)`，例如 `SpendAPFunction` 同时负责“检查能否支付 AP”和“实际扣 AP”。
+- 参数不是独立行为组件，而是传给 `EffectFunction` 的数据；在编辑器里可以表现为该函数暴露出的参数面板。
+- 用户/策划只创建和配置统一的 `EffectDefinition` 资产，不创建 `DamageEffectDefinition : EffectDefinition`、`HealEffectDefinition : EffectDefinition` 等派生类。
+- 自定义计算/应用逻辑通过新增静态 `EffectFunction` 完成；新增函数类属于代码扩展，不通过继承 Effect 资产类完成。
+- **Instant Effect**：执行后不追踪生命周期，即使它有 Tag（如带 `Effect.Damage.Physical`）
 - **Persistent Effect**：注册到目标 `SkillExecutor` 的内置定时器，追踪 `RemainingRounds`。每回合 tick，过期后自动 Remove
+
+当前失败语义：
+- `Costs` / `Cooldowns` 的 Compute 失败会阻止整个技能执行，不 Apply 任何 Cost、Cooldown 或普通 Effect。
+- 普通 `Effects` 的 Compute 失败不阻止技能执行，只影响该 Effect 自身是否能释放到目标上；其他 Effect 继续按 Ability 流程执行。
+- `FailurePolicy` / `isRequired` 这类“普通 Effect 失败是否反过来阻塞技能”的细粒度策略暂不进入当前设计，列为重要级偏后的扩展。
 
 ### 冷却机制
 
@@ -329,49 +400,49 @@ basic_move:
     ├── BlockedTags: [State.Rooted]
     ├── Costs: [SpendAPEffect]
     ├── Cooldowns: []
-    └── Effects: [MoveEffect]
+    └── Effects: []
 
   执行流程:
   1. Compute 阶段（hover预览 / AI评估）:
-     MoveEffect.Compute: 计算 NavMesh 路径 → 得出 pathLength
+     GroundMoveAbility: 计算 NavMesh 路径 → 得出 pathLength
      SpendAPEffect.Compute: pathLength/speed → 预计AP消耗, 检查AP是否够
   
   2. Execute 阶段（确认）:
-     MoveEffect.Apply: MovementController.TryStartMove(path) ← 纯移动
+     GroundMoveAbility: MovementController.TryStartMove(path) ← 主动移动流程
      SpendAPEffect.Apply: AttributeSet.TrySpend(AP, computed.cost)
 ```
+
+主动移动是 `GroundMoveAbility` 的核心行为，不再额外建 `MoveEffect`。强制位移、拉拽、击退、传送等“技能对目标施加的位移”仍可作为普通 EffectFunction，例如 `ForcedMove` / `PullTarget`。
 
 ### 攻击技能示例
 
 ```
 basic_attack:
-  Ability: null (纯Effect技能)
-    ← SkillExecutor 直接遍历 skill.Effects，全部 Instant 触发
-  
-  或带 Ability:
   Ability: MeleeAttackAbility
     ├── BlockedTags: [State.Disarmed]
-    ├── Costs: [SpendAPEffect(amount=1, blockedCasterTags=[State.FreeCast])]
+    ├── Costs: [Effect(Function=SpendAP, amount=1, blockedCasterTags=[State.FreeCast])]
     ├── Cooldowns: []  ← basic_attack 无冷却
-    └── Effects: [DamageEffect(amount=20)]
+    └── Effects: [Effect(Function=ModifyAttribute, attribute=Attribute.HP, amount=-20)]
 
   执行流程:
-  1. SpendAPEffect.Compute → 检查 AP>=1 且 caster 没有 State.FreeCast
-  2. SpendAPEffect.Apply → 扣 1 AP（若有 State.FreeCast 则跳过）
-  3. DamageEffect.Apply → AttributeSet.Modify(HP, -20)
+  1. CostEffect.Compute → 检查 AP>=1 且 caster 没有 State.FreeCast
+  2. CostEffect.Apply → 扣 1 AP（若有 State.FreeCast 则跳过或返回 0 消耗）
+  3. DamageEffect.Compute → 得到 -20 HP 改变量
+  4. DamageEffect.Apply → AttributeSet.Modify(HP, -20)
 ```
 
 ### 改动范围
 
 | 文件 | 改动 |
 |------|------|
-| `SkillAbility.cs` | 接口精简为 `Execute(context, fireEffect)`；新增 Costs/Cooldowns/Effects/BlockedTags 槽位 |
-| `SkillExecutor.cs` | Execute 流程改为：Compute 全部 Costs+Cooldowns → AllSuccess → Execute Ability → Apply Costs+Cooldowns+Effects。内置定时器管理 Persistent Effect |
-| `EffectDefinition.cs` | 新增 `Compute()` / `Apply()` 两步接口；新增 `EEffectDuration` 枚举 |
-| `GroundMoveAbility.cs` | 重写：内部调用 CombatMovementResolver，编排 Compute→Execute 流程 |
+| `SkillAbility.cs` | 接口精简为 `Execute(context)`；新增 Costs/Cooldowns/Effects/BlockedTags 槽位；基类提供显式调用的 Cost/Cooldown/Effect helper |
+| `SkillExecutor.cs` | Execute 流程改为：通用 SkillDefinition 校验 → 调用 Ability.Execute。Cost/Cooldown/Effect 的具体顺序由 Ability 显式调用 helper 编排 |
+| `EffectDefinition.cs` | 改为统一 data-only ScriptableObject；新增 EffectFunction、参数、`EEffectDuration` |
+| 静态 EffectFunction 类 | 新增预定义函数类；每个函数类同时提供 Compute / Apply，由 Effect 配置选择，Ability 直接调用 |
+| `GroundMoveAbility.cs` | 重写：内部调用 CombatMovementResolver 与 MovementController；主动移动不通过 MoveEffect |
 | `MovementController.cs` | 删除 AP 扣除逻辑，变为纯移动工具 |
 | `CombatMovementResolver.cs` | GroundMoveAbility 直接复用，消除功能重叠 |
-| `SkillDefinition.cs` | `m_apCost` / `m_cooldown` 不再需要（迁移到 Costs/Cooldowns Effect 上） |
+| `SkillDefinition.cs` | 删除 `m_apCost` / `m_cooldown`；当前仍处设计阶段，资产依赖少，不保留旧字段兼容层，避免后续重构出现双轨逻辑 |
 
 ### Effect 的 Tag 互作用字段
 
@@ -381,7 +452,7 @@ basic_attack:
 |------|------|------|
 | **Identity Tags** (`m_tags`) | `GameplayTag[]` | Effect 的身份标记，如 `Effect.Damage.Physical`（已有） |
 | **GrantTags** (`m_grantedTags`) | `GameplayTag[]` | Apply 时给目标添加这些 Tag。Persistent Effect 过期时自动通过 `RemoveAllTagsFromSource` 移除（已有） |
-| **RemoveTags** | `GameplayTag[]` | Apply 时从目标移除匹配的 Tag。例如 `MoveEffect` 带 RemoveTags: `[State.Rooted]`，移动后自动驱散定身 |
+| **RemoveTags** | `GameplayTag[]` | Apply 时从目标移除匹配的 Tag。例如清除燃烧、解除标记等 |
 | **RequiredTags** | `GameplayTag[]` | Compute 时检查目标是否拥有这些 Tag。不满足 → Compute 返回失败，Effect 不应用。例如 `ExecuteEffect` 带 RequiredTags: `[State.Weakened]` |
 | **BlockedTags** | `GameplayTag[]` | Compute 时检查目标是否拥有这些 Tag。命中任一 → Compute 返回失败。例如 `DamageEffect` 带 BlockedTags: `[State.Immune.Fire]` |
 

@@ -310,7 +310,9 @@ public class StatusComponent : MonoBehaviour
 }
 ```
 
-### 1.3 AddStatusEffectDefinition 完整实现
+### 1.3 AddStatus EffectFunction 完整实现
+
+> **迁移说明 (2026-05-12):** 下方代码是旧式派生类草案。最新决议为 `EffectDefinition` 统一 data-only，不再创建 `AddStatusEffectDefinition : EffectDefinition`。实现时应改为 `EffectDefinition(Function=AddStatus, parameters=StatusDefinition + durationOverride)`，由 Ability 按阶段直接调用该 EffectFunction 的 `Compute` / `Apply`。
 
 ```csharp
 public class AddStatusEffectDefinition : EffectDefinition
@@ -725,14 +727,17 @@ public float Modify(GameplayTag tag, float delta)
 |------|------|------|
 | `id` 非空 | Error | 技能必须有唯一 ID |
 | `id` 全项目唯一 | Error | 遍历所有 SkillDefinition 资产 |
-| `apCost >= 0` | Warning | 允许 0 AP 技能 |
-| `cooldown >= 0` | Error | 负冷却非法 |
 | `range >= 0` | Error | 负范围非法 |
-| `effects` 至少一个 | Warning | 提示可能遗漏 |
+| 可释放技能必须显式配置 Ability | Error | 不允许 Ability=null 默认流程 |
 | 每个 Effect 引用非空 | Error | 空引用导致运行时 NullRef |
 | 每个 Effect 有至少一个 Tag | Error | Tag First 原则 |
+| Effect 使用统一 data-only 类型 | Error | 不允许新增 `DamageEffectDefinition : EffectDefinition` 等用户派生资产类 |
+| EffectFunction 合法 | Error | 必须能解析到预定义静态函数类；函数类同时提供 Compute / Apply |
+| 普通 Effect 不配置 FailurePolicy | Info | 当前普通 Effect 失败只影响自身；FailurePolicy 延后设计 |
 | `targetType == GroundPoint` 必须有 Ability | Error | 地面点技能需要移动能力 |
 | `targetType == SingleEnemy/Ally` 且 Ability==null 且 effects 为空 | Error | 无行为且无效果的技能无意义 |
+| Ability 与 CostEffect 出现相同 Required/Blocked Tag | Warning | 语义重复；Ability 应表达流程权限，CostEffect 应表达资源支付规则 |
+| 同一作用域 RequiredTags 与 BlockedTags 出现相同 Tag | Error | 配置自相矛盾 |
 
 #### Effect 校验
 

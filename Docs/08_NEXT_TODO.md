@@ -166,7 +166,7 @@
 
 确认方案：
 - 新增 `SkillDefinition` ScriptableObject。
-- 首批字段包括：`id`、`displayName`、`description`、`apCost`、`cooldown`、`targetType`、`range`、`effects`、`skillTags`、`aiTags`、`aiBaseWeight`。
+- 首批字段包括：`id`、`displayName`、`description`、`targetType`、`range`、`ability`、`effects`、`skillTags`、`aiTags`、`aiBaseWeight`。`apCost` 与 `cooldown` 不保留为 `SkillDefinition` 字段，分别由 Ability 的 `Costs` / `Cooldowns` 槽位表达。
 - `effects` 引用独立的 `EffectDefinition` ScriptableObject 资产，不使用 `[SerializeReference]` 内嵌多态数据，也不把 Effect 仅作为 `SkillDefinition` 子资产。独立 Effect 资产可被多个 `SkillDefinition` 复用。
 - 创建 `Assets/Data/Skills/`，用于保存技能配置资产。
 - 创建 `Assets/Data/Effects/`，用于保存可复用 Effect 配置资产。
@@ -201,13 +201,13 @@
 
 确认方案：
 - 创建 `basic_attack` 技能资产。
-- `apCost = 1`、`range = 1.5m`、固定伤害 20；这些数值只属于 `basic_attack` 配置资产，后续可直接改配置调整。
+- `range = 1.5m`、`SpendAPEffect(amount=1)`、固定伤害 20；这些数值只属于 `basic_attack` 相关配置资产，后续可直接改配置调整。
 - 现有点击敌人攻击不再作为当前阶段要求；主动攻击释放方式（技能栏、快捷键、点击目标、或其他交互）待后续技能设计确认。
 - 后续可战斗角色通过自身 `SkillExecutor.availableSkills` 配置 `basic_attack`，不通过全局管理器补发技能。
 - `basic_attack` 使用自身配置的 `range` 判断攻击距离，而不是使用单独硬编码的攻击范围。
-- 若 `CurrentAP >= basic_attack.apCost + 移动所需 AP`，并且角色能通过 NavMesh 移动到 `basic_attack.range` 内，则执行“移动到攻击距离内 + 攻击”。
+- 若 `CurrentAP` 足够支付移动技能 `Costs` + `basic_attack` 的 `Costs`，并且角色能通过 NavMesh 移动到 `basic_attack.range` 内，则执行“移动到攻击距离内 + 攻击”。
 - 若本回合无法走到 `basic_attack.range` 内，则不攻击，只使用剩余可移动 AP 沿路径向目标靠近。
-- 若已经在 `basic_attack.range` 内，则只消耗 `basic_attack.apCost` 并执行攻击。
+- 若已经在 `basic_attack.range` 内，则只支付 `basic_attack` 的 `Costs` 并执行攻击。
 
 产出：
 - `basic_attack` 技能资产。
@@ -319,7 +319,7 @@
   - 计算目标是否已在 `skill.range` 内。
   - 计算进入 `skill.range` 的可释放位置。
   - 计算移动路径长度与移动 AP 预估。
-  - 判断 `CurrentAP >= skill.apCost + moveApCost`。
+  - 判断 `CurrentAP` 是否足够支付移动技能 `Costs` + 目标技能 `Costs`。
   - 在无法进入技能范围时，为允许追击退化的技能生成 fallback 靠近点。
   - 复用现有软占位检查，避免多个 AI 选择同一终点。
 - `MoveInputController` 只负责玩家输入和预览；释放技能时交给 `SkillExecutor`。
@@ -352,7 +352,7 @@
   - 本单位可用技能列表。
   - 最近一次释放失败原因（可选，用于 debug）。
 - 回合开始或回合结束时推进冷却；第一阶段按回合推进，不实现探索实时冷却。
-- 任何 cooldown 值都来自 `SkillDefinition.cooldown`，运行时只记录剩余值，不写回资产。
+- 冷却配置来自 Ability 的 `Cooldowns` 槽位（例如 `SetCooldownEffect`），运行时只记录剩余状态，不写回资产。
 
 产出：
 - `SkillRuntimeState` / `SkillCooldownTracker` 或 `SkillExecutor` 内部等价实现。
@@ -362,7 +362,7 @@
 验证：
 - 两个单位引用同一个 `basic_attack` 或后续同一个技能资产时，冷却状态互不污染。
 - 技能释放后进入冷却；冷却未结束时释放失败并返回明确原因。
-- `cooldown = 0` 的 `basic_attack` 可以每次有 AP 时使用。
+- 没有配置 Cooldown Effect 的 `basic_attack` 可以每次有 AP 时使用。
 
 ## 5.5 建立游戏 Tag 系统
 
@@ -515,7 +515,7 @@
 4. 移动与范围评估
    - 若目标已在技能范围内，移动消耗为 0。
    - 若目标不在范围内，使用 NavMesh 计算进入 `skill.range` 的可释放点。
-   - 若 `CurrentAP >= skill.apCost + moveApCost`，候选标记为“本回合可释放”。
+   - 若 `CurrentAP` 足够支付移动技能 `Costs` + 目标技能 `Costs`，候选标记为“本回合可释放”。
    - 若无法进入范围，但技能允许追击退化，例如 `basic_attack`，则生成“靠近目标”的 fallback 候选。
    - fallback 候选只移动，不释放技能，评分低于可释放候选。
    - 所有移动候选必须引用行动单位自身的 `basic_move` 或等价移动技能，并通过 `SkillExecutor.Execute(SkillExecutionContext.ForGroundPoint(...))` 执行，不能直接调用 `EnemyController.TryMove`。
@@ -623,8 +623,7 @@
 - 校验范围包括：
   - `SkillDefinition.id` 非空。
   - `SkillDefinition.id` 在当前项目内唯一。
-  - `apCost >= 0`。
-  - `cooldown >= 0`。
+  - Ability 的 Cost / Cooldown Effect 配置合法。
   - `range >= 0`。
   - `effects` 不为空。
   - 每个 Effect 引用不为空。
@@ -703,9 +702,9 @@
 
 确认方案：
 - 第一阶段只确认 `MaxAP = 6` 作为 MVP 单位默认 AP。
-- 删除“全局 BasicAttackCost”概念，基础攻击消耗改为 `basic_attack.apCost`。
-- `basic_attack.apCost = 1` 只作为 `basic_attack` 技能资产的示例配置，不代表所有基础攻击或所有技能必须固定消耗 1 AP。
-- 后续技能全部通过 `SkillDefinition.apCost` 单独配置，例如治疗、buff、重击、debuff 都可以有不同 AP 消耗。
+- 删除“全局 BasicAttackCost”概念，基础攻击消耗改为 `basic_attack` Ability 的 `Costs` 槽位，例如 `SpendAPEffect(amount=1)`。
+- `SpendAPEffect(amount=1)` 只作为 `basic_attack` 的示例配置，不代表所有基础攻击或所有技能必须固定消耗 1 AP。
+- 后续技能全部通过 Ability 的 Cost Effect 单独配置，例如治疗、buff、重击、debuff 都可以有不同 AP 消耗。
 
 产出：
 - 更新 `Q-0005` 决议。
@@ -714,8 +713,8 @@
 
 验证：
 - 文档不再出现“所有基础攻击固定消耗全局 AP 表”的误导。
-- `basic_attack` 的 AP 消耗来自技能资产配置。
-- 玩家攻击、敌方攻击都读取同一个 `basic_attack.apCost`。
+- `basic_attack` 的 AP 消耗来自技能 Ability 的 `Costs` 配置。
+- 玩家攻击、敌方攻击都读取同一个 `basic_attack` Cost Effect。
 
 关联问题：
 - `Q-0005` MaxAP 与基础攻击 AP 消耗。

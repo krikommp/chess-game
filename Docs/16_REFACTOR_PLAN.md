@@ -93,7 +93,7 @@ if (attr != null)
 
 ---
 
-## Step 3: 创建系统技能资产 + Effect 类型 + RoundPhaseManager
+## Step 3: 创建系统技能资产 + Effect 函数配置 + RoundPhaseManager
 
 **CR/IS:** CR-0024  
 **严重级别:** P0  
@@ -103,54 +103,56 @@ if (attr != null)
 ### 现状
 
 - `sys_round_start`、`sys_turn_end`、`sys_on_death` 技能资产不存在
-- 以下 Effect 类不存在：`RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`、`DeregisterFromCombatEffect`、`DeathVisualEffect`、`DestroyGameObjectEffect`
+- 以下 EffectFunction 尚未实现：`RestoreAttribute`、`ResetMovement`、`AdvanceCooldowns`、`TriggerStatusTick`、`DecrementStatusDuration`、`DeregisterFromCombat`、`DeathVisual`、`DestroyGameObject`
 - `RoundPhaseManager` MonoBehaviour 不存在
 
 ### 目标
 
-#### 3a. 创建 Effect 类（`Assets/Scripts/Combat/Skills/`，菜单路径 `MiniChess/Effects/`）
+#### 3a. 创建 EffectFunction
 
-> **设计决议 (2026-05-11):** 所有 Effect 使用统一接口 `Compute(ctx)→EffectResult` + `Apply(ctx, result)` + `EEffectDuration`。详见 `OPEN_QUESTIONS.md` §Ability-Effect 设计决议。
+> **设计决议 (2026-05-12):** `EffectDefinition` 是统一 data-only ScriptableObject，不创建 `RestoreAttributeEffect : EffectDefinition` 等用户派生类。Effect 通过配置一个静态 `EffectFunction` 完成判断、计算和实际修改；该函数类同时提供 `Compute` 与 `Apply`，参数通过 Effect 数据传入。Ability 按阶段直接调用 Effect，不引入 `EffectOperation` / `HandlerId` / `EffectRunner` 分发层。详见 `OPEN_QUESTIONS.md` §Ability-Effect 设计决议。
 
-**RestoreAttributeEffect** (EffectDefinition 派生, Instant):
+> **Ability 决议 (2026-05-12):** `SkillAbility` 是开放给用户编写的流程类。基类只提供 Tag / Cost / Cooldown / Effect 的通用检查与应用 helper，当前阶段由具体 Ability 显式调用；如果后续发现流程高度重复，再提取自动流程或模板方法。
+
+**EffectFunction: RestoreAttribute** (Instant):
 - `[SerializeField] private GameplayTag m_attributeTag;` — 要恢复的属性（如 `Attribute.AP`）
 - `[SerializeField] private ERestoreMode m_mode;` — `ToMax` / `ByValue`
 - `[SerializeField] private float m_value;` — ByValue 模式下的恢复量
 - `RequiredCapability` → `Statusable`（所有单位都应能接受系统维护）
 - `Apply()` → 根据 mode 调用 `attr.SetToMax(tag)` 或 `attr.Modify(tag, +value)`
 
-**ResetMovementEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: ResetMovement** (Instant):
 - `RequiredCapability` → `Movable`
 - `Compute()` → 总是返回成功
 - `Apply()` → `movement?.ResetUnpaidDistance()`
 
-**AdvanceCooldownsEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: AdvanceCooldowns** (Instant):
 - `RequiredCapability` → `Statusable`
 - `Compute()` → 总是返回成功
 - `Apply()` → `executor?.AdvanceCooldowns()`
 
-**TriggerStatusTickEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: TriggerStatusTick** (Instant):
 - `[SerializeField] private EStatusTickPhase m_phase;` — `TurnStart` / `TurnEnd`
 - `RequiredCapability` → `Statusable`
 - `Compute()` → 总是返回成功
 - `Apply()` → 遍历 `executor.ActiveEffects`，对匹配 phase 的 tick
 
-**DecrementStatusDurationEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: DecrementStatusDuration** (Instant):
 - `RequiredCapability` → `Statusable`
 - `Compute()` → 总是返回成功
 - `Apply()` → 遍历 `executor.ActiveEffects`，`remainingRounds -= 1`，归零的移除
 
-**DeregisterFromCombatEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: DeregisterFromCombat** (Instant):
 - `RequiredCapability` → `Statusable`
 - `Compute()` → 总是返回成功
 - `Apply()` → `CombatRoundManager` 实例从 turnOrder 移除 `context.Target`
 
-**DeathVisualEffect** (EffectDefinition 派生, Instant):
+**EffectFunction: DeathVisual** (Instant):
 - `RequiredCapability` → `Statusable`
 - `Compute()` → 总是返回成功
 - `Apply()` → Phase 1 用 `Debug.Log` + 可选 Material 颜色变化；后续接正式动画
 
-**DestroyGameObjectEffect** (EffectDefinition 派生):
+**EffectFunction: DestroyGameObject**:
 - `[SerializeField] private float m_delaySeconds = 0.5f;`
 - `RequiredCapability` → `Statusable`
 - `Apply()` → `Destroy(context.Target, m_delaySeconds)`
@@ -199,26 +201,26 @@ public class RoundPhaseManager : MonoBehaviour
 #### 3c. 创建技能资产（通过 Unity Editor）
 
 - `Assets/Data/Skills/sys_round_start.asset`:
-  - id: `sys_round_start`, apCost: 0, targetType: Self, cooldown: 0
-  - effects: [RestoreAttributeEffect(AP, ToMax), ResetMovementEffect, AdvanceCooldownsEffect, TriggerStatusTickEffect(TurnStart)]
+  - id: `sys_round_start`, targetType: Self, Costs: [], Cooldowns: []
+  - effects: [Effect(Function=RestoreAttribute, AP, ToMax), Effect(Function=ResetMovement), Effect(Function=AdvanceCooldowns), Effect(Function=TriggerStatusTick, TurnStart)]
 - `Assets/Data/Skills/sys_turn_end.asset`:
-  - id: `sys_turn_end`, apCost: 0, targetType: Self, cooldown: 0
-  - effects: [TriggerStatusTickEffect(TurnEnd), DecrementStatusDurationEffect]
+  - id: `sys_turn_end`, targetType: Self, Costs: [], Cooldowns: []
+  - effects: [Effect(Function=TriggerStatusTick, TurnEnd), Effect(Function=DecrementStatusDuration)]
 - `Assets/Data/Skills/sys_on_death.asset`:
-  - id: `sys_on_death`, apCost: 0, targetType: Self, cooldown: 0
-  - effects: [DeregisterFromCombatEffect, DeathVisualEffect, DestroyGameObjectEffect]
+  - id: `sys_on_death`, targetType: Self, Costs: [], Cooldowns: []
+  - effects: [Effect(Function=DeregisterFromCombat), Effect(Function=DeathVisual), Effect(Function=DestroyGameObject)]
   - 注意：targetType=Self 意味着 caster=target=死亡单位自身
 
 ### 涉及文件
 
-- 新建 8 个 Effect .cs 文件
+- 新建/扩展 EffectFunction 静态函数类
 - 新建 `RoundPhaseManager.cs`
 - 新建 3 个技能 .asset（Unity Editor 操作）
 - 新建配套 Effect .asset（Unity Editor 操作）
 
 ### 验证
 
-- 编译通过，所有 Effect 类可创建 SO 资产
+- 编译通过，统一 EffectDefinition 资产可选择上述 EffectFunction
 - `sys_round_start` / `sys_turn_end` / `sys_on_death` 资产可在 Project 窗口看到
 - RoundPhaseManager Inspector 可拖入技能引用
 
@@ -248,7 +250,7 @@ foreach (var go in m_turnOrder)
 1. 在场景 `[CombatRoundManager]` 对象上（或 Systems 对象上）挂载 `RoundPhaseManager`
 2. 拖入 `m_roundManager`、`m_sysRoundStart`、`m_sysTurnEnd`、`m_sysOnDeath` 引用
 3. 移除 `StartNextRound()` 中的 `SkillExecutor.OnRoundStart()` 直接调用循环
-4. 确认 `RestoreAttributeEffect(AP, ToMax)` → `sys_round_start` 链路完整
+4. 确认 `Effect(Function=RestoreAttribute, AP, ToMax)` → `sys_round_start` 链路完整
 
 ### 涉及文件
 

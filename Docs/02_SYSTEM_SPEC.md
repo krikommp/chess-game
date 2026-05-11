@@ -41,12 +41,12 @@ Exploration ──(进入战斗触发)──▶ CombatStart
 | `MaxAP` | 6? | 每个单位每回合上限，待平衡 |
 | `CurrentAP` | — | 回合开始时 = MaxAP；回合结束清零 |
 | `MoveSpeed` | 米/AP | 角色属性，决定 1 AP 能走多远 |
-| 技能 AP 消耗 | — | 由每个 `SkillDefinition.apCost` 配置；基础攻击也是一个技能 |
+| 技能 AP 消耗 | — | 由技能 Ability 的 `Costs` 槽位配置，例如 `SpendAPEffect`；基础攻击也是一个技能 |
 
 公式：
 - **移动**：`canWalkDistance = CurrentAP × MoveSpeed`（实际走的距离按 NavMesh 路径长度算，不按直线）。
 - 移动 AP 扣除按本轮累计实际移动距离结算：单次或多次移动累计每达到 `MoveSpeed` 米扣除 1 AP；未满 1 AP 的距离暂存到本轮后续移动继续累计。
-- **攻击/技能**：AP 消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。当前基础攻击会迁移为 `basic_attack` 技能资产，其 AP 消耗来自 `basic_attack.apCost`。
+- **攻击/技能**：AP 消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。当前基础攻击会迁移为 `basic_attack` 技能资产，其 AP 消耗来自 Ability 的 `Costs` 槽位，例如 `SpendAPEffect(amount=1)`。
 - **结束回合**：玩家可主动结束（剩余 AP 不保留 / 是否保留 → OPEN_QUESTIONS）。
 
 ## 4. 单位通用接口（程序约定）
@@ -159,7 +159,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 
 | 参数 | 值 | 说明 |
 |---|---|---|
-| 攻击 AP 消耗 | 1 | `basic_attack.apCost` 示例配置 |
+| 攻击 AP 消耗 | 1 | `basic_attack` 的 `SpendAPEffect(amount=1)` 示例配置 |
 | 攻击伤害 | 20 | `basic_attack` 的 `DamageEffect` 示例配置，暂不计算属性/防御 |
 | 攻击范围 | 1.5m | `basic_attack.range` 示例配置 |
 | 敌方 HP | 100 | `AttributeSet.GetMax(HP)` 默认值（通过 `AttributeSetDef` 配置） |
@@ -170,8 +170,8 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 1. 玩家通过待定交互选择主动攻击技能与目标。
 2. 系统取得当前角色自身配置的 `basic_attack` 或其他攻击技能配置。
 3. 使用技能自身 `range` 判断当前是否已经在攻击距离内。
-4. 若已在范围内，且 `CurrentAP >= skill.apCost`，则消耗技能 AP 并造成效果。
+4. 若已在范围内，且 `CurrentAP` 足够支付目标技能 `Costs`，则消耗技能 AP 并造成效果。
 5. 若不在范围内，AI/技能计划系统可计算从施法者到目标的 NavMesh 全路径，并寻找能进入 `skill.range` 的可施放点。
-6. 若 `CurrentAP >= skill.apCost + 移动所需 AP`，且能走到可施放点，则先移动到技能范围内，再消耗 `skill.apCost` 执行技能。
+6. 若 `CurrentAP` 足够支付移动技能 `Costs` + 目标技能 `Costs`，且能走到可施放点，则先移动到技能范围内，再执行目标技能。
 7. 若本回合 AP 不足以抵达技能范围，则是否只移动靠近由 AI 候选评分或玩家交互规则决定。
 8. 若路径不存在或没有合法可施放点，则不执行技能，并输出失败原因。

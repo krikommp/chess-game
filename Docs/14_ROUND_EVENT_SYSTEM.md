@@ -215,7 +215,7 @@ CombatStart
 系统技能是普通的 `SkillDefinition` 资产，区别在于：
 - 它们不通过玩家 UI 选择，由 `RoundPhaseManager` 自动调用
 - `targetType = Self`（对单位自身生效）
-- `apCost = 0`（系统执行，不消耗 AP）
+- 不配置 Cost Effect（系统执行，不消耗 AP）
 - 通过 Tag 条件实现 debuff 阻断
 
 ### 4.1 sys_round_start
@@ -224,8 +224,9 @@ CombatStart
 SkillDefinition: sys_round_start
 ├── id: "sys_round_start"
 ├── displayName: "回合开始维护"
-├── apCost: 0
 ├── targetType: Self
+├── Costs: []
+├── Cooldowns: []
 ├── effects:
 │   ├── RestoreAttributeEffect
 │   │   ├── tag: Attribute.AP
@@ -253,8 +254,9 @@ SkillDefinition: sys_round_start
 ```
 SkillDefinition: sys_turn_end
 ├── id: "sys_turn_end"
-├── apCost: 0
 ├── targetType: Self
+├── Costs: []
+├── Cooldowns: []
 ├── effects:
 │   ├── TriggerStatusTickEffect
 │   │   └── phase: TurnEnd
@@ -270,8 +272,9 @@ SkillDefinition: sys_turn_end
 ```
 SkillDefinition: sys_on_death
 ├── id: "sys_on_death"
-├── apCost: 0
 ├── targetType: Self
+├── Costs: []
+├── Cooldowns: []
 ├── effects:
 │   ├── DeregisterFromCombatEffect
 │   │   └── (从 CombatRoundManager 的 turnOrder 中移除)
@@ -761,7 +764,7 @@ public class CombatRoundManager : MonoBehaviour
    ├── CanExecute:
    │   ├── Skill 非空 ✓
    │   ├── Caster 存活 ✓
-   │   ├── AP=0, apCost=0 → 够 ✓
+   │   ├── 系统技能 Costs 为空 → 不消耗 AP ✓
    │   └── EvaluateTagConditions:  (target=Self)
    │       ├── requiredCasterTags: [] → ✓
    │       ├── blockedCasterTags: [] → ✓
