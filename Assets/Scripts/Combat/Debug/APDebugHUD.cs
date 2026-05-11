@@ -20,8 +20,8 @@ namespace MiniChess.Combat.DebugUI
 
         private void OnGUI()
         {
-            Player1Controller activePlayer = m_combatManager != null && m_combatManager.SelectedPlayer != null
-                ? m_combatManager.SelectedPlayer
+            Player1Controller activePlayer = m_combatManager != null && m_combatManager.ActiveUnit != null
+                ? m_combatManager.ActiveUnit.GetComponent<Player1Controller>()
                 : m_player;
             if (activePlayer == null) return;
 
@@ -45,9 +45,9 @@ namespace MiniChess.Combat.DebugUI
             }
 
             string waitingLine = "";
-            if (m_combatManager != null && m_combatManager.IsWaiting && m_combatManager.SelectedUnit != null)
+            if (m_combatManager != null && m_combatManager.IsWaiting && m_combatManager.ActiveUnit != null)
             {
-                var selAttr = m_combatManager.SelectedUnit.GetComponent<AttributeSet>();
+                var selAttr = m_combatManager.ActiveUnit.GetComponent<AttributeSet>();
                 string selName = selAttr != null ? selAttr.DisplayName : "?";
                 waitingLine = $" >>> {selName} acting... <<<";
             }
@@ -87,7 +87,7 @@ namespace MiniChess.Combat.DebugUI
                 var attr = go.GetComponent<AttributeSet>();
                 if (attr == null || !attr.IsAlive) continue;
 
-                bool isActive = (go == m_combatManager.SelectedUnit);
+                bool isActive = (go == m_combatManager.ActiveUnit);
                 string marker = isActive ? ">" : " ";
                 string typeTag = attr.Faction == EFaction.Enemy ? "[E]" : "[P]";
                 bool ended = m_combatManager.HasEndedRound(go);

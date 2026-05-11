@@ -18,10 +18,27 @@ namespace MiniChess.Combat.Skills
 
         private AttributeSet m_attributes;
         private MovementController m_movement;
+        private GameplayTagComponent m_tagComp;
         private readonly Dictionary<string, int> m_cooldowns = new Dictionary<string, int>();
+        private readonly List<ActiveEffect> m_activeEffects = new List<ActiveEffect>();
+        private readonly List<SkillDefinition> m_grantedSkills = new List<SkillDefinition>();
         private SkillDefinition m_activeSkill;
 
-        public SkillDefinition[] AvailableSkills => m_availableSkills ?? Array.Empty<SkillDefinition>();
+        public SkillDefinition[] AvailableSkills
+        {
+            get
+            {
+                if (m_grantedSkills.Count == 0)
+                    return m_availableSkills ?? Array.Empty<SkillDefinition>();
+
+                var all = new List<SkillDefinition>();
+                if (m_availableSkills != null) all.AddRange(m_availableSkills);
+                all.AddRange(m_grantedSkills);
+                return all.ToArray();
+            }
+        }
+
+        public IReadOnlyList<ActiveEffect> ActiveEffects => m_activeEffects;
         public ETargetCapability Capabilities => m_capabilities;
         public SkillDefinition ActiveSkill => m_activeSkill;
         public int GetCooldownRemaining(string skillId) => m_cooldowns.TryGetValue(skillId, out int v) ? v : 0;
@@ -180,7 +197,15 @@ namespace MiniChess.Combat.Skills
             for (int i = 0; i < effects.Length; i++)
             {
                 if (effects[i] == null) continue;
-                effects[i].Apply(effectContext);
+
+                if (effects[i].IsPersistent && resolved.TargetExecutor != null)
+                {
+                    resolved.TargetExecutor.ApplyEffect(effects[i], gameObject);
+                }
+                else
+                {
+                    effects[i].Apply(effectContext);
+                }
             }
 
             if (skill.Cooldown > 0)
@@ -382,12 +407,197 @@ namespace MiniChess.Combat.Skills
             }
         }
 
+        // ── Effect management ──────────────────────────────────────
+
+        /// <summary>Apply an effect and track it if persistent. Called by Execute or externally.</summary>
+        public void ApplyEffect(EffectDefinition effect, GameObject source)
+        {
+            if (effect == null) return;
+
+            var ctx = new EffectContext
+            {
+                Caster = source ?? gameObject,
+                Target = gameObject,
+                CasterExecutor = source != null ? source.GetComponent<SkillExecutor>() : null,
+                TargetExecutor = this,
+            };
+
+            effect.Apply(ctx);
+
+            if (!effect.IsPersistent) return;
+
+            // Stack rule
+            if (effect.DurationRounds > 0)
+            {
+                var existing = FindActiveEffect(effect);
+                switch (effect.StackRule)
+                {
+                    case EStackRule.RefreshDuration:
+                        if (existing != null) { existing.RemainingRounds = effect.DurationRounds; return; }
+                        break;
+                    case EStackRule.ExtendDuration:
+                        if (existing != null) { existing.RemainingRounds += effect.DurationRounds; return; }
+                        break;
+                }
+            }
+
+            var active = new ActiveEffect(effect, source, effect.DurationRounds);
+            m_activeEffects.Add(active);
+
+            // Apply granted tags
+            var tags = effect.GrantedTags;
+            if (tags.Length > 0)
+            {
+                var tc = TagComp;
+                for (int i = 0; i < tags.Length; i++)
+                    if (!string.IsNullOrEmpty(tags[i].Value))
+                        tc.AddTag(tags[i], $"Effect.{effect.name}");
+            }
+
+            // Apply granted abilities
+            var abilities = effect.GrantedAbilities;
+            for (int i = 0; i < abilities.Length; i++)
+                if (abilities[i] != null)
+                    m_grantedSkills.Add(abilities[i]);
+
+            // Apply stat modifiers
+            var mods = effect.StatModifiers;
+            if (mods.Length > 0)
+            {
+                var attr = Attributes;
+                if (attr != null)
+                {
+                    for (int i = 0; i < mods.Length; i++)
+                    {
+                        float value = mods[i].Type == EModifierType.Additive
+                            ? mods[i].Value
+                            : attr.GetMax(mods[i].Attribute) * mods[i].Value;
+                        attr.Modify(mods[i].Attribute, value);
+                    }
+                }
+            }
+        }
+
+        private void RemoveActiveEffect(ActiveEffect active)
+        {
+            var effect = active.Definition;
+            if (effect == null) return;
+
+            // Remove granted abilities
+            var abilities = effect.GrantedAbilities;
+            for (int i = 0; i < abilities.Length; i++)
+                m_grantedSkills.Remove(abilities[i]);
+
+            // Remove granted tags
+            var tags = effect.GrantedTags;
+            if (tags.Length > 0)
+            {
+                var tc = TagComp;
+                for (int i = 0; i < tags.Length; i++)
+                    tc.RemoveTag(tags[i], $"Effect.{effect.name}");
+            }
+
+            // Reverse stat modifiers
+            var mods = effect.StatModifiers;
+            if (mods.Length > 0)
+            {
+                var attr = Attributes;
+                if (attr != null)
+                {
+                    for (int i = 0; i < mods.Length; i++)
+                    {
+                        float value = mods[i].Type == EModifierType.Additive
+                            ? mods[i].Value
+                            : attr.GetMax(mods[i].Attribute) * mods[i].Value;
+                        attr.Modify(mods[i].Attribute, -value);
+                    }
+                }
+            }
+
+            // OnRemove callback
+            var ctx = new EffectContext
+            {
+                Caster = active.Source,
+                Target = gameObject,
+                CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
+                TargetExecutor = this,
+            };
+            effect.OnRemove(ctx);
+
+            m_activeEffects.Remove(active);
+        }
+
+        private ActiveEffect FindActiveEffect(EffectDefinition def)
+        {
+            for (int i = 0; i < m_activeEffects.Count; i++)
+                if (m_activeEffects[i].Definition == def)
+                    return m_activeEffects[i];
+            return null;
+        }
+
+        /// <summary>Called by CombatRoundManager at the start of each round.</summary>
+        public void OnRoundStart()
+        {
+            // Advance cooldowns
+            AdvanceCooldowns();
+
+            // Tick and expire active effects
+            for (int i = m_activeEffects.Count - 1; i >= 0; i--)
+            {
+                var active = m_activeEffects[i];
+
+                if (active.Definition.TickPerRound)
+                    active.Definition.Apply(new EffectContext
+                    {
+                        Caster = active.Source,
+                        Target = gameObject,
+                        CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
+                        TargetExecutor = this,
+                    });
+
+                if (active.Definition.DurationRounds > 0)
+                {
+                    active.RemainingRounds--;
+                    if (active.RemainingRounds <= 0)
+                        RemoveActiveEffect(active);
+                }
+            }
+        }
+
+        private GameplayTagComponent TagComp
+        {
+            get
+            {
+                if (m_tagComp == null)
+                    m_tagComp = GetComponent<GameplayTagComponent>();
+                if (m_tagComp == null)
+                    m_tagComp = gameObject.AddComponent<GameplayTagComponent>();
+                return m_tagComp;
+            }
+        }
+
         private static int GetApCost(SkillExecutionContext context)
         {
             if (context.Skill == null) return 0;
             return context.Skill.Ability != null
                 ? context.Skill.Ability.GetApCost(context)
                 : context.Skill.ApCost;
+        }
+    }
+
+    /// <summary>Active instance of a persistent effect on a unit.</summary>
+    [System.Serializable]
+    public class ActiveEffect
+    {
+        public EffectDefinition Definition;
+        public GameObject Source;
+        public int RemainingRounds;
+
+        public ActiveEffect(EffectDefinition def, GameObject source, int remainingRounds)
+        {
+            Definition = def;
+            Source = source;
+            RemainingRounds = remainingRounds;
         }
     }
 }
