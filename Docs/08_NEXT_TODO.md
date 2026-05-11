@@ -892,6 +892,55 @@
 - 创建配套 Effect 资产：`RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`、`TriggerStatusTickEffect`、`DecrementStatusDurationEffect`
 - 资产全部拖入 `RoundPhaseManager` Inspector
 
+### CR-0025 场景迁移到新回合架构
+
+严重级别：P0
+
+对应问题：`IS-0019`
+
+目标：
+- 所有参战单位通过 Unity Editor 显式添加 `CombatUnit`
+- 在 `Systems/[CombatSystems]` 或当前战斗系统对象上挂载 `UnitTurnHandler` / `EnemyTurnRunner`
+- 通过 Inspector 显式配置 `m_roundManager`、`m_inputController`、`m_cameraController`
+- 确认 Play 模式中 `CombatRoundManager.TurnOrder` 能收集到玩家和敌人
+- 确认 `UnitTurnStarted` 能分别驱动玩家侧输入和敌方 AI
+
+### CR-0026 恢复回合开始 AP / 移动预算生命周期
+
+严重级别：P0
+
+对应问题：`IS-0020`
+
+目标：
+- 创建 `RoundPhaseManager`
+- 创建并配置 `RestoreAttributeEffect`、`ResetMovementEffect`、`AdvanceCooldownsEffect`
+- 创建 `sys_round_start` 技能资产并拖入 `RoundPhaseManager`
+- 确认新一轮开始时 AP 恢复到 MaxAP，`MovementController.ResetUnpaidDistance()` 被执行
+- 确认系统技能后续可通过 Tag 条件支持 `State.APBlocked` / `State.Rooted`
+
+### CR-0027 UnitTurnHandler 选择入口统一校验
+
+严重级别：P1
+
+对应问题：`IS-0021`、`Q-0024`
+
+目标：
+- 增加统一的 `TrySelectUnit(GameObject unit)` 入口
+- 数字键与点击玩家选择都校验 `ControllableUnits.Contains(unit)`
+- 已结束本轮行动的单位不可再次被选中
+- 验证 `P1 -> Enemy -> P2` 时无法提前控制 P2
+
+### CR-0028 补齐 UnitTurnHandler.cs.meta
+
+严重级别：P2
+
+对应问题：`IS-0022`
+
+目标：
+- 通过 Unity 重新导入 `UnitTurnHandler.cs`
+- 生成包含 `MonoImporter` 的完整 `.meta`
+- 将 `Assets/Scripts/Combat/UnitTurnHandler.cs.meta` 纳入 git
+
 ## 暂不进入下一阶段的内容
 
 - 战斗触发方式与正式 `CombatTrigger`。

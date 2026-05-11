@@ -431,6 +431,117 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 
 ---
 
+## 2026-05-11 分支审阅新增问题
+
+> 来源：`refactor/combat-round-enemy-ai` 分支审阅。`m_maxPartySize` 不再作为硬性限制，允许玩家单位数量突破 4，因此不记录为问题。
+
+### IS-0019 场景未迁移到 CombatUnit / UnitTurnHandler / EnemyTurnRunner 新架构
+
+**严重级别：** P0（阻塞 Play 模式回合闭环）
+
+**现状：**
+- `CombatRoundManager.CollectUnits()` 现在只通过 `FindObjectsOfType<CombatUnit>()` 收集参战单位。
+- 当前 `SampleScene` 中玩家和敌人对象仍只挂载旧组件栈，未发现 `CombatUnit` 组件引用。
+- 当前 `SampleScene` 的 `[CombatRoundManager]` 对象仍只挂载 `CombatRoundManager`，没有挂载或配置新增的 `UnitTurnHandler` / `EnemyTurnRunner`。
+- 新增 `UnitTurnHandler.cs.meta` 当前处于未跟踪状态，场景也没有引用该脚本。
+
+**影响：**
+- `StartCombat()` 收集到 0 个单位，回合队列为空。
+- `UnitTurnStarted` 没有玩家侧或敌方侧处理器订阅，输入、相机聚焦、敌方 AI 都不会进入新流程。
+- 分支代码和场景资产状态不一致，Play 模式无法验证新回合架构。
+
+**涉及文件：**
+- `Assets/Scripts/Combat/CombatRoundManager.cs`
+- `Assets/Scripts/Combat/CombatUnit.cs`
+- `Assets/Scripts/Combat/UnitTurnHandler.cs`
+- `Assets/Scripts/Combat/EnemyTurnRunner.cs`
+- `Assets/Scenes/SampleScene.unity`
+
+**建议方向：**
+- 通过 Unity Editor / Unity Skills 为所有参战单位显式添加 `CombatUnit`。
+- 在 `Systems/[CombatSystems]` 或当前战斗系统对象上挂载并配置 `UnitTurnHandler` / `EnemyTurnRunner`。
+- 将 `m_roundManager`、`m_inputController`、`m_cameraController` 等引用通过 Inspector 显式拖入；`FindObjectOfType` 只保留 Awake fallback 并输出警告。
+- 确认并提交 Unity 生成的完整 `.meta` 文件。
+
+---
+
+### IS-0020 回合开始 AP 恢复与移动预算重置丢失
+
+**严重级别：** P0（破坏 AP / 移动核心规则）
+
+**现状：**
+- 旧版 `CombatRoundManager.StartNextRound()` 会对每个存活单位执行 `AttributeSet.SetToMax(AP)`、`MovementController.ResetUnpaidDistance()` 和 `SkillExecutor.AdvanceCooldowns()`。
+- 新版 `StartNextRound()` 只调用 `SkillExecutor.OnRoundStart()`。
+- 当前 `SkillExecutor.OnRoundStart()` 只推进冷却、tick/expire active effects，没有恢复 AP，也没有重置 `MovementController` 的 unpaid movement distance。
+- 文档设计中的 `RoundPhaseManager`、`RestoreAttributeEffect`、`ResetMovementEffect`、系统技能 `sys_round_start` 目前尚未落地到代码和资产。
+
+**影响：**
+- 第一轮消耗 AP 后，下一轮不会恢复 AP。
+- `m_unpaidMoveDistance` 跨轮残留，导致 `canWalkDistance = CurrentAP * MoveSpeed` 的预算计算被污染。
+- `State.APBlocked` / `State.Rooted` 这类基于系统技能和 Tag 条件的阻断设计无法验证。
+
+**涉及文件：**
+- `Assets/Scripts/Combat/CombatRoundManager.cs`
+- `Assets/Scripts/Combat/Skills/SkillExecutor.cs`
+- `Assets/Scripts/Combat/MovementController.cs`
+- 待创建：`RoundPhaseManager.cs`
+- 待创建：`RestoreAttributeEffectDefinition.cs`
+- 待创建：`ResetMovementEffectDefinition.cs`
+
+**建议方向：**
+- 按 `Docs/14_ROUND_EVENT_SYSTEM.md` 实现 `RoundPhaseManager` 与系统技能。
+- 在 `RoundStarted` 时通过显式配置的 `sys_round_start` 技能恢复 AP、重置移动预算、推进冷却。
+- 在系统技能落地前，如需保持原型可跑，需要明确临时恢复路径并加 TODO 引用本条 issue。
+
+---
+
+### IS-0021 玩家点击选择未校验 ControllableUnits
+
+**严重级别：** P1（可破坏连续玩家块先攻规则）
+
+**现状：**
+- `UnitTurnHandler.Update()` 中数字键切换使用 `m_roundManager.ControllableUnits`。
+- `UnitTurnHandler.OnInputReceived()` 中点击玩家对象时直接调用 `SelectUnit(player.gameObject)`。
+- `SelectUnit()` 本身不检查目标是否属于当前 `ControllableUnits`，也不检查目标是否已经结束本轮行动。
+
+**影响：**
+- 在 `P1 -> Enemy -> P2` 的 turn order 中，玩家可能通过点击提前选择并控制 P2。
+- 违反 `OPEN_QUESTIONS.md` 中 `Q-0024` 已确认的"连续玩家块内自由切换"规则。
+
+**涉及文件：**
+- `Assets/Scripts/Combat/UnitTurnHandler.cs`
+- `Docs/OPEN_QUESTIONS.md` (`Q-0024`)
+
+**建议方向：**
+- 增加 `TrySelectUnit(GameObject unit)`，统一检查 `ControllableUnits.Contains(unit)` 和 `!HasEndedRound(unit)`。
+- 数字键与点击选择都走同一个选择入口。
+- 对非法点击仅忽略或给 debug 日志，不把选择状态切出当前可控块。
+
+---
+
+### IS-0022 UnitTurnHandler.cs.meta 未完整提交
+
+**严重级别：** P2（资产导入稳定性）
+
+**现状：**
+- 工作区存在未跟踪的 `Assets/Scripts/Combat/UnitTurnHandler.cs.meta`。
+- 当前文件内容只有 `fileFormatVersion` 和 `guid`，缺少 Unity 常规 `MonoImporter` 块。
+- `UnitTurnHandler.cs` 已纳入分支代码，但对应 `.meta` 未进入 git。
+
+**影响：**
+- 不同机器或 Unity 重新导入时可能生成不同 GUID。
+- 后续一旦场景或 prefab 引用 `UnitTurnHandler`，缺失/变化的 GUID 会造成 Missing Script 风险。
+
+**涉及文件：**
+- `Assets/Scripts/Combat/UnitTurnHandler.cs`
+- `Assets/Scripts/Combat/UnitTurnHandler.cs.meta`
+
+**建议方向：**
+- 让 Unity 重新导入该脚本并生成完整 `.meta`。
+- 确认 `.meta` 包含 `MonoImporter` 后提交。
+
+---
+
 ## 问题状态汇总
 
 | ID | 标题 | 严重级别 | 状态 |
@@ -453,3 +564,7 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 | IS-0016 | 缺少战斗日志/事件总线 | P3 | 待处理 |
 | IS-0017 | Player1Controller.OnAttributeDepleted 为空 | P3 | 待处理 |
 | IS-0018 | APDebugHUD 直接访问内部字段 | P3 | 待处理 |
+| IS-0019 | 场景未迁移到 CombatUnit / UnitTurnHandler / EnemyTurnRunner 新架构 | P0 | 待处理 |
+| IS-0020 | 回合开始 AP 恢复与移动预算重置丢失 | P0 | 待处理 |
+| IS-0021 | 玩家点击选择未校验 ControllableUnits | P1 | 待处理 |
+| IS-0022 | UnitTurnHandler.cs.meta 未完整提交 | P2 | 待处理 |
