@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -18,8 +17,7 @@ namespace MiniChess.Combat
         public IEnumerator RunTurn(
             EnemyController enemy,
             IReadOnlyList<Player1Controller> players,
-            IReadOnlyList<EnemyController> enemies,
-            SkillDefinition skill)
+            IReadOnlyList<EnemyController> enemies)
         {
             var enemyAttr = enemy.GetComponent<AttributeSet>();
             var enemyMove = enemy.GetComponent<MovementController>();
@@ -28,19 +26,6 @@ namespace MiniChess.Combat
 
             yield return new WaitForSeconds(m_turnStartDelay);
 
-            var skillExecutor = enemy.GetComponent<SkillExecutor>();
-            if (skillExecutor == null)
-            {
-                Debug.LogWarning($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} has no SkillExecutor.");
-                yield break;
-            }
-
-            if (skill == null)
-            {
-                Debug.LogWarning($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} has no skill assigned.");
-                yield break;
-            }
-
             Player1Controller target = FindNearestLivingPlayer(enemy, players);
             if (target == null)
             {
@@ -48,34 +33,20 @@ namespace MiniChess.Combat
                 yield break;
             }
 
-            // 1. Move into range if needed
-            if (!CombatMovementResolver.IsInRange(enemy.transform.position, target.transform.position, skill.Range))
-            {
-                TryMoveTowardTarget(enemy, target.gameObject, players, enemies, skill, enemyAttr, enemyMove);
+            // Move toward nearest player using available AP
+            TryMoveTowardTarget(enemy, target.gameObject, players, enemies, enemyAttr, enemyMove);
 
-                float waitStart = Time.time;
-                while (IsMovingEnemy(enemy, enemyMove))
+            float waitStart = Time.time;
+            while (IsMovingEnemy(enemy, enemyMove))
+            {
+                if (Time.time - waitStart > m_movementTimeoutSeconds)
                 {
-                    if (Time.time - waitStart > m_movementTimeoutSeconds)
-                    {
-                        enemyMove?.StopMovement();
-                        enemy.StopMovement();
-                        Debug.LogWarning($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} movement timed out.");
-                        break;
-                    }
-                    yield return null;
+                    enemyMove?.StopMovement();
+                    enemy.StopMovement();
+                    Debug.LogWarning($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} movement timed out.");
+                    break;
                 }
-            }
-
-            // 2. Execute skill via shared post-move entry
-            var result = skillExecutor.ExecuteAfterMove(skill, target.gameObject);
-            if (result.IsSuccess)
-            {
-                Debug.Log($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} casts '{skill.DisplayName}' on {GetDisplayName(target)}.");
-            }
-            else
-            {
-                Debug.Log($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} failed to cast '{skill.DisplayName}': {result.FailureMessage}");
+                yield return null;
             }
 
             yield return new WaitForSeconds(m_afterActionDelay);
@@ -108,58 +79,26 @@ namespace MiniChess.Combat
             GameObject target,
             IReadOnlyList<Player1Controller> players,
             IReadOnlyList<EnemyController> enemies,
-            SkillDefinition skill,
             AttributeSet enemyAttr,
             MovementController enemyMove)
         {
             float currentAP = enemyAttr != null ? enemyAttr.Get(WellKnownAttributeTags.AP) : enemy.CurrentAP;
             if (currentAP <= 0f) return;
 
-            float remainingMove = enemyMove != null ? enemyMove.RemainingMoveDistance : enemy.RemainingMoveDistance;
             float moveSpeed = enemyAttr != null ? enemyAttr.Get(WellKnownAttributeTags.MoveSpeed) : enemy.MoveSpeedMetersPerAp;
-
-            var positioning = CombatMovementResolver.Resolve(
-                casterPosition: enemy.transform.position,
-                targetPosition: target.transform.position,
-                skillRange: skill.Range,
-                skillApCost: skill.ApCost,
-                currentAp: (int)currentAP,
-                remainingMoveDistance: remainingMove,
-                moveSpeedMetersPerAp: moveSpeed,
-                navMeshSnapRadius: m_navMeshSnapRadius);
+            float maxMoveDist = currentAP * moveSpeed;
 
             if (!CombatMovementResolver.TryGetNavMeshPosition(enemy.transform.position, m_navMeshSnapRadius, out Vector3 origin))
                 return;
 
-            Vector3 destination = default;
-
-            if (positioning.CanReachRange)
-            {
-                if (TryFindOpenAttackDestination(enemy, players, enemies, origin,
-                    positioning.Destination, target.transform.position, skill.Range, skill.ApCost, enemyAttr, enemyMove, out destination))
-                {
-                }
-                else
-                {
-                    if (!TryFindFarthestReachablePoint(enemy, enemyMove, positioning.MovePath.corners, out Vector3 farthest)
-                        || !TryFindOpenMoveDestination(enemy, players, enemies, origin, farthest, enemyAttr, enemyMove, out destination))
-                    {
-                        return;
-                    }
-                }
-            }
-            else if (positioning.HasFallback)
-            {
-                if (!TryFindOpenMoveDestination(enemy, players, enemies, origin,
-                    positioning.FallbackDestination, enemyAttr, enemyMove, out destination))
-                {
-                    return;
-                }
-            }
-            else
-            {
+            if (!CombatMovementResolver.TryBuildCompletePath(origin, target.transform.position, out NavMeshPath fullPath))
                 return;
-            }
+
+            if (!CombatMovementResolver.TryFindFarthestReachablePoint(fullPath.corners, maxMoveDist, out Vector3 farthestPoint))
+                return;
+
+            if (!TryFindOpenMoveDestination(enemy, players, enemies, origin, farthestPoint, enemyAttr, enemyMove, out Vector3 destination))
+                return;
 
             if (!CombatMovementResolver.TryBuildCompletePath(origin, destination, out NavMeshPath movePath))
                 return;
@@ -169,51 +108,8 @@ namespace MiniChess.Combat
 
             if (TryMove(enemy, enemyMove, movePath))
             {
-                Debug.Log($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} moves toward {target.name} ({moveCost} AP movement preview).");
+                Debug.Log($"[EnemyAI] {GetDisplayName(enemy, enemyAttr)} moves toward {target.name} ({moveCost} AP).");
             }
-        }
-
-        private bool TryFindOpenAttackDestination(
-            EnemyController enemy,
-            IReadOnlyList<Player1Controller> players,
-            IReadOnlyList<EnemyController> enemies,
-            Vector3 origin,
-            Vector3 preferred,
-            Vector3 targetPosition,
-            float attackRange,
-            int attackCost,
-            AttributeSet enemyAttr,
-            MovementController enemyMove,
-            out Vector3 destination)
-        {
-            if (TryUseDestination(enemy, players, enemies, origin, preferred, attackCost, enemyAttr, enemyMove, out destination))
-                return true;
-
-            Vector3 baseDirection = preferred - targetPosition;
-            baseDirection.y = 0f;
-            if (baseDirection.sqrMagnitude <= 0.001f)
-            {
-                baseDirection = enemy.transform.position - targetPosition;
-                baseDirection.y = 0f;
-            }
-            if (baseDirection.sqrMagnitude <= 0.001f) baseDirection = Vector3.forward;
-            baseDirection.Normalize();
-
-            float baseAngle = Mathf.Atan2(baseDirection.z, baseDirection.x) * Mathf.Rad2Deg;
-            for (int i = 0; i < m_occupancyProbeCount; i++)
-            {
-                int step = (i + 1) / 2;
-                float sign = i % 2 == 0 ? 1f : -1f;
-                float angle = baseAngle + sign * step * (360f / m_occupancyProbeCount);
-                Vector3 direction = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), 0f, Mathf.Sin(angle * Mathf.Deg2Rad));
-                Vector3 candidate = targetPosition + direction * attackRange;
-
-                if (TryUseDestination(enemy, players, enemies, origin, candidate, attackCost, enemyAttr, enemyMove, out destination))
-                    return true;
-            }
-
-            destination = default;
-            return false;
         }
 
         private bool TryFindOpenMoveDestination(
@@ -271,12 +167,6 @@ namespace MiniChess.Combat
 
             destination = navDestination;
             return true;
-        }
-
-        private bool TryFindFarthestReachablePoint(EnemyController enemy, MovementController enemyMove, Vector3[] fullPathCorners, out Vector3 destination)
-        {
-            float remainingDist = enemyMove != null ? enemyMove.RemainingMoveDistance : enemy.RemainingMoveDistance;
-            return CombatMovementResolver.TryFindFarthestReachablePoint(fullPathCorners, remainingDist, out destination);
         }
 
         // ── Bridge helpers ──────────────────────────────────────────

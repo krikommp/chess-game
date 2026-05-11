@@ -25,8 +25,6 @@ namespace MiniChess.Combat
         [SerializeField, Range(1, 4)] private int m_maxPartySize = 4;
 
         [Header("Skills")]
-        [Tooltip("Optional: assign basic_attack skill. If null, auto-loaded from Assets/Data/Skills/.")]
-        [SerializeField] private SkillDefinition m_basicAttackSkillOverride;
         [SerializeField] private SkillDefinition m_basicMoveSkillOverride;
 
         [Header("Debug")]
@@ -42,8 +40,6 @@ namespace MiniChess.Combat
         public IReadOnlyList<Player1Controller> ControllableBlock => m_controllableBlock;
         public GameObject SelectedUnit { get; private set; }
         public Player1Controller SelectedPlayer => SelectedUnit != null ? SelectedUnit.GetComponent<Player1Controller>() : null;
-        public float AttackRange => BasicAttackSkill != null ? BasicAttackSkill.Range : 1.5f;
-        public SkillDefinition BasicAttackSkill { get; private set; }
         public SkillDefinition BasicMoveSkill { get; private set; }
         public int RoundCount { get; private set; }
         public bool IsWaiting { get; private set; }
@@ -58,7 +54,6 @@ namespace MiniChess.Combat
             if (m_enemyTurnRunner == null) m_enemyTurnRunner = gameObject.AddComponent<EnemyTurnRunner>();
             if (m_inputController != null) m_inputController.InputReceived += HandleInputReceived;
             CacheUnits();
-            ResolveBasicAttackSkill();
             ResolveBasicMoveSkill();
         }
 
@@ -67,30 +62,17 @@ namespace MiniChess.Combat
             if (m_inputController != null) m_inputController.InputReceived -= HandleInputReceived;
         }
 
-        private void ResolveBasicAttackSkill()
-        {
-            if (m_basicAttackSkillOverride != null) { BasicAttackSkill = m_basicAttackSkillOverride; return; }
-#if UNITY_EDITOR
-            BasicAttackSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>("Assets/Data/Skills/basic_attack.asset");
-            if (BasicAttackSkill != null) return;
-#endif
-            BasicAttackSkill = Resources.Load<SkillDefinition>("Skills/basic_attack");
-            if (BasicAttackSkill == null) BasicAttackSkill = Resources.Load<SkillDefinition>("basic_attack");
-            if (BasicAttackSkill == null)
-                Debug.LogWarning("[CombatRoundManager] basic_attack skill not found.");
-        }
-
         private void ResolveBasicMoveSkill()
         {
             if (m_basicMoveSkillOverride != null) { BasicMoveSkill = m_basicMoveSkillOverride; return; }
 #if UNITY_EDITOR
-            BasicMoveSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>("Assets/Data/Skills/basic_move.asset");
+            BasicMoveSkill = UnityEditor.AssetDatabase.LoadAssetAtPath<SkillDefinition>("Assets/Data/Skills/BasicMove.asset");
             if (BasicMoveSkill != null) return;
 #endif
-            BasicMoveSkill = Resources.Load<SkillDefinition>("Skills/basic_move");
-            if (BasicMoveSkill == null) BasicMoveSkill = Resources.Load<SkillDefinition>("basic_move");
+            BasicMoveSkill = Resources.Load<SkillDefinition>("Skills/BasicMove");
+            if (BasicMoveSkill == null) BasicMoveSkill = Resources.Load<SkillDefinition>("BasicMove");
             if (BasicMoveSkill == null)
-                Debug.LogWarning("[CombatRoundManager] basic_move skill not found.");
+                Debug.LogWarning("[CombatRoundManager] BasicMove skill not found.");
         }
 
         private void Start() { StartCombat(); }
@@ -214,19 +196,6 @@ namespace MiniChess.Combat
             return true;
         }
 
-        public EnemyController GetEnemyUnderAttack(Player1Controller attacker)
-        {
-            EnemyController best = null;
-            float bestDist = float.MaxValue;
-            foreach (var enemy in m_enemyUnits)
-            {
-                if (enemy == null || !enemy.IsAlive) continue;
-                float dist = Vector3.Distance(attacker.transform.position, enemy.transform.position);
-                if (dist < bestDist) { bestDist = dist; best = enemy; }
-            }
-            return best;
-        }
-
         private void CacheUnits()
         {
             m_playerUnits.RemoveAll(p => p == null);
@@ -282,7 +251,7 @@ namespace MiniChess.Combat
             enemy.FlashTurn();
             Debug.Log($"[Combat] Enemy turn starts: {GetDisplayName(enemy.gameObject)}");
 
-            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits, BasicAttackSkill);
+            yield return m_enemyTurnRunner.RunTurn(enemy, m_playerUnits, m_enemyUnits);
 
             TryEndUnitRound(enemy.gameObject);
             m_turnOrder.Remove(enemy.gameObject);
