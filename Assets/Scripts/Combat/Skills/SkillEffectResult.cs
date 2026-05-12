@@ -1,29 +1,24 @@
 namespace MiniChess.Combat.Skills
 {
-    /// <summary>
-    /// Result of an EffectFunction.Compute call.
-    /// Carries the computed value (e.g. AP cost, damage amount) and success/failure info.
-    /// </summary>
-    public struct EffectResult
+    public struct SkillEffectResult
     {
         public bool IsSuccess;
         public ESkillCastFailure Failure;
         public string FailureMessage;
         public float ComputedValue;
 
-        public static EffectResult Success(float value = 0f)
+        public static SkillEffectResult Success(float value = 0f)
         {
-            return new EffectResult
+            return new SkillEffectResult
             {
                 IsSuccess = true,
-                Failure = ESkillCastFailure.None,
                 ComputedValue = value,
             };
         }
 
-        public static EffectResult Fail(ESkillCastFailure reason, string message)
+        public static SkillEffectResult Fail(ESkillCastFailure reason, string message)
         {
-            return new EffectResult
+            return new SkillEffectResult
             {
                 IsSuccess = false,
                 Failure = reason,

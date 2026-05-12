@@ -12,15 +12,15 @@ namespace MiniChess.Combat.Skills
 
         [Header("Costs")]
         [Tooltip("Resource costs (e.g. SpendAP). Compute failure blocks the entire skill.")]
-        [SerializeField] private EffectDefinition[] m_costs;
+        [SerializeField] private SkillEffect[] m_costs;
 
         [Header("Cooldowns")]
-        [Tooltip("Cooldown management (e.g. SetCooldown). Compute failure blocks the entire skill.")]
-        [SerializeField] private EffectDefinition[] m_cooldowns;
+        [Tooltip("Cooldown effects (persistent effects with Cooldown tags). Compute failure blocks the entire skill.")]
+        [SerializeField] private SkillEffect[] m_cooldowns;
 
         [Header("Effects")]
         [Tooltip("Actual game effects (damage, heal, add status, etc.). Individual Compute failure does NOT block the skill.")]
-        [SerializeField] private EffectDefinition[] m_effects;
+        [SerializeField] private SkillEffect[] m_effects;
 
         [Header("Tag Conditions")]
         [Tooltip("Tags the caster must have to use this skill.")]
@@ -40,9 +40,9 @@ namespace MiniChess.Combat.Skills
 
         // ── Public properties — Execution slots ───────────────────────
 
-        public EffectDefinition[] Costs => m_costs ?? System.Array.Empty<EffectDefinition>();
-        public EffectDefinition[] Cooldowns => m_cooldowns ?? System.Array.Empty<EffectDefinition>();
-        public EffectDefinition[] Effects => m_effects ?? System.Array.Empty<EffectDefinition>();
+        public SkillEffect[] Costs => m_costs ?? System.Array.Empty<SkillEffect>();
+        public SkillEffect[] Cooldowns => m_cooldowns ?? System.Array.Empty<SkillEffect>();
+        public SkillEffect[] Effects => m_effects ?? System.Array.Empty<SkillEffect>();
 
         // ── Public properties — Tag conditions ────────────────────────
 
@@ -57,12 +57,12 @@ namespace MiniChess.Combat.Skills
 
         // ── Helpers (子类显式调用) ────────────────────────────────────
 
-        protected EffectResult[] ComputeCosts(SkillExecutionContext context)
+        protected SkillEffectResult[] ComputeCosts(SkillExecutionContext context)
         {
             if (m_costs == null || m_costs.Length == 0)
-                return System.Array.Empty<EffectResult>();
+                return System.Array.Empty<SkillEffectResult>();
 
-            var results = new EffectResult[m_costs.Length];
+            var results = new SkillEffectResult[m_costs.Length];
             for (int i = 0; i < m_costs.Length; i++)
             {
                 if (m_costs[i] == null) continue;
@@ -74,7 +74,7 @@ namespace MiniChess.Combat.Skills
             return results;
         }
 
-        protected void ApplyCosts(SkillExecutionContext context, EffectResult[] results)
+        protected void ApplyCosts(SkillExecutionContext context, SkillEffectResult[] results)
         {
             if (m_costs == null || results == null) return;
             int count = System.Math.Min(m_costs.Length, results.Length);
@@ -87,12 +87,12 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        protected EffectResult[] ComputeCooldowns(SkillExecutionContext context)
+        protected SkillEffectResult[] ComputeCooldowns(SkillExecutionContext context)
         {
             if (m_cooldowns == null || m_cooldowns.Length == 0)
-                return System.Array.Empty<EffectResult>();
+                return System.Array.Empty<SkillEffectResult>();
 
-            var results = new EffectResult[m_cooldowns.Length];
+            var results = new SkillEffectResult[m_cooldowns.Length];
             for (int i = 0; i < m_cooldowns.Length; i++)
             {
                 if (m_cooldowns[i] == null) continue;
@@ -104,7 +104,7 @@ namespace MiniChess.Combat.Skills
             return results;
         }
 
-        protected void ApplyCooldowns(SkillExecutionContext context, EffectResult[] results)
+        protected void ApplyCooldowns(SkillExecutionContext context, SkillEffectResult[] results)
         {
             if (m_cooldowns == null || results == null) return;
             int count = System.Math.Min(m_cooldowns.Length, results.Length);
@@ -117,7 +117,7 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        protected void ApplyEffects(SkillExecutionContext context, EffectDefinition[] effects)
+        protected void ApplyEffects(SkillExecutionContext context, SkillEffect[] effects)
         {
             if (effects == null) return;
             for (int i = 0; i < effects.Length; i++)
@@ -130,9 +130,9 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        private static EffectContext BuildEffectContext(SkillExecutionContext context, GameObject target)
+        private static SkillEffectContext BuildEffectContext(SkillExecutionContext context, GameObject target)
         {
-            return new EffectContext
+            return new SkillEffectContext
             {
                 Caster = context.Caster,
                 Target = target ?? context.Target,

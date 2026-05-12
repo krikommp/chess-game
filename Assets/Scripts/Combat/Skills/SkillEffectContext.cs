@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
-    public struct EffectContext
+    public struct SkillEffectContext
     {
         public GameObject Caster;
         public GameObject Target;

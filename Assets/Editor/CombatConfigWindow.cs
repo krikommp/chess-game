@@ -60,7 +60,7 @@ namespace MiniChess.EditorTools
                     DrawStubTab("Skills", "SkillAbility assets will appear here once created.");
                     break;
                 case ETab.Effects:
-                    DrawStubTab("Effects", "EffectDefinition assets will appear here once created.");
+                    DrawStubTab("Effects", "SkillEffect assets will appear here once created.");
                     break;
                 case ETab.Statuses:
                     DrawStubTab("Statuses", "StatusDefinition assets not yet available.");
@@ -362,7 +362,7 @@ namespace MiniChess.EditorTools
             }
 
             var skillGuids = AssetDatabase.FindAssets("t:SkillAbility");
-            var effectGuids = AssetDatabase.FindAssets("t:EffectDefinition");
+            var effectGuids = AssetDatabase.FindAssets("t:SkillEffect");
             var skillDefs = new List<SkillAbility>(skillGuids.Length);
             var skillIdMap = new Dictionary<string, SkillAbility>(System.StringComparer.OrdinalIgnoreCase);
 
@@ -401,17 +401,17 @@ namespace MiniChess.EditorTools
                 }
             }
 
-            // 4. Check each EffectDefinition
-            var effectDefs = new Dictionary<string, EffectDefinition>();
+            // 4. Check each SkillEffect
+            var effectDefs = new Dictionary<string, SkillEffect>();
             for (int i = 0; i < effectGuids.Length; i++)
             {
                 var path = AssetDatabase.GUIDToAssetPath(effectGuids[i]);
-                var effect = AssetDatabase.LoadAssetAtPath<EffectDefinition>(path);
+                var effect = AssetDatabase.LoadAssetAtPath<SkillEffect>(path);
                 if (effect != null) effectDefs[path] = effect;
             }
             foreach (var kvp in effectDefs)
             {
-                ValidateEffectDefinition(kvp.Value, kvp.Key);
+                ValidateSkillEffect(kvp.Value, kvp.Key);
             }
 
             // 5. basic_attack existence
@@ -437,7 +437,7 @@ namespace MiniChess.EditorTools
                         {
                             AddError($"basic_attack.effects[{i}] is null.", baPath);
                         }
-                        else if (effects[i] != null && effects[i].Function == EEffectFunction.ModifyAttribute)
+                        else if (effects[i] != null && effects[i].Function is ModifyAttributeFunction)
                         {
                             hasDamage = true;
                         }
@@ -527,12 +527,12 @@ namespace MiniChess.EditorTools
             }
         }
 
-        private void ValidateEffectDefinition(EffectDefinition effect, string path)
+        private void ValidateSkillEffect(SkillEffect effect, string path)
         {
             if (!effect.HasAnyTag())
             {
                 AddWarning(
-                    $"Effect '{effect.name}' has no GameplayTag. Every effect should carry at least one tag.",
+                    $"SkillEffect '{effect.name}' has no GameplayTag. Every effect should carry at least one tag.",
                     path);
             }
         }

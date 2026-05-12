@@ -1,6 +1,6 @@
 namespace MiniChess.Combat.Skills
 {
-    public enum EEffectDuration
+    public enum ESkillEffectDuration
     {
         Instant,
         Persistent,

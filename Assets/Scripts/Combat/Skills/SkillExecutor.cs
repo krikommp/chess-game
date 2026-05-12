@@ -11,10 +11,6 @@ namespace MiniChess.Combat.Skills
         [Header("Skills")]
         [SerializeField] private SkillAbility[] m_availableSkills;
 
-        [Header("Target Capabilities")]
-        [Tooltip("What effect types this object can receive.")]
-        [SerializeField] private ETargetCapability m_capabilities = ETargetCapability.Damageable;
-
         private AttributeSet m_attributes;
         private MovementController m_movement;
         private GameplayTagComponent m_tagComp;
@@ -38,7 +34,6 @@ namespace MiniChess.Combat.Skills
         }
 
         public IReadOnlyList<ActiveEffect> ActiveEffects => m_activeEffects;
-        public ETargetCapability Capabilities => m_capabilities;
         public SkillAbility ActiveSkill => m_activeSkill;
         public MovementController Movement => m_movement;
 
@@ -150,7 +145,6 @@ namespace MiniChess.Combat.Skills
 
         public SkillCastResult Execute(SkillExecutionContext context)
         {
-            // Generic validation
             var canExecute = CanExecute(context);
             if (!canExecute.IsSuccess)
                 return canExecute;
@@ -202,26 +196,21 @@ namespace MiniChess.Combat.Skills
             m_cooldowns.Clear();
         }
 
-        /// <summary>
-        /// Legacy input routing. For non-move skills only.
-        /// Move skill input is handled directly by UnitTurnHandler.
-        /// </summary>
         public SkillCastResult HandleInputLegacy(SkillInputRequest request, SkillAbility activeSkill)
         {
             if (activeSkill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "No active skill.");
 
-            // Non-move skills: just log for now (attack skills not yet implemented)
             return SkillCastResult.Success();
         }
 
         // ── Effect management ───────────────────────────────────────
 
-        public void ApplyEffect(EffectDefinition effect, GameObject source)
+        public void ApplyEffect(SkillEffect effect, GameObject source)
         {
             if (effect == null) return;
 
-            var ctx = new EffectContext
+            var ctx = new SkillEffectContext
             {
                 Caster = source ?? gameObject,
                 Target = gameObject,
@@ -229,24 +218,9 @@ namespace MiniChess.Combat.Skills
                 TargetExecutor = this,
             };
 
-            effect.Apply(ctx, EffectResult.Success());
+            effect.Apply(ctx, SkillEffectResult.Success());
 
             if (!effect.IsPersistent) return;
-
-            // Stack rule
-            if (effect.DurationRounds > 0)
-            {
-                var existing = FindActiveEffect(effect);
-                switch (effect.StackRule)
-                {
-                    case EStackRule.RefreshDuration:
-                        if (existing != null) { existing.RemainingRounds = effect.DurationRounds; return; }
-                        break;
-                    case EStackRule.ExtendDuration:
-                        if (existing != null) { existing.RemainingRounds += effect.DurationRounds; return; }
-                        break;
-                }
-            }
 
             var active = new ActiveEffect(effect, source, effect.DurationRounds);
             m_activeEffects.Add(active);
@@ -331,39 +305,36 @@ namespace MiniChess.Combat.Skills
                 }
             }
 
-            // OnRemove callback via Apply (stub)
-            var ctx = new EffectContext
+            var ctx = new SkillEffectContext
             {
                 Caster = active.Source,
                 Target = gameObject,
                 CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
                 TargetExecutor = this,
             };
-            effect.Apply(ctx, EffectResult.Success());
+            effect.Apply(ctx, SkillEffectResult.Success());
 
             m_activeEffects.Remove(active);
         }
 
-        /// <summary>Called by CombatRoundManager / RoundPhaseManager at the start of each round.</summary>
         public void OnRoundStart()
         {
             AdvanceCooldowns();
 
-            // Tick and expire active effects
             for (int i = m_activeEffects.Count - 1; i >= 0; i--)
             {
                 var active = m_activeEffects[i];
 
                 if (active.Definition.TickPerRound)
                 {
-                    var tickCtx = new EffectContext
+                    var tickCtx = new SkillEffectContext
                     {
                         Caster = active.Source,
                         Target = gameObject,
                         CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
                         TargetExecutor = this,
                     };
-                    active.Definition.Apply(tickCtx, EffectResult.Success());
+                    active.Definition.Apply(tickCtx, SkillEffectResult.Success());
                 }
 
                 if (active.Definition.DurationRounds > 0)
@@ -436,13 +407,10 @@ namespace MiniChess.Combat.Skills
                     tags.Add(tag, "SkillExecutor.CollectTags");
             }
 
-            // Faction tags are auto-synced by AttributeSet.Awake → SyncFactionTag to GameplayTagComponent.
-            // No duplicate syncing here.
-
             return tags;
         }
 
-        private ActiveEffect FindActiveEffect(EffectDefinition def)
+        private ActiveEffect FindActiveEffect(SkillEffect def)
         {
             for (int i = 0; i < m_activeEffects.Count; i++)
                 if (m_activeEffects[i].Definition == def)
@@ -466,11 +434,11 @@ namespace MiniChess.Combat.Skills
     [System.Serializable]
     public class ActiveEffect
     {
-        public EffectDefinition Definition;
+        public SkillEffect Definition;
         public GameObject Source;
         public int RemainingRounds;
 
-        public ActiveEffect(EffectDefinition def, GameObject source, int remainingRounds)
+        public ActiveEffect(SkillEffect def, GameObject source, int remainingRounds)
         {
             Definition = def;
             Source = source;
