@@ -14,14 +14,6 @@ namespace MiniChess.Combat.Skills
     {
         public override SkillCastResult Execute(SkillExecutionContext context)
         {
-            var skill = context.Skill;
-            if (skill == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
-
-            if (skill.TargetType != ESkillTargetType.GroundPoint)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
-                    $"Expected GroundPoint target type, got {skill.TargetType}.");
-
             var caster = context.Caster;
             if (caster == null)
                 return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is null.");
@@ -36,12 +28,7 @@ namespace MiniChess.Combat.Skills
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     "NavMesh path is invalid or incomplete.");
 
-            // 1. Check ability-level tag conditions (e.g. State.Rooted)
-            var tagCheck = CheckAbilityTags(context);
-            if (!tagCheck.IsSuccess)
-                return tagCheck;
-
-            // 2. Compute costs (e.g. SpendAP) — failure blocks
+            // 1. Compute costs (e.g. SpendAP) — failure blocks
             var costResults = ComputeCosts(context);
             for (int i = 0; i < costResults.Length; i++)
             {
@@ -49,12 +36,12 @@ namespace MiniChess.Combat.Skills
                     return SkillCastResult.Fail(costResults[i].Failure, costResults[i].FailureMessage);
             }
 
-            // 3. Execute movement
+            // 2. Execute movement
             if (!movement.TryStartMove(path))
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
                     "Failed to start movement via MovementController.");
 
-            // 4. Apply costs after movement starts
+            // 3. Apply costs after movement starts
             ApplyCosts(context, costResults);
 
             return SkillCastResult.Success();

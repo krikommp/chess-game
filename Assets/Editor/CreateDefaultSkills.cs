@@ -9,12 +9,11 @@ namespace MiniChess.EditorTools
     public static class CreateDefaultSkills
     {
         private const string BasicMovePath = "Assets/Data/Skills/basic_move.asset";
-        private const string GroundMoveAbilityPath = "Assets/Data/Skills/GroundMoveAbility.asset";
 
         [MenuItem("MiniChess/Create basic_move Skill")]
         public static void CreateBasicMove()
         {
-            if (AssetDatabase.LoadAssetAtPath<SkillDefinition>(BasicMovePath) != null)
+            if (AssetDatabase.LoadAssetAtPath<SkillAbility>(BasicMovePath) != null)
             {
                 Debug.Log("[CreateDefaultSkills] basic_move.asset already exists.");
                 return;
@@ -22,8 +21,8 @@ namespace MiniChess.EditorTools
 
             EnsureDirectoryExists(BasicMovePath);
 
-            var skill = ScriptableObject.CreateInstance<SkillDefinition>();
-            ConfigureBasicMoveSkill(skill);
+            var skill = ScriptableObject.CreateInstance<GroundMoveAbility>();
+            ConfigureBasicMove(skill);
 
             AssetDatabase.CreateAsset(skill, BasicMovePath);
             AssetDatabase.SaveAssets();
@@ -35,32 +34,19 @@ namespace MiniChess.EditorTools
         [MenuItem("MiniChess/Configure Current Scene Move Skills")]
         public static void ConfigureCurrentSceneMoveSkills()
         {
-            var moveSkill = AssetDatabase.LoadAssetAtPath<SkillDefinition>(BasicMovePath);
+            var moveSkill = AssetDatabase.LoadAssetAtPath<GroundMoveAbility>(BasicMovePath);
             if (moveSkill == null)
             {
-                moveSkill = ScriptableObject.CreateInstance<SkillDefinition>();
-                ConfigureBasicMoveSkill(moveSkill);
+                moveSkill = ScriptableObject.CreateInstance<GroundMoveAbility>();
+                ConfigureBasicMove(moveSkill);
                 EnsureDirectoryExists(BasicMovePath);
                 AssetDatabase.CreateAsset(moveSkill, BasicMovePath);
             }
             else
             {
-                ConfigureBasicMoveSkill(moveSkill);
+                ConfigureBasicMove(moveSkill);
                 EditorUtility.SetDirty(moveSkill);
             }
-
-            var groundMoveAbility = AssetDatabase.LoadAssetAtPath<GroundMoveAbility>(GroundMoveAbilityPath);
-            if (groundMoveAbility == null)
-            {
-                groundMoveAbility = ScriptableObject.CreateInstance<GroundMoveAbility>();
-                EnsureDirectoryExists(GroundMoveAbilityPath);
-                AssetDatabase.CreateAsset(groundMoveAbility, GroundMoveAbilityPath);
-            }
-
-            var moveSkillObject = new SerializedObject(moveSkill);
-            moveSkillObject.FindProperty("m_ability").objectReferenceValue = groundMoveAbility;
-            moveSkillObject.ApplyModifiedProperties();
-            EditorUtility.SetDirty(moveSkill);
 
             int configuredCount = 0;
             configuredCount += ConfigurePlayerMoveSkill("Gameplay/Actors/player1", moveSkill);
@@ -76,40 +62,18 @@ namespace MiniChess.EditorTools
             Debug.Log($"[CreateDefaultSkills] Configured basic_move for {configuredCount} player actor(s) and {configuredSpawnerCount} enemy spawner(s).");
         }
 
-        private static void ConfigureBasicMoveSkill(SkillDefinition skill)
+        private static void ConfigureBasicMove(GroundMoveAbility skill)
         {
             var so = new SerializedObject(skill);
 
             so.FindProperty("m_id").stringValue = "basic_move";
             so.FindProperty("m_displayName").stringValue = "Basic Move";
             so.FindProperty("m_description").stringValue = "Move to a target position.";
-            so.FindProperty("m_apCost").intValue = 0;
-            so.FindProperty("m_cooldown").intValue = 0;
-            so.FindProperty("m_range").floatValue = 0f;
-            so.FindProperty("m_targetType").enumValueIndex = (int)ESkillTargetType.GroundPoint;
-            so.FindProperty("m_aiBaseWeight").floatValue = 10f;
-
-            // skillTags: Action.Move, Movement.Ground
-            var tagsProp = so.FindProperty("m_skillTags");
-            tagsProp.arraySize = 2;
-            var tag0 = tagsProp.GetArrayElementAtIndex(0);
-            tag0.FindPropertyRelative("m_value").stringValue = "Action.Move";
-            tag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Action.Move");
-            var tag1 = tagsProp.GetArrayElementAtIndex(1);
-            tag1.FindPropertyRelative("m_value").stringValue = "Movement.Ground";
-            tag1.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Movement.Ground");
-
-            // aiTags: AI.Skill.Mobility
-            var aiTagsProp = so.FindProperty("m_aiTags");
-            aiTagsProp.arraySize = 1;
-            var aiTag0 = aiTagsProp.GetArrayElementAtIndex(0);
-            aiTag0.FindPropertyRelative("m_value").stringValue = "AI.Skill.Mobility";
-            aiTag0.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("AI.Skill.Mobility");
 
             so.ApplyModifiedProperties();
         }
 
-        private static int ConfigurePlayerMoveSkill(string hierarchyPath, SkillDefinition moveSkill)
+        private static int ConfigurePlayerMoveSkill(string hierarchyPath, SkillAbility moveSkill)
         {
             var actor = GameObject.Find(hierarchyPath);
             if (actor == null)
@@ -120,7 +84,7 @@ namespace MiniChess.EditorTools
                 executor = actor.AddComponent<SkillExecutor>();
 
             var so = new SerializedObject(executor);
-            var skillsProp = so.FindProperty("availableSkills");
+            var skillsProp = so.FindProperty("m_availableSkills");
             skillsProp.arraySize = 1;
             skillsProp.GetArrayElementAtIndex(0).objectReferenceValue = moveSkill;
             so.ApplyModifiedProperties();
@@ -130,7 +94,7 @@ namespace MiniChess.EditorTools
             return 1;
         }
 
-        private static int ConfigureEnemySpawners(SkillDefinition moveSkill)
+        private static int ConfigureEnemySpawners(SkillAbility moveSkill)
         {
             var spawners = Object.FindObjectsOfType<EnemySpawner>(includeInactive: true);
             for (int i = 0; i < spawners.Length; i++)

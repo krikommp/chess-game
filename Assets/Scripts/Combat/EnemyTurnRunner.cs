@@ -57,10 +57,6 @@ namespace MiniChess.Combat
             if (m_cameraController != null)
                 m_cameraController.FocusOn(unit.transform);
 
-            // Flash turn indicator via EnemyController (TODO: UnitVisualController)
-            var controller = unit.GetComponent<EnemyController>();
-            controller?.FlashTurn();
-
             yield return new WaitForSeconds(m_turnStartDelay);
 
             var executor = unit.GetComponent<SkillExecutor>();

@@ -9,7 +9,7 @@ namespace MiniChess.Combat.Skills
     public class SkillExecutor : MonoBehaviour
     {
         [Header("Skills")]
-        [SerializeField] private SkillDefinition[] m_availableSkills;
+        [SerializeField] private SkillAbility[] m_availableSkills;
 
         [Header("Target Capabilities")]
         [Tooltip("What effect types this object can receive.")]
@@ -20,17 +20,17 @@ namespace MiniChess.Combat.Skills
         private GameplayTagComponent m_tagComp;
         private readonly Dictionary<string, int> m_cooldowns = new Dictionary<string, int>();
         private readonly List<ActiveEffect> m_activeEffects = new List<ActiveEffect>();
-        private readonly List<SkillDefinition> m_grantedSkills = new List<SkillDefinition>();
-        private SkillDefinition m_activeSkill;
+        private readonly List<SkillAbility> m_grantedSkills = new List<SkillAbility>();
+        private SkillAbility m_activeSkill;
 
-        public SkillDefinition[] AvailableSkills
+        public SkillAbility[] AvailableSkills
         {
             get
             {
                 if (m_grantedSkills.Count == 0)
-                    return m_availableSkills ?? Array.Empty<SkillDefinition>();
+                    return m_availableSkills ?? Array.Empty<SkillAbility>();
 
-                var all = new List<SkillDefinition>();
+                var all = new List<SkillAbility>();
                 if (m_availableSkills != null) all.AddRange(m_availableSkills);
                 all.AddRange(m_grantedSkills);
                 return all.ToArray();
@@ -39,7 +39,7 @@ namespace MiniChess.Combat.Skills
 
         public IReadOnlyList<ActiveEffect> ActiveEffects => m_activeEffects;
         public ETargetCapability Capabilities => m_capabilities;
-        public SkillDefinition ActiveSkill => m_activeSkill;
+        public SkillAbility ActiveSkill => m_activeSkill;
         public MovementController Movement => m_movement;
 
         public int GetCooldownRemaining(string skillId) =>
@@ -62,12 +62,12 @@ namespace MiniChess.Combat.Skills
 
         // ── Skill access ────────────────────────────────────────────
 
-        public SkillCastResult CanCast(SkillDefinition skill, GameObject target)
+        public SkillCastResult CanCast(SkillAbility skill, GameObject target)
         {
             return CanExecute(SkillExecutionContext.ForTarget(this, skill, target));
         }
 
-        public SkillDefinition FindSkill(string id)
+        public SkillAbility FindSkill(string id)
         {
             var skills = AvailableSkills;
             for (int i = 0; i < skills.Length; i++)
@@ -78,7 +78,7 @@ namespace MiniChess.Combat.Skills
             return null;
         }
 
-        public bool ActivateSkill(SkillDefinition skill)
+        public bool ActivateSkill(SkillAbility skill)
         {
             if (skill == null || !HasSkill(skill))
             {
@@ -95,12 +95,12 @@ namespace MiniChess.Combat.Skills
             m_activeSkill = null;
         }
 
-        public void SetSkills(SkillDefinition[] skills)
+        public void SetSkills(SkillAbility[] skills)
         {
             m_availableSkills = skills;
         }
 
-        private bool HasSkill(SkillDefinition skill)
+        private bool HasSkill(SkillAbility skill)
         {
             var skills = AvailableSkills;
             for (int i = 0; i < skills.Length; i++)
@@ -119,70 +119,31 @@ namespace MiniChess.Combat.Skills
             if (skill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
 
-            if (skill.Ability == null)
-                return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
-                    $"Skill '{skill.Id}' has no Ability configured. All castable skills must have an explicit Ability.");
-
             var casterAttr = Attributes;
             if (casterAttr == null || !casterAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing AttributeSet.");
 
-            // SkillDefinition-level tag conditions
             var tagResult = EvaluateSkillTagConditions(skill, context.Target);
             if (!tagResult.IsSuccess)
                 return tagResult;
 
-            // GroundPoint skills skip target validation
-            if (skill.TargetType == ESkillTargetType.GroundPoint)
+            if (context.Target == null)
                 return SkillCastResult.Success();
 
-            var resolved = ResolveTarget(skill, context.Target);
-            if (resolved.Target == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Target is null.");
-
-            if (skill.TargetType == ESkillTargetType.Self)
-                return SkillCastResult.Success();
-
-            // Target alive check
-            var targetAttr = resolved.Target?.GetComponent<AttributeSet>();
+            var targetAttr = context.Target.GetComponent<AttributeSet>();
             if (targetAttr != null && !targetAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target is dead.");
 
-            if (resolved.TargetExecutor == null)
+            if (context.Target.GetComponent<SkillExecutor>() == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetCapabilityBlocked,
                     "Target has no SkillExecutor and cannot be affected by skills.");
-
-            // Faction check
-            EFaction casterFaction = casterAttr.Faction;
-            EFaction targetFaction = targetAttr?.Faction ?? EFaction.Player;
-
-            bool factionMismatch = false;
-            switch (skill.TargetType)
-            {
-                case ESkillTargetType.SingleEnemy:
-                    factionMismatch = targetFaction == casterFaction;
-                    break;
-                case ESkillTargetType.SingleAlly:
-                    factionMismatch = targetFaction != casterFaction;
-                    break;
-            }
-
-            if (factionMismatch)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
-                    $"Target faction '{targetFaction}' is invalid for {skill.TargetType}.");
-
-            // Range check
-            float dist = Vector3.Distance(gameObject.transform.position, resolved.Target.transform.position);
-            if (dist > skill.Range + 0.05f)
-                return SkillCastResult.Fail(ESkillCastFailure.OutOfRange,
-                    $"Target is out of range ({dist:F1}m > {skill.Range}m).");
 
             return SkillCastResult.Success();
         }
 
         // ── Execution ────────────────────────────────────────────────
 
-        public SkillCastResult Execute(SkillDefinition skill, GameObject target)
+        public SkillCastResult Execute(SkillAbility skill, GameObject target)
         {
             return Execute(SkillExecutionContext.ForTarget(this, skill, target));
         }
@@ -195,15 +156,14 @@ namespace MiniChess.Combat.Skills
                 return canExecute;
 
             var skill = context.Skill;
-            if (skill?.Ability == null)
+            if (skill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
-                    "Skill has no Ability configured.");
+                    "Skill is null.");
 
-            // Delegate to Ability.Execute — all AP/Effect/Cooldown logic is inside the Ability
-            return skill.Ability.Execute(context);
+            return skill.Execute(context);
         }
 
-        public SkillCastResult ExecuteAfterMove(SkillDefinition skill, GameObject target)
+        public SkillCastResult ExecuteAfterMove(SkillAbility skill, GameObject target)
         {
             if (skill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
@@ -214,10 +174,6 @@ namespace MiniChess.Combat.Skills
             var targetAttr = target.GetComponent<AttributeSet>();
             if (targetAttr != null && !targetAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target died during approach.");
-
-            if (!NavMeshService.IsInRange(transform.position, target.transform.position, skill.Range))
-                return SkillCastResult.Fail(ESkillCastFailure.OutOfRange,
-                    "Target moved out of range during approach.");
 
             return Execute(skill, target);
         }
@@ -250,7 +206,7 @@ namespace MiniChess.Combat.Skills
         /// Legacy input routing. For non-move skills only.
         /// Move skill input is handled directly by UnitTurnHandler.
         /// </summary>
-        public SkillCastResult HandleInputLegacy(SkillInputRequest request, SkillDefinition activeSkill)
+        public SkillCastResult HandleInputLegacy(SkillInputRequest request, SkillAbility activeSkill)
         {
             if (activeSkill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "No active skill.");
@@ -421,31 +377,7 @@ namespace MiniChess.Combat.Skills
 
         // ── Internals ───────────────────────────────────────────────
 
-        private readonly struct ResolvedTarget
-        {
-            public readonly GameObject Target;
-            public readonly SkillExecutor TargetExecutor;
-
-            public ResolvedTarget(GameObject target, SkillExecutor executor)
-            {
-                Target = target;
-                TargetExecutor = executor;
-            }
-        }
-
-        private ResolvedTarget ResolveTarget(SkillDefinition skill, GameObject requestedTarget)
-        {
-            if (skill.TargetType == ESkillTargetType.Self)
-                return new ResolvedTarget(gameObject, this);
-
-            if (skill.TargetType == ESkillTargetType.GroundPoint)
-                return new ResolvedTarget(gameObject, this);
-
-            var executor = requestedTarget != null ? requestedTarget.GetComponent<SkillExecutor>() : null;
-            return new ResolvedTarget(requestedTarget, executor);
-        }
-
-        private SkillCastResult EvaluateSkillTagConditions(SkillDefinition skill, GameObject target)
+        private SkillCastResult EvaluateSkillTagConditions(SkillAbility skill, GameObject target)
         {
             var casterTags = CollectTagsFrom(gameObject);
 
@@ -466,10 +398,6 @@ namespace MiniChess.Combat.Skills
                     return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
                         $"Caster is blocked by tag '{blockedCaster[i].Value}'.");
             }
-
-            // Skill self-target or ground point: skip target tag checks
-            if (skill.TargetType == ESkillTargetType.Self || skill.TargetType == ESkillTargetType.GroundPoint)
-                return SkillCastResult.Success();
 
             if (target == null) return SkillCastResult.Success();
 

@@ -1,5 +1,6 @@
-using UnityEngine;
+using MiniChess.GameplayTags;
 using MiniChess.Combat.Skills;
+using UnityEngine;
 
 namespace MiniChess.Combat
 {
@@ -19,7 +20,7 @@ namespace MiniChess.Combat
 
         [Header("Skills")]
         [Tooltip("Skills assigned to the spawned enemy unit. MVP test scenes should assign basic_move here.")]
-        [SerializeField] private SkillDefinition[] m_defaultSkills;
+        [SerializeField] private SkillAbility[] m_defaultSkills;
 
         private void Awake()
         {
@@ -41,7 +42,12 @@ namespace MiniChess.Combat
                 renderer.material.color = m_enemyColor;
             }
 
-            // New component stack: AttributeSet → MovementController → SkillExecutor → EnemyController
+            // Component stack: CombatUnit → AttributeSet → MovementController → SkillExecutor
+            go.AddComponent<CombatUnit>();
+            var tagComp = go.AddComponent<GameplayTagComponent>();
+            tagComp.AddTag(new GameplayTags.GameplayTag("Control.AI"), "Auto-assigned by EnemySpawner");
+            tagComp.AddTag(new GameplayTags.GameplayTag("Faction.Enemy"), "Auto-assigned by EnemySpawner");
+
             var attr = go.AddComponent<AttributeSet>();
             attr.Testing_AddAttribute(WellKnownAttributeTags.HP, m_hp, m_hp);
             attr.Testing_AddAttribute(WellKnownAttributeTags.AP, 6f, 6f);
@@ -54,15 +60,6 @@ namespace MiniChess.Combat
 
             SkillExecutor skillExecutor = go.AddComponent<SkillExecutor>();
             skillExecutor.SetSkills(m_defaultSkills);
-
-            // Enemy controller (bridge phase — syncs from AttributeSet)
-            EnemyController enemy = go.AddComponent<EnemyController>();
-            enemy.DefaultColor = m_enemyColor;
-
-            // TODO(Docs/06_MAP_SPEC.md §2): Revisit dynamic unit blocking once
-            // enemy AI movement and obstacle carving share a proper movement layer.
-            // Do not add NavMeshObstacle in the MVP AI loop because it conflicts
-            // with the NavMeshAgent required by EnemyController.
         }
     }
 }

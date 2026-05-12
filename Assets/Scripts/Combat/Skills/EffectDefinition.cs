@@ -67,7 +67,7 @@ namespace MiniChess.Combat.Skills
 
         [Header("Granted Abilities")]
         [Tooltip("Skills added to the target while this effect is active.")]
-        [SerializeField] private SkillDefinition[] m_grantedAbilities;
+        [SerializeField] private SkillAbility[] m_grantedAbilities;
 
         [Header("Stat Modifiers")]
         [Tooltip("Attribute modifiers applied while this effect is active.")]
@@ -102,7 +102,7 @@ namespace MiniChess.Combat.Skills
         public GameplayTag[] RemoveTags => m_removeTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] RequiredTags => m_requiredTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] BlockedTags => m_blockedTags ?? System.Array.Empty<GameplayTag>();
-        public SkillDefinition[] GrantedAbilities => m_grantedAbilities ?? System.Array.Empty<SkillDefinition>();
+        public SkillAbility[] GrantedAbilities => m_grantedAbilities ?? System.Array.Empty<SkillAbility>();
         public StatModifier[] StatModifiers => m_statModifiers ?? System.Array.Empty<StatModifier>();
         public bool TickPerRound => m_tickPerRound;
 

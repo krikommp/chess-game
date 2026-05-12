@@ -1,4 +1,5 @@
 ﻿using MiniChess.Combat;
+using MiniChess.GameplayTags;
 using UnityEngine;
 
 public class CameraController : MonoBehaviour
@@ -30,7 +31,7 @@ public class CameraController : MonoBehaviour
     private Vector3 m_manualPanOffset;
     private Vector3 m_manualPanVelocity;
     private Vector3 m_lastMousePosition;
-    private Player1Controller m_trackedPlayer;
+    private GameObject m_trackedUnit;
     private bool m_autoFocusActive = true;
 
     private void Awake()
@@ -88,14 +89,9 @@ public class CameraController : MonoBehaviour
         ApplyFixedRotation();
     }
 
-    private void OnDisable()
-    {
-        UnbindTrackedPlayer();
-    }
-
     private void OnDestroy()
     {
-        UnbindTrackedPlayer();
+        UnbindTrackedUnit();
     }
 
     private void OnValidate()
@@ -121,29 +117,48 @@ public class CameraController : MonoBehaviour
     {
         if (m_target == null)
         {
-            var player = FindObjectOfType<Player1Controller>();
-            if (player != null)
+            var units = FindObjectsOfType<CombatUnit>();
+            foreach (var cu in units)
             {
-                m_target = player.transform;
+                if (!cu.gameObject.activeInHierarchy) continue;
+                var tagComp = cu.GetComponent<GameplayTagComponent>();
+                if (tagComp != null && tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                {
+                    var attr = cu.GetComponent<AttributeSet>();
+                    if (attr != null && attr.IsAlive)
+                    {
+                        m_target = cu.transform;
+                        break;
+                    }
+                }
             }
         }
 
-        var currentPlayer = m_target != null ? m_target.GetComponent<Player1Controller>() : null;
-        if (m_trackedPlayer == currentPlayer) return;
+        var currentUnit = m_target != null ? m_target.gameObject : null;
+        if (m_trackedUnit == currentUnit) return;
 
-        UnbindTrackedPlayer();
-        m_trackedPlayer = currentPlayer;
-        if (m_trackedPlayer != null)
+        UnbindTrackedUnit();
+        m_trackedUnit = currentUnit;
+        if (m_trackedUnit != null)
         {
-            m_trackedPlayer.MovementStarted += HandleTrackedPlayerMovementStarted;
+            var attr = m_trackedUnit.GetComponent<AttributeSet>();
+            if (attr != null)
+                attr.AttributeChanged += OnTrackedUnitAttributeChanged;
         }
     }
 
-    private void UnbindTrackedPlayer()
+    private void UnbindTrackedUnit()
     {
-        if (m_trackedPlayer == null) return;
-        m_trackedPlayer.MovementStarted -= HandleTrackedPlayerMovementStarted;
-        m_trackedPlayer = null;
+        if (m_trackedUnit == null) return;
+        var attr = m_trackedUnit.GetComponent<AttributeSet>();
+        if (attr != null)
+            attr.AttributeChanged -= OnTrackedUnitAttributeChanged;
+        m_trackedUnit = null;
+    }
+
+    private void OnTrackedUnitAttributeChanged(GameplayTag tag, float prev, float cur)
+    {
+        ActivateAutoFocus();
     }
 
     private bool HandlePanInput()
@@ -185,11 +200,6 @@ public class CameraController : MonoBehaviour
 
         m_manualPanOffset += panDelta;
         return true;
-    }
-
-    private void HandleTrackedPlayerMovementStarted()
-    {
-        ActivateAutoFocus();
     }
 
     private void ActivateAutoFocus()

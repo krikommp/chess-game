@@ -65,18 +65,23 @@ namespace MiniChess.Combat
         {
             semanticTarget = null;
 
-            var hitPlayer = hit.collider.GetComponentInParent<Player1Controller>();
-            if (hitPlayer != null)
+            var hitCombatUnit = hit.collider.GetComponentInParent<CombatUnit>();
+            if (hitCombatUnit != null)
             {
-                semanticTarget = hitPlayer.gameObject;
-                return SkillInputTag.k_TargetPlayer;
-            }
-
-            var hitEnemy = hit.collider.GetComponentInParent<EnemyController>();
-            if (hitEnemy != null)
-            {
-                semanticTarget = hitEnemy.gameObject;
-                return SkillInputTag.k_TargetEnemy;
+                var tagComp = hitCombatUnit.GetComponent<GameplayTagComponent>();
+                if (tagComp != null)
+                {
+                    if (tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                    {
+                        semanticTarget = hitCombatUnit.gameObject;
+                        return SkillInputTag.k_TargetPlayer;
+                    }
+                    if (tagComp.HasTag(new GameplayTag("Control.AI"), ETagMatchMode.Exact))
+                    {
+                        semanticTarget = hitCombatUnit.gameObject;
+                        return SkillInputTag.k_TargetEnemy;
+                    }
+                }
             }
 
             if (((1 << hit.collider.gameObject.layer) & m_groundMask) != 0)

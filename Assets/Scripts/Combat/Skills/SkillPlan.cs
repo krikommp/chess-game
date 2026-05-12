@@ -9,10 +9,10 @@ namespace MiniChess.Combat.Skills
     public struct SkillPlan
     {
         /// <summary>Movement skill to approach the target (e.g. basic_move). Null if already in range.</summary>
-        public SkillDefinition MovementSkill;
+        public SkillAbility MovementSkill;
 
         /// <summary>The primary skill to execute after movement (e.g. basic_attack).</summary>
-        public SkillDefinition PrimarySkill;
+        public SkillAbility PrimarySkill;
 
         /// <summary>Target of the primary skill.</summary>
         public GameObject PrimaryTarget;

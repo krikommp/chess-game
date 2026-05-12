@@ -126,22 +126,11 @@ namespace MiniChess.Combat
 
         private void SelectUnit(GameObject unit)
         {
-            // Deselect previous
-            if (m_selectedUnit != null && m_selectedUnit != unit)
-            {
-                var prevPlayer = m_selectedUnit.GetComponent<Player1Controller>();
-                prevPlayer?.SetVisualState(EPlayerVisualState.Default);
-            }
-
             m_selectedUnit = unit;
 
             // Camera
             if (m_cameraController != null)
                 m_cameraController.FocusOn(unit.transform);
-
-            // Visual (via Player1Controller for now; TODO: UnitVisualController)
-            var player = unit.GetComponent<Player1Controller>();
-            player?.SetVisualState(EPlayerVisualState.Selected);
 
             // Activate basic_move
             var executor = unit.GetComponent<SkillExecutor>();
@@ -179,7 +168,7 @@ namespace MiniChess.Combat
             var executor = m_selectedUnit.GetComponent<SkillExecutor>();
             var activeSkill = executor?.ActiveSkill;
 
-            if (activeSkill != null && activeSkill.Ability is GroundMoveAbility)
+            if (activeSkill != null && activeSkill is GroundMoveAbility)
             {
                 HandleMoveInput(executor, activeSkill, request);
                 return;
@@ -189,7 +178,7 @@ namespace MiniChess.Combat
             executor?.HandleInputLegacy(request, activeSkill);
         }
 
-        private void HandleMoveInput(SkillExecutor executor, SkillDefinition moveSkill, SkillInputRequest request)
+        private void HandleMoveInput(SkillExecutor executor, SkillAbility moveSkill, SkillInputRequest request)
         {
             if (!request.IsTarget(SkillInputTag.k_TargetGround) || !request.HasWorldPosition)
             {

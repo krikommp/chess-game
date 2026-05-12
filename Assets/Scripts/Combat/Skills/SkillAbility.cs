@@ -3,68 +3,60 @@ using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
-    /// <summary>
-    /// 开放给用户编写的流程类。基类提供 Tag / Cost / Cooldown / Effect 的通用 helper；
-    /// 具体 Ability 在 Execute(context) 中显式调用这些 helper，自行编排流程顺序。
-    ///
-    /// Costs / Cooldowns / Effects 是标准槽位，能力可以选择性使用。
-    /// </summary>
     public abstract class SkillAbility : ScriptableObject
     {
-        [Header("Ability Tags")]
-        [Tooltip("Caster has any of these → ability cannot execute.")]
-        [SerializeField] protected GameplayTag[] m_blockedTags;
+        [Header("Identity")]
+        [SerializeField] private string m_id;
+        [SerializeField] private string m_displayName;
+        [SerializeField, TextArea(1, 4)] private string m_description;
 
         [Header("Costs")]
         [Tooltip("Resource costs (e.g. SpendAP). Compute failure blocks the entire skill.")]
-        [SerializeField] protected EffectDefinition[] m_costs;
+        [SerializeField] private EffectDefinition[] m_costs;
 
         [Header("Cooldowns")]
         [Tooltip("Cooldown management (e.g. SetCooldown). Compute failure blocks the entire skill.")]
-        [SerializeField] protected EffectDefinition[] m_cooldowns;
+        [SerializeField] private EffectDefinition[] m_cooldowns;
 
         [Header("Effects")]
         [Tooltip("Actual game effects (damage, heal, add status, etc.). Individual Compute failure does NOT block the skill.")]
-        [SerializeField] protected EffectDefinition[] m_effects;
+        [SerializeField] private EffectDefinition[] m_effects;
 
-        // ── Public properties ──────────────────────────────────────
+        [Header("Tag Conditions")]
+        [Tooltip("Tags the caster must have to use this skill.")]
+        [SerializeField] private GameplayTag[] m_requiredCasterTags;
+        [Tooltip("Tags that block the caster from using this skill.")]
+        [SerializeField] private GameplayTag[] m_blockedCasterTags;
+        [Tooltip("Tags the target must have to be affected by this skill.")]
+        [SerializeField] private GameplayTag[] m_requiredTargetTags;
+        [Tooltip("Tags that block the target from being affected by this skill.")]
+        [SerializeField] private GameplayTag[] m_blockedTargetTags;
 
-        public GameplayTag[] BlockedTags => m_blockedTags ?? System.Array.Empty<GameplayTag>();
+        // ── Public properties — Identity ──────────────────────────────
+
+        public string Id => m_id ?? string.Empty;
+        public string DisplayName => m_displayName ?? string.Empty;
+        public string Description => m_description ?? string.Empty;
+
+        // ── Public properties — Execution slots ───────────────────────
+
         public EffectDefinition[] Costs => m_costs ?? System.Array.Empty<EffectDefinition>();
         public EffectDefinition[] Cooldowns => m_cooldowns ?? System.Array.Empty<EffectDefinition>();
         public EffectDefinition[] Effects => m_effects ?? System.Array.Empty<EffectDefinition>();
 
-        // ── Abstract ───────────────────────────────────────────────
+        // ── Public properties — Tag conditions ────────────────────────
 
-        /// <summary>
-        /// Execute the ability's full flow. Concrete abilities call helpers in the desired order.
-        /// </summary>
+        public GameplayTag[] RequiredCasterTags => m_requiredCasterTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] BlockedCasterTags => m_blockedCasterTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] RequiredTargetTags => m_requiredTargetTags ?? System.Array.Empty<GameplayTag>();
+        public GameplayTag[] BlockedTargetTags => m_blockedTargetTags ?? System.Array.Empty<GameplayTag>();
+
+        // ── Abstract ──────────────────────────────────────────────────
+
         public abstract SkillCastResult Execute(SkillExecutionContext context);
 
-        // ── Helpers (显式调用，不自动执行) ──────────────────────────
+        // ── Helpers (子类显式调用) ────────────────────────────────────
 
-        /// <summary>Check if the caster has any blocked tag. Returns fail if blocked.</summary>
-        protected SkillCastResult CheckAbilityTags(SkillExecutionContext context)
-        {
-            if (m_blockedTags == null || m_blockedTags.Length == 0)
-                return SkillCastResult.Success();
-
-            var casterTags = context.CasterExecutor?.GetComponent<GameplayTags.GameplayTagComponent>()?.TagSet;
-            if (casterTags == null)
-                return SkillCastResult.Success();
-
-            for (int i = 0; i < m_blockedTags.Length; i++)
-            {
-                if (string.IsNullOrEmpty(m_blockedTags[i].Value)) continue;
-                if (casterTags.Has(m_blockedTags[i], ETagMatchMode.Exact))
-                    return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
-                        $"Ability blocked by caster tag '{m_blockedTags[i].Value}'.");
-            }
-
-            return SkillCastResult.Success();
-        }
-
-        /// <summary>Compute all cost effects. Returns array of results. Any failure blocks the skill.</summary>
         protected EffectResult[] ComputeCosts(SkillExecutionContext context)
         {
             if (m_costs == null || m_costs.Length == 0)
@@ -77,12 +69,11 @@ namespace MiniChess.Combat.Skills
                 var ctx = BuildEffectContext(context, context.Target);
                 results[i] = m_costs[i].Compute(ctx);
                 if (!results[i].IsSuccess)
-                    return results; // 调用方检查 IsSuccess
+                    return results;
             }
             return results;
         }
 
-        /// <summary>Apply all cost effects with their computed results.</summary>
         protected void ApplyCosts(SkillExecutionContext context, EffectResult[] results)
         {
             if (m_costs == null || results == null) return;
@@ -96,7 +87,6 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        /// <summary>Compute all cooldown effects. Returns array of results. Any failure blocks the skill.</summary>
         protected EffectResult[] ComputeCooldowns(SkillExecutionContext context)
         {
             if (m_cooldowns == null || m_cooldowns.Length == 0)
@@ -114,7 +104,6 @@ namespace MiniChess.Combat.Skills
             return results;
         }
 
-        /// <summary>Apply all cooldown effects with their computed results.</summary>
         protected void ApplyCooldowns(SkillExecutionContext context, EffectResult[] results)
         {
             if (m_cooldowns == null || results == null) return;
@@ -128,24 +117,6 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        /// <summary>Compute a single effect. Does NOT block the skill on failure (caller decides).</summary>
-        protected EffectResult ComputeEffect(SkillExecutionContext context, EffectDefinition effect)
-        {
-            if (effect == null)
-                return EffectResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Effect is null.");
-            var ctx = BuildEffectContext(context, context.Target);
-            return effect.Compute(ctx);
-        }
-
-        /// <summary>Apply a single effect with its computed result.</summary>
-        protected void ApplyEffect(SkillExecutionContext context, EffectDefinition effect, EffectResult result)
-        {
-            if (effect == null || !result.IsSuccess) return;
-            var ctx = BuildEffectContext(context, context.Target);
-            effect.Apply(ctx, result);
-        }
-
-        /// <summary>Compute + Apply a batch of effects. Skips Compute-failed effects individually.</summary>
         protected void ApplyEffects(SkillExecutionContext context, EffectDefinition[] effects)
         {
             if (effects == null) return;
@@ -158,8 +129,6 @@ namespace MiniChess.Combat.Skills
                     effects[i].Apply(ctx, result);
             }
         }
-
-        // ── Internal ────────────────────────────────────────────────
 
         private static EffectContext BuildEffectContext(SkillExecutionContext context, GameObject target)
         {

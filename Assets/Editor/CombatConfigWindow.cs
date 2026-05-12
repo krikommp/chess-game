@@ -57,7 +57,7 @@ namespace MiniChess.EditorTools
                     DrawTagsTab();
                     break;
                 case ETab.Skills:
-                    DrawStubTab("Skills", "SkillDefinition assets will appear here once created.");
+                    DrawStubTab("Skills", "SkillAbility assets will appear here once created.");
                     break;
                 case ETab.Effects:
                     DrawStubTab("Effects", "EffectDefinition assets will appear here once created.");
@@ -290,8 +290,7 @@ namespace MiniChess.EditorTools
             {
                 EditorGUILayout.Space(8);
                 EditorGUILayout.LabelField("Checks performed:", EditorStyles.miniLabel);
-                EditorGUILayout.LabelField("• SkillDefinition.id non-empty / unique");
-                EditorGUILayout.LabelField("• range, effect references, effect tags validity");
+                EditorGUILayout.LabelField("• SkillAbility.id non-empty / unique");
                 EditorGUILayout.LabelField("• Effect references non-null, Effect tags present");
                 EditorGUILayout.LabelField("• Unregistered tags in Skill/Effect assets");
                 EditorGUILayout.LabelField("• basic_attack skill asset existence");
@@ -362,29 +361,29 @@ namespace MiniChess.EditorTools
                 Debug.LogError("[Validation] TagRegistry not found.");
             }
 
-            var skillGuids = AssetDatabase.FindAssets("t:SkillDefinition");
+            var skillGuids = AssetDatabase.FindAssets("t:SkillAbility");
             var effectGuids = AssetDatabase.FindAssets("t:EffectDefinition");
-            var skillDefs = new List<SkillDefinition>(skillGuids.Length);
-            var skillIdMap = new Dictionary<string, SkillDefinition>(System.StringComparer.OrdinalIgnoreCase);
+            var skillDefs = new List<SkillAbility>(skillGuids.Length);
+            var skillIdMap = new Dictionary<string, SkillAbility>(System.StringComparer.OrdinalIgnoreCase);
 
-            // Collect all SkillDefinitions
+            // Collect all SkillAbilitys
             for (int i = 0; i < skillGuids.Length; i++)
             {
                 var path = AssetDatabase.GUIDToAssetPath(skillGuids[i]);
-                var skill = AssetDatabase.LoadAssetAtPath<SkillDefinition>(path);
+                var skill = AssetDatabase.LoadAssetAtPath<SkillAbility>(path);
                 if (skill != null) skillDefs.Add(skill);
             }
 
-            // 2. Check each SkillDefinition
+            // 2. Check each SkillAbility
             for (int i = 0; i < skillDefs.Count; i++)
             {
                 var skill = skillDefs[i];
                 var path = AssetDatabase.GetAssetPath(skill);
 
-                ValidateSkillDefinition(skill, path, skillIdMap);
+                ValidateSkillAbility(skill, path, skillIdMap);
             }
 
-            // 3. Check duplicate SkillDefinition ids
+            // 3. Check duplicate SkillAbility ids
             foreach (var kvp in skillIdMap)
             {
                 var id = kvp.Key;
@@ -398,7 +397,7 @@ namespace MiniChess.EditorTools
                 if (count > 1)
                 {
                     var path = AssetDatabase.GetAssetPath(kvp.Value);
-                    AddError($"[{id}] Duplicate SkillDefinition.id '{id}' ({count} occurrences)", path);
+                    AddError($"[{id}] Duplicate SkillAbility.id '{id}' ({count} occurrences)", path);
                 }
             }
 
@@ -457,12 +456,6 @@ namespace MiniChess.EditorTools
                 {
                     var skill = skillDefs[i];
                     var path = AssetDatabase.GetAssetPath(skill);
-                    var tags = skill.SkillTags;
-                    for (int j = 0; j < tags.Length; j++)
-                        CheckTagRegistered(tags[j], $"Skill '{skill.Id}' SkillTags[{j}]", path);
-                    var aiTags = skill.AiTags;
-                    for (int j = 0; j < aiTags.Length; j++)
-                        CheckTagRegistered(aiTags[j], $"Skill '{skill.Id}' AiTags[{j}]", path);
                     var effects = skill.Effects;
                     for (int j = 0; j < effects.Length; j++)
                     {
@@ -493,27 +486,21 @@ namespace MiniChess.EditorTools
                 : $"[Validation] {errCount} error(s), {warnCount} warning(s) found. See the Validation ETab for details.");
         }
 
-        private void ValidateSkillDefinition(SkillDefinition skill, string path,
-            Dictionary<string, SkillDefinition> idMap)
+        private void ValidateSkillAbility(SkillAbility skill, string path,
+            Dictionary<string, SkillAbility> idMap)
         {
             var id = skill.Id;
 
             // id non-empty
             if (string.IsNullOrWhiteSpace(id))
             {
-                AddError("SkillDefinition.id is empty.", path);
+                AddError("SkillAbility.id is empty.", path);
             }
 
             // Track for uniqueness check (case-insensitive, first-wins for reporting)
             if (!string.IsNullOrWhiteSpace(id) && !idMap.ContainsKey(id))
             {
                 idMap[id] = skill;
-            }
-
-            // range >= 0
-            if (skill.Range < 0f)
-            {
-                AddError($"Skill '{id}': range = {skill.Range} (must be >= 0).", path);
             }
 
             // effects not empty
@@ -563,7 +550,7 @@ namespace MiniChess.EditorTools
             }
         }
 
-        private SkillDefinition FindSkillById(string id, List<SkillDefinition> skills)
+        private SkillAbility FindSkillById(string id, List<SkillAbility> skills)
         {
             for (int i = 0; i < skills.Count; i++)
             {

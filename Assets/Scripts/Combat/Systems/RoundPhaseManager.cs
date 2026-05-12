@@ -17,13 +17,13 @@ namespace MiniChess.Combat
     {
         [Header("System Skills")]
         [Tooltip("Executed on each alive unit when a new round starts.")]
-        [SerializeField] private SkillDefinition m_sysRoundStart;
+        [SerializeField] private SkillAbility m_sysRoundStart;
 
         [Tooltip("Executed on a unit when its turn ends.")]
-        [SerializeField] private SkillDefinition m_sysTurnEnd;
+        [SerializeField] private SkillAbility m_sysTurnEnd;
 
         [Tooltip("Executed on a unit when it dies (HP <= 0).")]
-        [SerializeField] private SkillDefinition m_sysOnDeath;
+        [SerializeField] private SkillAbility m_sysOnDeath;
 
         [Header("Refs")]
         [SerializeField] private CombatRoundManager m_roundManager;
@@ -76,7 +76,7 @@ namespace MiniChess.Combat
             ExecuteSystemSkill(unit, m_sysOnDeath, "sys_on_death");
         }
 
-        private void ExecuteSystemSkill(GameObject unit, SkillDefinition skill, string logLabel)
+        private void ExecuteSystemSkill(GameObject unit, SkillAbility skill, string logLabel)
         {
             if (unit == null || skill == null) return;
 
