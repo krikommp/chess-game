@@ -6,7 +6,7 @@ namespace MiniChess.Combat.Skills
 {
     /// <summary>
     /// 主动移动 Ability。BlockedTags 控制移动流程权限；Costs 控制 AP 消耗。
-    /// 直接调用 CombatMovementResolver + MovementController，不通过 MoveEffect。
+    /// 直接调用 NavMeshService + MovementController，不通过 MoveEffect。
     /// HandleInput 已移出到 UnitTurnHandler。
     /// </summary>
     [CreateAssetMenu(fileName = "GroundMoveAbility", menuName = "MiniChess/Skill Abilities/Ground Move", order = 20)]

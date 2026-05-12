@@ -82,7 +82,6 @@ namespace MiniChess.Combat
         public void BeginRound()
         {
             m_attributes?.SetToMax(WellKnownAttributeTags.AP);
-            m_movement?.ResetUnpaidDistance();
             GetComponent<SkillExecutor>()?.AdvanceCooldowns();
             StateChanged?.Invoke();
         }
@@ -91,7 +90,6 @@ namespace MiniChess.Combat
         {
             if (IsMoving) return false;
             m_attributes?.Set(WellKnownAttributeTags.AP, 0f);
-            m_movement?.ResetUnpaidDistance();
             StateChanged?.Invoke();
             return true;
         }
@@ -118,7 +116,9 @@ namespace MiniChess.Combat
 
         public int PreviewMovementApCost(float pathLength)
         {
-            return m_movement != null ? m_movement.PreviewMovementApCost(pathLength) : 0;
+            return NavMeshService.EstimateMoveApCost(pathLength,
+                m_attributes?.Get(WellKnownAttributeTags.MoveSpeed) ?? 1f,
+                Mathf.FloorToInt(m_attributes?.Get(WellKnownAttributeTags.AP) ?? 0f));
         }
 
         public void TakeDamage(int damage)
@@ -151,7 +151,6 @@ namespace MiniChess.Combat
             {
                 m_movement.MovementStarted += () => { MovementStarted?.Invoke(); StateChanged?.Invoke(); };
                 m_movement.MovementStopped += () => StateChanged?.Invoke();
-                m_movement.ApDeducted += () => StateChanged?.Invoke();
             }
 
             if (m_attributes != null)

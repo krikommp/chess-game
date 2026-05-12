@@ -215,7 +215,7 @@ namespace MiniChess.Combat.Skills
             if (targetAttr != null && !targetAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target died during approach.");
 
-            if (!CombatMovementResolver.IsInRange(transform.position, target.transform.position, skill.Range))
+            if (!NavMeshService.IsInRange(transform.position, target.transform.position, skill.Range))
                 return SkillCastResult.Fail(ESkillCastFailure.OutOfRange,
                     "Target moved out of range during approach.");
 

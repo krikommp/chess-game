@@ -150,8 +150,8 @@ namespace MiniChess.Combat
 
         private void UpdateDistanceLabel(Vector3[] reachable, Vector3[] unreachable)
         {
-            m_reachableDistance = PathCostCalculator.PathLength(reachable);
-            float unreachableDistance = PathCostCalculator.PathLength(unreachable);
+            m_reachableDistance = NavMeshService.PathLength(reachable);
+            float unreachableDistance = NavMeshService.PathLength(unreachable);
             m_totalDistance = m_reachableDistance + unreachableDistance;
 
             if (m_totalDistance <= 0.001f)

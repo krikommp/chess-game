@@ -188,7 +188,7 @@ namespace MiniChess.Combat
             }
 
             if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav,
-                    NavMeshManager.Instance.MouseSnapRadius, NavMesh.AllAreas))
+                    NavMeshService.Instance.MouseSnapRadius, NavMesh.AllAreas))
             {
                 preview.Show(System.Array.Empty<Vector3>(), new[] { origin, worldPosition });
                 return;
@@ -207,14 +207,14 @@ namespace MiniChess.Combat
                 return;
             }
 
-            float length = PathCostCalculator.PathLength(path.corners);
+            float length = NavMeshService.PathLength(path.corners);
             if (length <= movement.RemainingMoveDistance)
             {
                 preview.Show(path.corners, System.Array.Empty<Vector3>());
                 return;
             }
 
-            PathCostCalculator.Clip(path.corners, movement.RemainingMoveDistance,
+            NavMeshService.ClipPath(path.corners, movement.RemainingMoveDistance,
                 out Vector3[] head, out Vector3[] tail);
             preview.Show(head, tail);
         }
@@ -231,7 +231,7 @@ namespace MiniChess.Combat
             if (!TryGetOrigin(executor, out Vector3 origin)) return false;
 
             if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav,
-                    NavMeshManager.Instance.MouseSnapRadius, NavMesh.AllAreas))
+                    NavMeshService.Instance.MouseSnapRadius, NavMesh.AllAreas))
                 return false;
 
             var fullPath = new NavMeshPath();
@@ -241,12 +241,12 @@ namespace MiniChess.Combat
                 || fullPath.corners.Length < 2)
                 return false;
 
-            float length = PathCostCalculator.PathLength(fullPath.corners);
+            float length = NavMeshService.PathLength(fullPath.corners);
             destination = nav.position;
 
             if (length > remainingDist + 0.001f)
             {
-                PathCostCalculator.Clip(fullPath.corners, remainingDist,
+                NavMeshService.ClipPath(fullPath.corners, remainingDist,
                     out Vector3[] head, out _);
                 if (head == null || head.Length < 2) return false;
                 destination = head[head.Length - 1];
@@ -266,7 +266,7 @@ namespace MiniChess.Combat
         {
             var casterObject = executor.gameObject;
             if (casterObject != null && NavMesh.SamplePosition(casterObject.transform.position,
-                    out NavMeshHit hit, NavMeshManager.Instance.OriginSnapRadius, NavMesh.AllAreas))
+                    out NavMeshHit hit, NavMeshService.Instance.OriginSnapRadius, NavMesh.AllAreas))
             {
                 origin = hit.position;
                 return true;

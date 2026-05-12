@@ -476,9 +476,12 @@ RequiredTags/BlockedTags 当前在 `SkillDefinition` 层（`RequiredCasterTags`/
 ### Q-0041 MovementController AP 扣除何时迁移到 Ability 事件模式
 - 来源：2026-05-12 技能框架重写
 - 问题：当前 MovementController.AccountMovementDistance 仍保留增量 AP 扣除逻辑（标记 TODO）。设计目标是 AP 扣除由 Ability.Costs（SpendAPFunction）完成，但增量移动 AP 与 NavMeshAgent Update 循环耦合。是否需要引入 MovementBudget 组件或事件驱动的 AP 扣除？
-- 当前临时假设：**保留现状**。MovementController 继续在 Update 中扣除 AP。后续引入 MovementBudget 组件（监听 MovementController 的 ApDeducted 事件），MovementController 变为纯移动工具。
-- 决议：(空)
-- 影响：`MovementController.cs`、未来 `MovementBudget.cs`
+- 决议：**2026-05-12 — MovementController 去消耗化 + NavMeshService 拆分**。
+  1. **NavMeshService**（单例 MB）：合并原 CombatMovementResolver + PathCostCalculator + NavMeshManager，提供纯 NavMesh API（路径计算、采样、距离、占位、AP 估算）。Skill 可直接通过 `NavMeshService.Instance` 调用。
+  2. **MovementController**（单位组件）：移除所有消耗逻辑（`AccountMovementDistance`、`m_unpaidMoveDistance`、`ResetUnpaidDistance`、`ApDeducted`、`CanMoveAlong`、`PreviewMovementApCost`）。变为纯移动执行器（`TryMove`/`StopMovement`/`IsMoving`），`RemainingMoveDistance` 变为 `AP×Speed` 纯计算，无 unpaid 残留。
+  3. **AP 扣除职责**：迁移到 Skill 层。`GroundMoveAbility` 的 `Costs` 槽位（`SpendAPFunction`）在移动启动前一次算出预估消耗并扣除，不再逐帧增量扣除。
+  4. **扩展性**：未来飞行能力可扩展 MovementController 或加兄弟组件，通过 `GetComponent<MovementController>()` 统一访问。
+- 影响：`NavMeshService.cs`（新建）、`MovementController.cs`、`GroundMoveAbility.cs`、`UnitTurnHandler.cs`、`EnemyTurnRunner.cs`、`Player1Controller.cs`、`EnemyController.cs`、`PathPreview.cs`、`SystemEffectFunctions.cs`。删除 `CombatMovementResolver.cs`、`PathCostCalculator.cs`、`NavMeshManager.cs`。
 
 ### Q-0042 EffectFunction stub 何时实现
 - 来源：2026-05-12 技能框架重写

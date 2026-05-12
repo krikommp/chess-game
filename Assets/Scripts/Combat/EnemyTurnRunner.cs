@@ -126,23 +126,24 @@ namespace MiniChess.Combat
             float moveSpeed = attr?.Get(WellKnownAttributeTags.MoveSpeed) ?? 1f;
             float maxMoveDist = currentAP * moveSpeed;
 
-            if (!CombatMovementResolver.TryGetNavMeshPosition(unit.transform.position, m_navMeshSnapRadius, out var origin))
+            var nav = NavMeshService.Instance;
+            if (!nav.SamplePosition(unit.transform.position, m_navMeshSnapRadius, out var origin))
                 yield break;
 
-            if (!CombatMovementResolver.TryBuildCompletePath(origin, target.transform.position, out var fullPath))
+            if (!nav.CalculatePath(origin, target.transform.position, out var fullPath))
                 yield break;
 
-            if (!CombatMovementResolver.TryFindFarthestReachablePoint(fullPath.corners, maxMoveDist, out var farthestPoint))
+            if (!nav.FindFarthestReachablePoint(fullPath.corners, maxMoveDist, out var farthestPoint))
                 yield break;
 
             if (!NavMesh.SamplePosition(farthestPoint, out var destHit, m_navMeshSnapRadius, NavMesh.AllAreas))
                 yield break;
 
-            if (!CombatMovementResolver.TryBuildCompletePath(origin, destHit.position, out var movePath))
+            if (!nav.CalculatePath(origin, destHit.position, out var movePath))
                 yield break;
 
-            float pathLength = PathCostCalculator.PathLength(movePath.corners);
-            if (pathLength > moveExec.RemainingMoveDistance) yield break;
+            float pathLength = NavMeshService.PathLength(movePath.corners);
+            if (pathLength > maxMoveDist) yield break;
 
             moveExec.TryMove(movePath);
 

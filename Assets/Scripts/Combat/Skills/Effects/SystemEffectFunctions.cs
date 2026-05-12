@@ -19,7 +19,8 @@ namespace MiniChess.Combat.Skills
 
         public static void Apply(EffectContext context, EffectDefinition effect, EffectResult computed)
         {
-            context.Target?.GetComponent<MovementController>()?.ResetUnpaidDistance();
+            // Movement budget reset now handled by sys_round_start's ResetMovement effect.
+            // MovementController is a pure executor — no unpaid distance to reset.
         }
     }
 

@@ -562,10 +562,10 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 |----|------|---------|------|
 | IS-0001 | Status 系统完全缺失 | P0 | 待处理 |
 | IS-0002 | AI Action Candidate 框架未实现 | P0 | 待处理 |
-| IS-0003 | CombatRoundManager 职责过重 | P0 | 待处理 |
+| IS-0003 | CombatRoundManager 职责过重 | P0 | ✅ 已解决（2026-05-12: 355→175行，纯事件广播器，UnitTurnHandler/AITurnRunner 拆分） |
 | IS-0004 | SkillDefinition.Ability DefaultInstance 运行时构造 | P0 | 待处理 |
-| IS-0005 | EnemyTurnRunner 新旧 API 桥接冗余 | P1 | 待处理 |
-| IS-0006 | CombatRoundManager 编辑器代码在运行时路径 | P1 | 待处理 |
+| IS-0005 | EnemyTurnRunner 新旧 API 桥接冗余 | P1 | ✅ 已解决（2026-05-12: 重写为事件驱动，直接使用 AttributeSet/MovementController） |
+| IS-0006 | CombatRoundManager 编辑器代码在运行时路径 | P1 | ✅ 已解决（2026-05-12: ResolveBasicMoveSkill + #if UNITY_EDITOR 已删除） |
 | IS-0007 | SkillExecutor.CollectTags 手动 Faction 同步重复 | P1 | 待处理 |
 | IS-0008 | EnemySpawner 使用临时 API | P1 | 待处理 |
 | IS-0009 | CombatTrigger / 战斗进入流程缺失 | P2 | 待处理 |
@@ -574,11 +574,11 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 | IS-0012 | TagRegistry 线性查找性能 | P2 | 待处理 |
 | IS-0013 | GroundMoveAbility NavMesh 重复采样 | P3 | 待处理 |
 | IS-0014 | EffectDefinition 空 Tag 检查不一致 | P3 | 待处理 |
-| IS-0015 | turnOrder 使用 GameObject 而非组件引用 | P3 | 待处理 |
+| IS-0015 | turnOrder 使用 GameObject 而非组件引用 | P3 | 已弱化（2026-05-12: CombatRoundManager 精简后 GetComponent 调用集中，不再反复查询） |
 | IS-0016 | 缺少战斗日志/事件总线 | P3 | 待处理 |
 | IS-0017 | Player1Controller.OnAttributeDepleted 为空 | P0 | 已决议，待实现 |
 | IS-0018 | APDebugHUD 直接访问内部字段 | P3 | 待处理 |
 | IS-0019 | 场景未迁移到 CombatUnit / UnitTurnHandler / EnemyTurnRunner 新架构 | P0 | 待处理 |
-| IS-0020 | 回合开始 AP 恢复与移动预算重置丢失 | P0 | 待处理 |
+| IS-0020 | 回合开始 AP 恢复与移动预算重置丢失 | P0 | 已弱化（2026-05-12: MovementController 去消耗化，RemainingMoveDistance=AP×Speed 纯计算无 unpaid 残留；AP 恢复由 CombatRoundManager.StartNextRound → SkillExecutor.OnRoundStart 调用） |
 | IS-0021 | 玩家点击选择未校验 ControllableUnits | P1 | 待处理 |
 | IS-0022 | UnitTurnHandler.cs.meta 未完整提交 | P2 | 待处理 |
