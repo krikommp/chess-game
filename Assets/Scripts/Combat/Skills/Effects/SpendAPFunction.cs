@@ -15,6 +15,7 @@ namespace MiniChess.Combat.Skills
             if (casterAttr == null)
                 return EffectResult.Fail(ESkillCastFailure.CasterDead, "Caster has no AttributeSet.");
 
+            float currentAP = casterAttr.Get(WellKnownAttributeTags.AP);
             float amount;
 
             if (context.TargetPosition.HasValue)
@@ -26,8 +27,7 @@ namespace MiniChess.Combat.Skills
                 {
                     float pathLength = NavMeshService.PathLength(path.corners);
                     float speed = casterAttr.Get(WellKnownAttributeTags.MoveSpeed);
-                    int currentAP = Mathf.FloorToInt(casterAttr.Get(WellKnownAttributeTags.AP));
-                    amount = NavMeshService.EstimateMoveApCost(pathLength, speed, currentAP);
+                    amount = NavMeshService.EstimateMoveApCost(pathLength, speed, Mathf.FloorToInt(currentAP));
                 }
                 else
                 {
@@ -42,7 +42,6 @@ namespace MiniChess.Combat.Skills
             if (amount <= 0f)
                 return EffectResult.Success(0f);
 
-            float currentAP = casterAttr.Get(WellKnownAttributeTags.AP);
             if (currentAP < amount)
                 return EffectResult.Fail(ESkillCastFailure.InsufficientAp,
                     $"Need {amount} AP, have {currentAP}.");

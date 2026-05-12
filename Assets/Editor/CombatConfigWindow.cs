@@ -291,7 +291,7 @@ namespace MiniChess.EditorTools
                 EditorGUILayout.Space(8);
                 EditorGUILayout.LabelField("Checks performed:", EditorStyles.miniLabel);
                 EditorGUILayout.LabelField("• SkillDefinition.id non-empty / unique");
-                EditorGUILayout.LabelField("• apCost, cooldown, range validity");
+                EditorGUILayout.LabelField("• range, effect references, effect tags validity");
                 EditorGUILayout.LabelField("• Effect references non-null, Effect tags present");
                 EditorGUILayout.LabelField("• Unregistered tags in Skill/Effect assets");
                 EditorGUILayout.LabelField("• basic_attack skill asset existence");
@@ -508,18 +508,6 @@ namespace MiniChess.EditorTools
             if (!string.IsNullOrWhiteSpace(id) && !idMap.ContainsKey(id))
             {
                 idMap[id] = skill;
-            }
-
-            // apCost >= 0
-            if (skill.ApCost < 0)
-            {
-                AddError($"Skill '{id}': apCost = {skill.ApCost} (must be >= 0).", path);
-            }
-
-            // cooldown >= 0
-            if (skill.Cooldown < 0)
-            {
-                AddError($"Skill '{id}': cooldown = {skill.Cooldown} (must be >= 0).", path);
             }
 
             // range >= 0
