@@ -12,7 +12,7 @@ namespace MiniChess.Combat.Skills
 
         public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
-            var executor = context.Target?.GetComponent<SkillExecutor>();
+            var executor = context.Target?.GetComponent<AbilitySystemComponent>();
             if (executor == null) return;
 
             var activeEffects = executor.ActiveEffects;

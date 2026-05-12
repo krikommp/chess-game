@@ -133,7 +133,7 @@ namespace MiniChess.Combat
                 m_cameraController.FocusOn(unit.transform);
 
             // Activate basic_move
-            var executor = unit.GetComponent<SkillExecutor>();
+            var executor = unit.GetComponent<AbilitySystemComponent>();
             var moveSkill = executor != null ? executor.FindSkill("basic_move") : null;
             if (moveSkill != null)
                 executor.ActivateSkill(moveSkill);
@@ -165,7 +165,7 @@ namespace MiniChess.Combat
             }
 
             // Route ground-point input to movement handling
-            var executor = m_selectedUnit.GetComponent<SkillExecutor>();
+            var executor = m_selectedUnit.GetComponent<AbilitySystemComponent>();
             var activeSkill = executor?.ActiveSkill;
 
             if (activeSkill != null && activeSkill is GroundMoveAbility)
@@ -178,7 +178,7 @@ namespace MiniChess.Combat
             executor?.HandleInputLegacy(request, activeSkill);
         }
 
-        private void HandleMoveInput(SkillExecutor executor, SkillAbility moveSkill, SkillInputRequest request)
+        private void HandleMoveInput(AbilitySystemComponent executor, SkillAbility moveSkill, SkillInputRequest request)
         {
             if (!request.IsTarget(SkillInputTag.k_TargetGround) || !request.HasWorldPosition)
             {
@@ -207,7 +207,7 @@ namespace MiniChess.Combat
             }
         }
 
-        private static void ShowMovePreview(SkillExecutor executor, Vector3 worldPosition)
+        private static void ShowMovePreview(AbilitySystemComponent executor, Vector3 worldPosition)
         {
             var preview = PathPreview.Instance;
             if (preview == null) return;
@@ -251,7 +251,7 @@ namespace MiniChess.Combat
             preview.Show(head, tail);
         }
 
-        private static bool TryBuildMovePath(SkillExecutor executor, Vector3 worldPosition,
+        private static bool TryBuildMovePath(AbilitySystemComponent executor, Vector3 worldPosition,
             out Vector3 destination, out NavMeshPath path)
         {
             destination = default;
@@ -294,7 +294,7 @@ namespace MiniChess.Combat
             return true;
         }
 
-        private static bool TryGetOrigin(SkillExecutor executor, out Vector3 origin)
+        private static bool TryGetOrigin(AbilitySystemComponent executor, out Vector3 origin)
         {
             var casterObject = executor.gameObject;
             if (casterObject != null && NavMesh.SamplePosition(casterObject.transform.position,

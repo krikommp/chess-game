@@ -6,8 +6,8 @@ namespace MiniChess.Combat.Skills
     {
         public GameObject Caster;
         public GameObject Target;
-        public SkillExecutor CasterExecutor;
-        public SkillExecutor TargetExecutor;
+        public AbilitySystemComponent CasterExecutor;
+        public AbilitySystemComponent TargetExecutor;
         public Vector3? TargetPosition;
     }
 }

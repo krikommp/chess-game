@@ -14,7 +14,7 @@ namespace MiniChess.Combat
     /// 4. Receive EndTurn and advance the queue
     ///
     /// No game logic (AP, skills, cooldowns, movement, AI, input, camera) lives here.
-    /// All game logic is executed through SkillExecutor.OnRoundStart() and handlers
+    /// All game logic is executed through AbilitySystemComponent.OnRoundStart() and handlers
     /// that subscribe to UnitTurnStarted.
     /// </summary>
     public class CombatRoundManager : MonoBehaviour

@@ -48,7 +48,18 @@
       "Bash(\"C:/Program Files/Unity/Hub/Editor/2022.3.62f3c1/Editor/Unity.exe\" -quit -batchmode -nographics -runTests -testPlatform EditMode -projectPath \".\" -testResults \"results.xml\")",
       "Bash(echo \"EXIT:$?\")",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npx skills *)"
+      "Bash(npx skills *)",
+      "Bash(git log *)",
+      "Bash(where msbuild *)",
+      "Bash(where dotnet *)",
+      "Read(//c/Program Files/Microsoft Visual Studio/2022/**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)",
+      "Bash(\"/c/Program Files/Unity/Editor/Unity.exe\" -quit -batchmode -nographics -projectPath \"D:/SandBox/MiniChess\")",
+      "Bash(echo \"EXIT_CODE:$?\")",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit: $?\")",
+      "WebSearch",
+      "Bash(git restore *)"
     ]
   }
 }

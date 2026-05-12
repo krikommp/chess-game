@@ -59,7 +59,7 @@ namespace MiniChess.Combat
 
             yield return new WaitForSeconds(m_turnStartDelay);
 
-            var executor = unit.GetComponent<SkillExecutor>();
+            var executor = unit.GetComponent<AbilitySystemComponent>();
 
             // Find target: nearest alive player
             var target = FindNearestEnemy(unit);

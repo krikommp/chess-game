@@ -42,7 +42,7 @@ namespace MiniChess.Combat
                 renderer.material.color = m_enemyColor;
             }
 
-            // Component stack: CombatUnit → AttributeSet → MovementController → SkillExecutor
+            // Component stack: CombatUnit → AttributeSet → MovementController → AbilitySystemComponent
             go.AddComponent<CombatUnit>();
             var tagComp = go.AddComponent<GameplayTagComponent>();
             tagComp.AddTag(new GameplayTags.GameplayTag("Control.AI"), "Auto-assigned by EnemySpawner");
@@ -58,7 +58,7 @@ namespace MiniChess.Combat
 
             go.AddComponent<MovementController>();
 
-            SkillExecutor skillExecutor = go.AddComponent<SkillExecutor>();
+            AbilitySystemComponent skillExecutor = go.AddComponent<AbilitySystemComponent>();
             skillExecutor.SetSkills(m_defaultSkills);
         }
     }

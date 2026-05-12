@@ -137,7 +137,7 @@ namespace MiniChess.Combat.Skills
                 Caster = context.Caster,
                 Target = target ?? context.Target,
                 CasterExecutor = context.CasterExecutor,
-                TargetExecutor = target != null ? target.GetComponent<SkillExecutor>() : null,
+                TargetExecutor = target != null ? target.GetComponent<AbilitySystemComponent>() : null,
                 TargetPosition = context.TargetPosition,
             };
         }

@@ -79,9 +79,9 @@ namespace MiniChess.EditorTools
             if (actor == null)
                 return 0;
 
-            var executor = actor.GetComponent<SkillExecutor>();
+            var executor = actor.GetComponent<AbilitySystemComponent>();
             if (executor == null)
-                executor = actor.AddComponent<SkillExecutor>();
+                executor = actor.AddComponent<AbilitySystemComponent>();
 
             var so = new SerializedObject(executor);
             var skillsProp = so.FindProperty("m_availableSkills");

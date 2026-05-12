@@ -6,7 +6,7 @@ namespace MiniChess.Combat.Skills
 {
     public struct SkillExecutionContext
     {
-        public SkillExecutor CasterExecutor;
+        public AbilitySystemComponent CasterExecutor;
         public SkillAbility Skill;
         public GameObject Target;
         public Vector3? TargetPosition;
@@ -18,7 +18,7 @@ namespace MiniChess.Combat.Skills
         public MovementController CasterMovement => CasterExecutor != null ? CasterExecutor.Movement : null;
 
         public static SkillExecutionContext ForTarget(
-            SkillExecutor casterExecutor,
+            AbilitySystemComponent casterExecutor,
             SkillAbility skill,
             GameObject target)
         {
@@ -31,7 +31,7 @@ namespace MiniChess.Combat.Skills
         }
 
         public static SkillExecutionContext ForGroundPoint(
-            SkillExecutor casterExecutor,
+            AbilitySystemComponent casterExecutor,
             SkillAbility skill,
             Vector3 groundPosition,
             NavMeshPath path)
@@ -46,7 +46,7 @@ namespace MiniChess.Combat.Skills
         }
 
         public static SkillExecutionContext ForInput(
-            SkillExecutor casterExecutor,
+            AbilitySystemComponent casterExecutor,
             SkillAbility skill,
             SkillInputRequest inputRequest)
         {

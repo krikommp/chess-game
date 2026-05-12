@@ -83,7 +83,7 @@ namespace MiniChess.Combat
             var attr = unit.GetComponent<AttributeSet>();
             if (attr == null || !attr.IsAlive) return;
 
-            var executor = unit.GetComponent<SkillExecutor>();
+            var executor = unit.GetComponent<AbilitySystemComponent>();
             if (executor == null) return;
 
             // System skills are self-targeted

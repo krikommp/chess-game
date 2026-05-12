@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
-    public class SkillExecutor : MonoBehaviour
+    public class AbilitySystemComponent : MonoBehaviour
     {
         [Header("Skills")]
         [SerializeField] private SkillAbility[] m_availableSkills;
@@ -15,7 +15,7 @@ namespace MiniChess.Combat.Skills
         private MovementController m_movement;
         private GameplayTagComponent m_tagComp;
         private readonly Dictionary<string, int> m_cooldowns = new Dictionary<string, int>();
-        private readonly List<ActiveEffect> m_activeEffects = new List<ActiveEffect>();
+        private readonly List<ActiveSkillEffect> m_activeEffects = new List<ActiveSkillEffect>();
         private readonly List<SkillAbility> m_grantedSkills = new List<SkillAbility>();
         private SkillAbility m_activeSkill;
 
@@ -33,7 +33,7 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        public IReadOnlyList<ActiveEffect> ActiveEffects => m_activeEffects;
+        public IReadOnlyList<ActiveSkillEffect> ActiveEffects => m_activeEffects;
         public SkillAbility ActiveSkill => m_activeSkill;
         public MovementController Movement => m_movement;
 
@@ -129,9 +129,9 @@ namespace MiniChess.Combat.Skills
             if (targetAttr != null && !targetAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target is dead.");
 
-            if (context.Target.GetComponent<SkillExecutor>() == null)
+            if (context.Target.GetComponent<AbilitySystemComponent>() == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetCapabilityBlocked,
-                    "Target has no SkillExecutor and cannot be affected by skills.");
+                    "Target has no AbilitySystemComponent and cannot be affected by skills.");
 
             return SkillCastResult.Success();
         }
@@ -214,7 +214,7 @@ namespace MiniChess.Combat.Skills
             {
                 Caster = source ?? gameObject,
                 Target = gameObject,
-                CasterExecutor = source != null ? source.GetComponent<SkillExecutor>() : null,
+                CasterExecutor = source != null ? source.GetComponent<AbilitySystemComponent>() : null,
                 TargetExecutor = this,
             };
 
@@ -222,7 +222,7 @@ namespace MiniChess.Combat.Skills
 
             if (!effect.IsPersistent) return;
 
-            var active = new ActiveEffect(effect, source, effect.DurationRounds);
+            var active = new ActiveSkillEffect(effect, source, effect.DurationRounds);
             m_activeEffects.Add(active);
 
             // Apply granted tags
@@ -269,7 +269,7 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        internal void RemoveActiveEffect(ActiveEffect active)
+        internal void RemoveActiveEffect(ActiveSkillEffect active)
         {
             var effect = active.Definition;
             if (effect == null) return;
@@ -309,7 +309,7 @@ namespace MiniChess.Combat.Skills
             {
                 Caster = active.Source,
                 Target = gameObject,
-                CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
+                CasterExecutor = active.Source != null ? active.Source.GetComponent<AbilitySystemComponent>() : null,
                 TargetExecutor = this,
             };
             effect.Apply(ctx, SkillEffectResult.Success());
@@ -331,7 +331,7 @@ namespace MiniChess.Combat.Skills
                     {
                         Caster = active.Source,
                         Target = gameObject,
-                        CasterExecutor = active.Source != null ? active.Source.GetComponent<SkillExecutor>() : null,
+                        CasterExecutor = active.Source != null ? active.Source.GetComponent<AbilitySystemComponent>() : null,
                         TargetExecutor = this,
                     };
                     active.Definition.Apply(tickCtx, SkillEffectResult.Success());
@@ -404,13 +404,13 @@ namespace MiniChess.Combat.Skills
             if (tagComp != null)
             {
                 foreach (var tag in tagComp.TagSet.Tags)
-                    tags.Add(tag, "SkillExecutor.CollectTags");
+                    tags.Add(tag, "AbilitySystemComponent.CollectTags");
             }
 
             return tags;
         }
 
-        private ActiveEffect FindActiveEffect(SkillEffect def)
+        private ActiveSkillEffect FindActiveEffect(SkillEffect def)
         {
             for (int i = 0; i < m_activeEffects.Count; i++)
                 if (m_activeEffects[i].Definition == def)
@@ -432,13 +432,13 @@ namespace MiniChess.Combat.Skills
     }
 
     [System.Serializable]
-    public class ActiveEffect
+    public class ActiveSkillEffect
     {
         public SkillEffect Definition;
         public GameObject Source;
         public int RemainingRounds;
 
-        public ActiveEffect(SkillEffect def, GameObject source, int remainingRounds)
+        public ActiveSkillEffect(SkillEffect def, GameObject source, int remainingRounds)
         {
             Definition = def;
             Source = source;
