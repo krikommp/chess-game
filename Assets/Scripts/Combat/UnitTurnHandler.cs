@@ -28,6 +28,32 @@ namespace MiniChess.Combat
             if (m_cameraController == null) m_cameraController = FindObjectOfType<CameraController>();
         }
 
+        private void Start()
+        {
+            if (NavMeshService.Instance == null)
+            {
+                var go = new GameObject("[NavMeshService]");
+                go.AddComponent<NavMeshService>();
+            }
+
+            if (m_roundManager == null)
+            {
+                // Bypass round controller: auto-select first human-controlled unit
+                foreach (var cu in FindObjectsOfType<CombatUnit>())
+                {
+                    if (!cu.gameObject.activeInHierarchy) continue;
+                    var tagComp = cu.GetComponent<GameplayTagComponent>();
+                    if (tagComp == null) continue;
+                    if (!tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact)) continue;
+                    var attr = cu.GetComponent<AttributeSet>();
+                    if (attr == null || !attr.IsAlive) continue;
+
+                    SelectUnit(cu.gameObject);
+                    break;
+                }
+            }
+        }
+
         private void OnEnable()
         {
             if (m_roundManager != null)
@@ -46,7 +72,10 @@ namespace MiniChess.Combat
 
         private void Update()
         {
-            if (m_roundManager == null || m_selectedUnit == null || m_roundManager.IsWaiting) return;
+            if (m_selectedUnit == null) return;
+            if (m_roundManager == null) return;
+
+            if (m_roundManager.IsWaiting) return;
             if (m_roundManager.HasEndedRound(m_selectedUnit)) return;
 
             if (Input.GetKeyDown(m_endTurnKey))
@@ -75,9 +104,20 @@ namespace MiniChess.Combat
         private bool TrySelectUnit(GameObject unit)
         {
             if (unit == null) return false;
-            if (m_roundManager == null) return false;
-            if (!m_roundManager.ControllableUnits.Contains(unit)) return false;
-            if (m_roundManager.HasEndedRound(unit)) return false;
+
+            if (m_roundManager != null)
+            {
+                if (!m_roundManager.ControllableUnits.Contains(unit)) return false;
+                if (m_roundManager.HasEndedRound(unit)) return false;
+            }
+            else
+            {
+                var tagComp = unit.GetComponent<GameplayTagComponent>();
+                if (tagComp == null || !tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                    return false;
+                var attr = unit.GetComponent<AttributeSet>();
+                if (attr == null || !attr.IsAlive) return false;
+            }
 
             SelectUnit(unit);
             return true;
@@ -89,8 +129,7 @@ namespace MiniChess.Combat
             if (m_selectedUnit != null && m_selectedUnit != unit)
             {
                 var prevPlayer = m_selectedUnit.GetComponent<Player1Controller>();
-                if (prevPlayer != null)
-                    prevPlayer.SetVisualState(EPlayerVisualState.Default);
+                prevPlayer?.SetVisualState(EPlayerVisualState.Default);
             }
 
             m_selectedUnit = unit;
@@ -101,8 +140,7 @@ namespace MiniChess.Combat
 
             // Visual (via Player1Controller for now; TODO: UnitVisualController)
             var player = unit.GetComponent<Player1Controller>();
-            if (player != null)
-                player.SetVisualState(EPlayerVisualState.Selected);
+            player?.SetVisualState(EPlayerVisualState.Selected);
 
             // Activate basic_move
             var executor = unit.GetComponent<SkillExecutor>();
@@ -115,8 +153,12 @@ namespace MiniChess.Combat
 
         private void OnInputReceived(SkillInputRequest request)
         {
-            if (m_roundManager == null || m_roundManager.IsWaiting) return;
-            if (m_selectedUnit == null || m_roundManager.HasEndedRound(m_selectedUnit)) return;
+            if (m_selectedUnit == null) return;
+            if (m_roundManager != null)
+            {
+                if (m_roundManager.IsWaiting) return;
+                if (m_roundManager.HasEndedRound(m_selectedUnit)) return;
+            }
 
             // Number key / click to switch unit
             if (request.IsSignal(SkillInputTag.k_PrimaryPressed)

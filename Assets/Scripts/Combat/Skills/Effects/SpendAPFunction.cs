@@ -1,5 +1,6 @@
 using MiniChess.Combat;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace MiniChess.Combat.Skills
 {
@@ -14,9 +15,34 @@ namespace MiniChess.Combat.Skills
             if (casterAttr == null)
                 return EffectResult.Fail(ESkillCastFailure.CasterDead, "Caster has no AttributeSet.");
 
-            float amount = effect.Amount > 0f ? effect.Amount : 1f;
-            float currentAP = casterAttr.Get(WellKnownAttributeTags.AP);
+            float amount;
 
+            if (context.TargetPosition.HasValue)
+            {
+                // GroundPoint: compute AP cost from NavMesh path
+                var casterPos = context.Caster.transform.position;
+                var nav = NavMeshService.Instance;
+                if (nav != null && nav.CalculatePath(casterPos, context.TargetPosition.Value, out var path))
+                {
+                    float pathLength = NavMeshService.PathLength(path.corners);
+                    float speed = casterAttr.Get(WellKnownAttributeTags.MoveSpeed);
+                    int currentAP = Mathf.FloorToInt(casterAttr.Get(WellKnownAttributeTags.AP));
+                    amount = NavMeshService.EstimateMoveApCost(pathLength, speed, currentAP);
+                }
+                else
+                {
+                    amount = effect.Amount > 0f ? effect.Amount : 1f;
+                }
+            }
+            else
+            {
+                amount = effect.Amount > 0f ? effect.Amount : 1f;
+            }
+
+            if (amount <= 0f)
+                return EffectResult.Success(0f);
+
+            float currentAP = casterAttr.Get(WellKnownAttributeTags.AP);
             if (currentAP < amount)
                 return EffectResult.Fail(ESkillCastFailure.InsufficientAp,
                     $"Need {amount} AP, have {currentAP}.");
@@ -30,7 +56,7 @@ namespace MiniChess.Combat.Skills
             if (casterAttr == null) return;
 
             float amount = computed.ComputedValue > 0f ? computed.ComputedValue : effect.Amount;
-            if (amount <= 0f) amount = 1f;
+            if (amount <= 0f) return;
 
             casterAttr.TrySpend(WellKnownAttributeTags.AP, amount);
         }
