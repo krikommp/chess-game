@@ -1,6 +1,20 @@
 # 17 - Effect 系统设计
 
-> 2026-05-12 讨论中。Effect 系统的重构设计，尚未实现。
+> 2026-05-12 讨论 + 实施。已完成 4 阶段提交。
+
+## 实施状态
+
+**已实施** (4 commits on `refactor/combat-round-enemy-ai`):
+- `d7641ea` — Function SO 替代枚举 + 类型重命名 + 字段精简 (22→12)
+- `89b76bf` — SkillExecutor → AbilitySystemComponent 重命名
+- `d4be821` — Tag 驱动冷却 + AttributeSet 触发器 + 被动 Ability 系统
+- `66c975f` — 删除旧资产，Editor 脚本更新
+
+**已知问题**:
+- `Assets/Data/EffectFunctions/` 资产需通过 Unity Editor 菜单 `MiniChess/Create Basic Attack Assets` 创建
+- ASC 组件 GUID 变更，场景中需重新挂载 `AbilitySystemComponent`
+- `GameplayTagSet.Add/Remove` 改为返回 bool（影响调用方）
+- `AdvanceCooldownsFunction.Apply` 现为空操作（冷却由 ActiveSkillEffect 生命周期管理）
 
 ## 当前状态
 
