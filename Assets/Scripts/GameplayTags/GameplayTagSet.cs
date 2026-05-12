@@ -47,12 +47,14 @@ namespace MiniChess.GameplayTags
 
         // ── Mutate ─────────────────────────────────────────────
 
-        public void Add(GameplayTag tag, object source = null)
+        public bool Add(GameplayTag tag, object source = null)
         {
             if (!GameplayTag.IsValid(tag.Value))
                 throw new ArgumentException($"Cannot add invalid tag to GameplayTagSet: '{tag.Value}'");
 
-            source ??= ETagSourceType.Debug; // default source if none provided
+            source ??= ETagSourceType.Debug;
+
+            bool isNew = !m_entries.ContainsKey(tag);
 
             if (!m_entries.TryGetValue(tag, out var sources))
             {
@@ -60,23 +62,28 @@ namespace MiniChess.GameplayTags
                 m_entries[tag] = sources;
             }
             sources.Add(source);
+            return isNew;
         }
 
-        public void Remove(GameplayTag tag, object source = null)
+        public bool Remove(GameplayTag tag, object source = null)
         {
-            if (!m_entries.TryGetValue(tag, out var sources)) return;
+            if (!m_entries.TryGetValue(tag, out var sources)) return false;
 
             if (source != null)
             {
                 sources.Remove(source);
                 if (sources.Count == 0)
+                {
                     m_entries.Remove(tag);
+                    return true;
+                }
             }
             else
             {
-                // Remove all sources for this tag
                 m_entries.Remove(tag);
+                return true;
             }
+            return false;
         }
 
         /// <summary>

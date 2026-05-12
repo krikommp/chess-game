@@ -5,6 +5,20 @@ using UnityEngine;
 
 namespace MiniChess.Combat
 {
+    public enum ETriggerCondition { LessOrEqual, LessThan }
+
+    [System.Serializable]
+    public struct AttributeTriggerRule
+    {
+        [Tooltip("Attribute to watch (e.g. Attribute.HP).")]
+        public GameplayTag Attribute;
+        [Tooltip("When does this trigger?")]
+        public ETriggerCondition Condition;
+        [Tooltip("Threshold value to compare against.")]
+        public float Threshold;
+        [Tooltip("Tags to add when triggered.")]
+        public GameplayTag[] AddTags;
+    }
     /// <summary>
     /// Runtime attribute container. Owns current values keyed by GameplayTag, initialized from an
     /// AttributeSetDef ScriptableObject. Skills read/write attributes through this component rather
@@ -15,6 +29,10 @@ namespace MiniChess.Combat
         [Header("Definition")]
         [Tooltip("Template asset defining attribute tags and base/max values. If null, values must be set programmatically.")]
         [SerializeField] private AttributeSetDef m_definition;
+
+        [Header("Triggers")]
+        [Tooltip("Rules that add tags when attribute thresholds are met (e.g. HP <= 0 → Status.Dead).")]
+        [SerializeField] private AttributeTriggerRule[] m_triggerRules;
 
         [Header("Identity")]
         [SerializeField] private string m_displayName;
@@ -106,6 +124,7 @@ namespace MiniChess.Combat
                 AttributeChanged?.Invoke(tag, prev, clamped);
                 if (clamped <= 0f && prev > 0f)
                     AttributeDepleted?.Invoke(tag);
+                CheckTriggerRules(tag, clamped);
             }
         }
 
@@ -138,6 +157,7 @@ namespace MiniChess.Combat
                 AttributeChanged?.Invoke(tag, current, result);
                 if (result <= 0f && current > 0f)
                     AttributeDepleted?.Invoke(tag);
+                CheckTriggerRules(tag, result);
             }
 
             return result;
@@ -150,6 +170,35 @@ namespace MiniChess.Combat
             if (Get(tag) < amount) return false;
             Set(tag, Get(tag) - amount);
             return true;
+        }
+
+        private void CheckTriggerRules(GameplayTag tag, float currentValue)
+        {
+            if (m_triggerRules == null || m_triggerRules.Length == 0) return;
+
+            var tagComp = GetComponent<GameplayTagComponent>();
+            if (tagComp == null) return;
+
+            for (int i = 0; i < m_triggerRules.Length; i++)
+            {
+                var rule = m_triggerRules[i];
+                if (rule.Attribute != tag) continue;
+                if (rule.AddTags == null || rule.AddTags.Length == 0) continue;
+
+                bool triggered = rule.Condition switch
+                {
+                    ETriggerCondition.LessOrEqual => currentValue <= rule.Threshold,
+                    ETriggerCondition.LessThan => currentValue < rule.Threshold,
+                    _ => false
+                };
+
+                if (triggered)
+                {
+                    for (int j = 0; j < rule.AddTags.Length; j++)
+                        if (!string.IsNullOrEmpty(rule.AddTags[j].Value) && !tagComp.HasTag(rule.AddTags[j], ETagMatchMode.Exact))
+                            tagComp.AddTag(rule.AddTags[j], "AttributeSet.Trigger");
+                }
+            }
         }
 
         // ── Helpers ─────────────────────────────────────────────────

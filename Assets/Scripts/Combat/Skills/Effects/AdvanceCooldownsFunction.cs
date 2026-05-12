@@ -12,7 +12,8 @@ namespace MiniChess.Combat.Skills
 
         public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
-            context.Target?.GetComponent<AbilitySystemComponent>()?.AdvanceCooldowns();
+            // Cooldowns are now managed as persistent SkillEffects with DurationRounds.
+            // Expiry is handled by DecrementStatusDurationFunction / ASC.OnRoundStart.
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace MiniChess.GameplayTags
 {
@@ -12,6 +13,9 @@ namespace MiniChess.GameplayTags
 
         public GameplayTagSet TagSet { get; private set; } = new GameplayTagSet();
 
+        public event Action<GameplayTag> OnTagAdded;
+        public event Action<GameplayTag> OnTagRemoved;
+
         private void Awake()
         {
             foreach (var tag in m_initialTags)
@@ -23,7 +27,6 @@ namespace MiniChess.GameplayTags
             }
         }
 
-        // Convenience shortcuts so callers don't need to reach into TagSet directly
         public bool HasTag(GameplayTag tag, ETagMatchMode mode = ETagMatchMode.Exact) =>
             TagSet.Has(tag, mode);
 
@@ -33,11 +36,19 @@ namespace MiniChess.GameplayTags
         public bool HasAllTags(GameplayTag[] tags, ETagMatchMode mode = ETagMatchMode.Exact) =>
             TagSet.HasAll(tags, mode);
 
-        public void AddTag(GameplayTag tag, object source = null) =>
-            TagSet.Add(tag, source ?? ETagSourceType.Debug);
+        public void AddTag(GameplayTag tag, object source = null)
+        {
+            bool added = TagSet.Add(tag, source ?? ETagSourceType.Debug);
+            if (added)
+                OnTagAdded?.Invoke(tag);
+        }
 
-        public void RemoveTag(GameplayTag tag, object source = null) =>
-            TagSet.Remove(tag, source);
+        public void RemoveTag(GameplayTag tag, object source = null)
+        {
+            bool removed = TagSet.Remove(tag, source);
+            if (removed)
+                OnTagRemoved?.Invoke(tag);
+        }
 
         public void RemoveAllTagsFromSource(object source) =>
             TagSet.RemoveAllFromSource(source);

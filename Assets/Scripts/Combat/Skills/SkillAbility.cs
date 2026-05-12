@@ -95,11 +95,26 @@ namespace MiniChess.Combat.Skills
             var results = new SkillEffectResult[m_cooldowns.Length];
             for (int i = 0; i < m_cooldowns.Length; i++)
             {
-                if (m_cooldowns[i] == null) continue;
-                var ctx = BuildEffectContext(context, context.Target);
-                results[i] = m_cooldowns[i].Compute(ctx);
-                if (!results[i].IsSuccess)
-                    return results;
+                var cd = m_cooldowns[i];
+                if (cd == null) continue;
+
+                // Check if caster already has any GrantedTag from this cooldown effect
+                var casterTagComp = context.Caster?.GetComponent<MiniChess.GameplayTags.GameplayTagComponent>();
+                if (casterTagComp != null)
+                {
+                    var grantedTags = cd.GrantedTags;
+                    for (int j = 0; j < grantedTags.Length; j++)
+                    {
+                        if (string.IsNullOrEmpty(grantedTags[j].Value)) continue;
+                        if (casterTagComp.HasTag(grantedTags[j], MiniChess.GameplayTags.ETagMatchMode.Exact))
+                        {
+                            results[i] = SkillEffectResult.Fail(ESkillCastFailure.OnCooldown,
+                                $"Skill is on cooldown (tag: {grantedTags[j].Value})");
+                            return results;
+                        }
+                    }
+                }
+                results[i] = SkillEffectResult.Success();
             }
             return results;
         }
@@ -107,13 +122,16 @@ namespace MiniChess.Combat.Skills
         protected void ApplyCooldowns(SkillExecutionContext context, SkillEffectResult[] results)
         {
             if (m_cooldowns == null || results == null) return;
+            var asc = context.CasterExecutor;
+            if (asc == null) return;
+
             int count = System.Math.Min(m_cooldowns.Length, results.Length);
             for (int i = 0; i < count; i++)
             {
                 if (m_cooldowns[i] == null) continue;
                 if (!results[i].IsSuccess) continue;
-                var ctx = BuildEffectContext(context, context.Target);
-                m_cooldowns[i].Apply(ctx, results[i]);
+                // Add as persistent effect on caster — this grants Cooldown tags + auto-expires via DurationRounds
+                asc.ApplyEffect(m_cooldowns[i], context.Caster);
             }
         }
 
