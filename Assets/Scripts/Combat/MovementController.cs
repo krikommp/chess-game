@@ -5,20 +5,24 @@ using UnityEngine.AI;
 namespace MiniChess.Combat
 {
     /// <summary>
-    /// Unified NavMeshAgent movement wrapper. Extracted from the duplicated movement logic
-    /// that was in EnemyController and Player1Controller.
+    /// Unified NavMeshAgent movement wrapper. Handles movement execution and budget tracking.
     /// Requires NavMeshAgent (for pathfinding) and AttributeSet (for AP / MoveSpeed).
+    ///
+    /// TODO(IS-0004): AP deduction is still here for MVP. The design target is to move AP deduction
+    /// to the Ability's Costs slot (SpendAPFunction), but incremental movement AP accounting is
+    /// mechanically coupled to the NavMeshAgent update loop. A future MovementBudget component or
+    /// event-based AP deduction should replace this.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent), typeof(AttributeSet))]
     public class MovementController : MonoBehaviour
     {
         [Header("Movement")]
-        [Tooltip("Animation/agent speed in meters per second. Independent from AP-based movement budget.")]
+        [Tooltip("Animation/agent speed in meters per second.")]
         [SerializeField, Min(0.1f)] private float m_agentSpeed = 3.5f;
 
         public event Action MovementStarted;
         public event Action MovementStopped;
-        public event Action ApDeducted; // fired each time AP is deducted during movement
+        public event Action ApDeducted;
 
         private NavMeshAgent m_agent;
         private AttributeSet m_attributes;
@@ -94,18 +98,6 @@ namespace MiniChess.Combat
             m_isMoving = false;
             if (wasMoving)
                 MovementStopped?.Invoke();
-        }
-
-        public int PreviewMovementApCost(float pathLength)
-        {
-            if (pathLength <= 0f) return 0;
-
-            float speed = m_attributes.Get(WellKnownAttributeTags.MoveSpeed);
-            if (speed <= 0f) return 0;
-
-            float projectedDistance = m_unpaidMoveDistance + pathLength;
-            int cost = Mathf.FloorToInt((projectedDistance + 0.0001f) / speed);
-            return Mathf.Clamp(cost, 0, (int)m_attributes.Get(WellKnownAttributeTags.AP));
         }
 
         // ── Internals ───────────────────────────────────────────────

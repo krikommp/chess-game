@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using MiniChess.Combat.Skills;
 using UnityEngine;
 using UnityEngine.AI;
@@ -9,7 +7,7 @@ namespace MiniChess.Combat
 {
     /// <summary>
     /// Handles enemy AI turns. Subscribes to CombatRoundManager.UnitTurnStarted,
-    /// filters for Faction.Enemy, and runs move + attack decision loop.
+    /// filters for Control.AI units, and runs move + attack decision loop.
     /// </summary>
     public class EnemyTurnRunner : MonoBehaviour
     {
@@ -24,8 +22,6 @@ namespace MiniChess.Combat
 
         [Header("Movement")]
         [SerializeField, Min(0.05f)] private float m_navMeshSnapRadius = 2f;
-        [SerializeField, Min(0.1f)] private float m_approachRange = 1.5f;
-        [SerializeField, Min(0.1f)] private float m_occupiedRadius = 1.0f;
         [SerializeField, Range(4, 24)] private int m_occupancyProbeCount = 12;
         [SerializeField, Min(0.1f)] private float m_movementTimeoutSeconds = 8f;
 
@@ -45,8 +41,11 @@ namespace MiniChess.Combat
         {
             if (unit == null) return;
 
-            var attr = unit.GetComponent<AttributeSet>();
-            if (attr == null || attr.Faction != EFaction.Enemy) return;
+            // Check Control.AI tag instead of EnemyController component
+            var tagComp = unit.GetComponent<GameplayTags.GameplayTagComponent>();
+            if (tagComp == null || !tagComp.HasTag(new GameplayTags.GameplayTag("Control.AI"),
+                    GameplayTags.ETagMatchMode.Exact))
+                return;
 
             StartCoroutine(RunAITurn(unit));
         }
@@ -55,18 +54,16 @@ namespace MiniChess.Combat
         {
             m_roundManager.IsWaiting = true;
 
-            // Camera focus
             if (m_cameraController != null)
                 m_cameraController.FocusOn(unit.transform);
 
-            // Flash enemy turn indicator
+            // Flash turn indicator via EnemyController (TODO: UnitVisualController)
             var controller = unit.GetComponent<EnemyController>();
             controller?.FlashTurn();
 
             yield return new WaitForSeconds(m_turnStartDelay);
 
             var executor = unit.GetComponent<SkillExecutor>();
-            var attr = unit.GetComponent<AttributeSet>();
 
             // Find target: nearest alive player
             var target = FindNearestEnemy(unit);
@@ -145,8 +142,7 @@ namespace MiniChess.Combat
                 yield break;
 
             float pathLength = PathCostCalculator.PathLength(movePath.corners);
-            int moveCost = moveExec.PreviewMovementApCost(pathLength);
-            if (moveCost > currentAP) yield break;
+            if (pathLength > moveExec.RemainingMoveDistance) yield break;
 
             moveExec.TryMove(movePath);
 

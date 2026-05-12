@@ -7,13 +7,18 @@ public static class CreateBasicAttackAssets
     [MenuItem("MiniChess/Create Basic Attack Assets")]
     public static void Create()
     {
-        // 1. Create DamageEffect
-        var damageFx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        // 1. Create DamageEffect (sealed EffectDefinition with ModifyAttribute function)
+        var damageFx = ScriptableObject.CreateInstance<EffectDefinition>();
         damageFx.name = "basic_attack_damage";
 
         var fxSo = new SerializedObject(damageFx);
-        fxSo.FindProperty("m_amount").intValue = 20;
-        // Add tag
+        fxSo.FindProperty("m_function").enumValueIndex = (int)EEffectFunction.ModifyAttribute;
+        fxSo.FindProperty("m_amount").floatValue = 20f;
+        // Attribute tag: HP
+        var attrTagProp = fxSo.FindProperty("m_attributeTag");
+        attrTagProp.FindPropertyRelative("m_value").stringValue = "Attribute.HP";
+        attrTagProp.FindPropertyRelative("m_id").intValue = MiniChess.GameplayTags.GameplayTag.ComputeTagHash("Attribute.HP");
+        // Add identity tag
         var tagsProp = fxSo.FindProperty("m_tags");
         tagsProp.arraySize = 1;
         var tag0 = tagsProp.GetArrayElementAtIndex(0);
@@ -32,8 +37,6 @@ public static class CreateBasicAttackAssets
         skillSo.FindProperty("m_id").stringValue = "basic_attack";
         skillSo.FindProperty("m_displayName").stringValue = "Basic Attack";
         skillSo.FindProperty("m_description").stringValue = "A basic melee attack.";
-        skillSo.FindProperty("m_apCost").intValue = 1;
-        skillSo.FindProperty("m_cooldown").intValue = 0;
         skillSo.FindProperty("m_range").floatValue = 1.5f;
         skillSo.FindProperty("m_targetType").enumValueIndex = (int)ESkillTargetType.SingleEnemy;
         skillSo.FindProperty("m_aiBaseWeight").floatValue = 10f;
@@ -61,6 +64,6 @@ public static class CreateBasicAttackAssets
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log("[MiniChess] Created basic_attack_damage.asset and basic_attack.asset");
+        Debug.Log("[MiniChess] Created basic_attack_damage.asset and basic_attack.asset (EffectDefinition + SkillDefinition)");
     }
 }

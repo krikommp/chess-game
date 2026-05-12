@@ -103,13 +103,7 @@ namespace MiniChess.Combat
             BuildTurnOrder(units);
             m_hasEndedRound.Clear();
 
-            // Tick all units' SkillExecutor timers
-            foreach (var go in m_turnOrder)
-            {
-                if (go == null || !IsAlive(go)) continue;
-                go.GetComponent<SkillExecutor>()?.OnRoundStart();
-            }
-
+            // RoundStarted event → RoundPhaseManager executes sys_round_start on each unit
             RoundStarted?.Invoke(RoundCount);
 
             RefreshControllableBlock();

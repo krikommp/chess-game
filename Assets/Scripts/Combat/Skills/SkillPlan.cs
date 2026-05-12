@@ -26,7 +26,7 @@ namespace MiniChess.Combat.Skills
         /// <summary>Estimated AP cost of the movement portion.</summary>
         public int MoveApCost;
 
-        /// <summary>AP cost of the primary skill (= PrimarySkill.ApCost).</summary>
+        /// <summary>AP cost of the primary skill (read from Ability.Costs).</summary>
         public int PrimaryApCost;
 
         /// <summary>MoveApCost + PrimaryApCost.</summary>

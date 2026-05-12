@@ -465,3 +465,38 @@ RequiredTags/BlockedTags 当前在 `SkillDefinition` 层（`RequiredCasterTags`/
 ### Q-0037 已合并到 Q-0035 决议
 ### Q-0038 已合并到 Q-0035 决议
 ### Q-0039 已合并到 Q-0035 决议
+
+### Q-0040 EffectFunction 参数结构是否统一
+- 来源：2026-05-12 技能框架重写
+- 问题：当前 EffectDefinition 把所有可能的参数（m_amount, m_attributeTag, m_restoreMode, m_cooldownSkillId, m_cooldownRounds 等）平坦放在一个类里。是继续平坦化，还是引入 EffectParameterSet / 每个函数独立的参数 SO？
+- 当前临时假设：**继续平坦化**。字段少时平坦化最直观；Unity 序列化对此友好。当参数超过 15 个或出现互斥参数组时再考虑参数集重构。
+- 决议：(空)
+- 影响：`EffectDefinition.cs`、`EffectFunctionDispatcher.cs`、所有 EffectFunction 实现
+
+### Q-0041 MovementController AP 扣除何时迁移到 Ability 事件模式
+- 来源：2026-05-12 技能框架重写
+- 问题：当前 MovementController.AccountMovementDistance 仍保留增量 AP 扣除逻辑（标记 TODO）。设计目标是 AP 扣除由 Ability.Costs（SpendAPFunction）完成，但增量移动 AP 与 NavMeshAgent Update 循环耦合。是否需要引入 MovementBudget 组件或事件驱动的 AP 扣除？
+- 当前临时假设：**保留现状**。MovementController 继续在 Update 中扣除 AP。后续引入 MovementBudget 组件（监听 MovementController 的 ApDeducted 事件），MovementController 变为纯移动工具。
+- 决议：(空)
+- 影响：`MovementController.cs`、未来 `MovementBudget.cs`
+
+### Q-0042 EffectFunction stub 何时实现
+- 来源：2026-05-12 技能框架重写
+- 问题：当前只完整实现了移动技能需要的 EffectFunction（SpendAP, RestoreAttribute, ResetMovement, AdvanceCooldowns, SetCooldown）。ModifyAttribute 是带 capability check 的 stub；AddStatus、ForcedMove、PullTarget、TeleportTarget 是纯 log stub。这些 stub 何时实现完整行为？
+- 当前临时假设：**按需实现**。下一批需要 basic_attack / minor_heal 时完成 ModifyAttribute；需要 guarding_shout 时完成 AddStatus。强制位移函数（ForcedMove 等）最晚实现。
+- 决议：(空)
+- 影响：`Effects/AttributeEffectFunctions.cs`、`Effects/StatusEffectFunctions.cs`、`Effects/MovementEffectFunctions.cs`、`Effects/SystemEffectFunctions.cs`
+
+### Q-0043 系统技能资产如何创建
+- 来源：2026-05-12 技能框架重写
+- 问题：RoundPhaseManager 需要 sys_round_start、sys_turn_end、sys_on_death 三个系统技能资产（包含 RestoreAttribute、ResetMovement、AdvanceCooldowns 等 Effect）。这些资产是通过 Unity Editor 手动创建，还是通过代码脚本自动生成？
+- 当前临时假设：**通过 Unity Editor 手动创建**。使用 Unity Skills REST API（`localhost:8765`）或 Editor 菜单批量创建。RoundPhaseManager 在技能资产为空时会输出 Warning。
+- 决议：(空)
+- 影响：`Assets/Data/Skills/sys_*.asset`、`Assets/Data/Effects/eff_sys_*.asset`、`RoundPhaseManager.cs`
+
+### Q-0044 新 Scripts/*.cs 文件的 .meta 何时生成
+- 来源：2026-05-12 技能框架重写
+- 问题：本次重写新增了 ~14 个 .cs 文件（Effects/, Abilities/, Systems/, E*.cs），它们还没有对应的 .meta 文件。Unity 需要打开项目并完成编译才能自动生成。是否需要在当前会话中触发 Unity 编译？
+- 当前临时假设：**等用户下次打开 Unity 时自动生成**。.meta 文件不影响代码逻辑；Unity 打开项目时会自动为新 .cs 文件生成 MonoImporter GUID。
+- 决议：(空)
+- 影响：所有新增 .cs 文件的 .meta

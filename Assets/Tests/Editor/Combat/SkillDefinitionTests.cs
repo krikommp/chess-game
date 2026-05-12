@@ -1,4 +1,4 @@
-﻿using MiniChess.Combat.Skills;
+using MiniChess.Combat.Skills;
 using MiniChess.GameplayTags;
 using NUnit.Framework;
 using UnityEditor;
@@ -7,8 +7,6 @@ using UnityEngine;
 [TestFixture]
 public class SkillDefinitionTests
 {
-    // ── ESkillTargetType ────────────────────────────────────────
-
     [Test]
     public void TargetType_HasAllValues()
     {
@@ -19,12 +17,14 @@ public class SkillDefinitionTests
         Assert.AreEqual(4, (int)ESkillTargetType.Area);
     }
 
-    // ── EffectDefinition ───────────────────────────────────────
+    // ── EffectDefinition (sealed, data-only) ──────────────────────
 
     [Test]
-    public void EffectDefinition_DefaultTags_Empty()
+    public void EffectDefinition_Defaults()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
+        Assert.AreEqual(EEffectFunction.SpendAP, fx.Function); // first enum value
+        Assert.AreEqual(EEffectDuration.Instant, fx.Duration);
         Assert.AreEqual(0, fx.Tags.Length);
         Assert.IsFalse(fx.HasAnyTag());
         Object.DestroyImmediate(fx);
@@ -33,7 +33,7 @@ public class SkillDefinitionTests
     [Test]
     public void EffectDefinition_HasAnyTag_TrueWhenTagPresent()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
         SetTagsOnEffect(fx, "Effect.Damage.Physical");
         Assert.IsTrue(fx.HasAnyTag());
         Object.DestroyImmediate(fx);
@@ -42,55 +42,24 @@ public class SkillDefinitionTests
     [Test]
     public void EffectDefinition_HasAnyTag_FalseWhenTagsInvalid()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
         SetTagsOnEffect(fx, "");
         Assert.IsFalse(fx.HasAnyTag());
         Object.DestroyImmediate(fx);
     }
 
-    // ── DamageEffectDefinition ─────────────────────────────────
-
     [Test]
-    public void DamageEffect_DefaultAmount_Is20()
+    public void EffectDefinition_SetFunction()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
-        Assert.AreEqual(20, fx.Amount);
-        Object.DestroyImmediate(fx);
-    }
-
-    [Test]
-    public void DamageEffect_SetAmount()
-    {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
         var so = new SerializedObject(fx);
-        so.FindProperty("m_amount").intValue = 50;
+        so.FindProperty("m_function").enumValueIndex = (int)EEffectFunction.ModifyAttribute;
         so.ApplyModifiedProperties();
-        Assert.AreEqual(50, fx.Amount);
+        Assert.AreEqual(EEffectFunction.ModifyAttribute, fx.Function);
         Object.DestroyImmediate(fx);
     }
 
-    // ── HealEffectDefinition ───────────────────────────────────
-
-    [Test]
-    public void HealEffect_DefaultAmount_Is10()
-    {
-        var fx = ScriptableObject.CreateInstance<HealEffectDefinition>();
-        Assert.AreEqual(10, fx.Amount);
-        Object.DestroyImmediate(fx);
-    }
-
-    // ── AddStatusEffectDefinition ──────────────────────────────
-
-    [Test]
-    public void AddStatusEffect_DefaultValues()
-    {
-        var fx = ScriptableObject.CreateInstance<AddStatusEffectDefinition>();
-        Assert.AreEqual(string.Empty, fx.StatusId);
-        Assert.AreEqual(1, fx.DurationTurns);
-        Object.DestroyImmediate(fx);
-    }
-
-    // ── SkillDefinition ────────────────────────────────────────
+    // ── SkillDefinition ──────────────────────────────────────────
 
     [Test]
     public void SkillDefinition_Defaults()
@@ -98,14 +67,13 @@ public class SkillDefinitionTests
         var skill = ScriptableObject.CreateInstance<SkillDefinition>();
         Assert.AreEqual(string.Empty, skill.Id);
         Assert.AreEqual(string.Empty, skill.DisplayName);
-        Assert.AreEqual(1, skill.ApCost);
-        Assert.AreEqual(0, skill.Cooldown);
         Assert.AreEqual(1.5f, skill.Range, 0.001f);
         Assert.AreEqual(ESkillTargetType.SingleEnemy, skill.TargetType);
         Assert.AreEqual(0, skill.Effects.Length);
         Assert.AreEqual(0, skill.SkillTags.Length);
         Assert.AreEqual(0, skill.AiTags.Length);
         Assert.AreEqual(10f, skill.AiBaseWeight, 0.001f);
+        Assert.IsNull(skill.Ability); // No default ability fallback
         Object.DestroyImmediate(skill);
     }
 
@@ -116,8 +84,6 @@ public class SkillDefinitionTests
         var so = new SerializedObject(skill);
         so.FindProperty("m_id").stringValue = "basic_attack";
         so.FindProperty("m_displayName").stringValue = "Basic Attack";
-        so.FindProperty("m_apCost").intValue = 2;
-        so.FindProperty("m_cooldown").intValue = 1;
         so.FindProperty("m_range").floatValue = 3f;
         so.FindProperty("m_targetType").enumValueIndex = (int)ESkillTargetType.Self;
         so.FindProperty("m_aiBaseWeight").floatValue = 25f;
@@ -125,8 +91,6 @@ public class SkillDefinitionTests
 
         Assert.AreEqual("basic_attack", skill.Id);
         Assert.AreEqual("Basic Attack", skill.DisplayName);
-        Assert.AreEqual(2, skill.ApCost);
-        Assert.AreEqual(1, skill.Cooldown);
         Assert.AreEqual(3f, skill.Range, 0.001f);
         Assert.AreEqual(ESkillTargetType.Self, skill.TargetType);
         Assert.AreEqual(25f, skill.AiBaseWeight, 0.001f);
@@ -136,7 +100,7 @@ public class SkillDefinitionTests
     [Test]
     public void SkillDefinition_HasEffectTag_TrueWhenEffectHasTag()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
         SetTagsOnEffect(fx, "Effect.Damage.BasicAttack");
 
         var skill = ScriptableObject.CreateInstance<SkillDefinition>();
@@ -150,7 +114,7 @@ public class SkillDefinitionTests
     [Test]
     public void SkillDefinition_HasEffectTag_FalseWhenNoMatch()
     {
-        var fx = ScriptableObject.CreateInstance<DamageEffectDefinition>();
+        var fx = ScriptableObject.CreateInstance<EffectDefinition>();
         SetTagsOnEffect(fx, "Effect.Damage.Physical");
 
         var skill = ScriptableObject.CreateInstance<SkillDefinition>();
@@ -169,7 +133,7 @@ public class SkillDefinitionTests
         Object.DestroyImmediate(skill);
     }
 
-    // ── AISkillTag ─────────────────────────────────────────────
+    // ── AISkillTag ────────────────────────────────────────────────
 
     [Test]
     public void AISkillTag_AllConstants_AreValid()
@@ -190,7 +154,7 @@ public class SkillDefinitionTests
         Assert.AreEqual("AI.Skill.Heal", AISkillTag.k_Heal.Value);
     }
 
-    // ── Helpers ────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────
 
     private static void SetTagsOnEffect(EffectDefinition fx, string tagValue)
     {
@@ -210,6 +174,3 @@ public class SkillDefinitionTests
         so.ApplyModifiedProperties();
     }
 }
-
-
-

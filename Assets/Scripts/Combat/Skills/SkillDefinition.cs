@@ -1,4 +1,4 @@
-﻿using MiniChess.GameplayTags;
+using MiniChess.GameplayTags;
 using UnityEngine;
 
 namespace MiniChess.Combat.Skills
@@ -11,19 +11,22 @@ namespace MiniChess.Combat.Skills
         [SerializeField] private string m_displayName;
         [SerializeField, TextArea(1, 4)] private string m_description;
 
-        [Header("Cost & Limits")]
-        [SerializeField, Min(0)] private int m_apCost = 1;
-        [SerializeField, Min(0)] private int m_cooldown;
-        [SerializeField, Min(0f)] private float m_range = 1.5f;
-
         [Header("Targeting")]
         [SerializeField] private ESkillTargetType m_targetType = ESkillTargetType.SingleEnemy;
+        [SerializeField, Min(0f)] private float m_range = 1.5f;
+        [Tooltip("Does this skill require line of sight? (MVP: reserved, not enforced)")]
+        [SerializeField] private bool m_requiresLineOfSight;
+
+        [Header("Turn")]
+        [Tooltip("If true, using this skill ends the unit's turn immediately.")]
+        [SerializeField] private bool m_endsTurnAfterCast;
 
         [Header("Ability")]
-        [Tooltip("Skill-specific behavior. Use GroundMoveAbility for basic_move. Leave empty for pure effect skills.")]
+        [Tooltip("Skill-specific behavior. Must be explicitly assigned. No default fallback.")]
         [SerializeField] private SkillAbility m_ability;
 
         [Header("Effects")]
+        [Tooltip("Legacy effect references. Preferred path: Ability.Effects. Retained for SkillDefinition-level tag checks.")]
         [SerializeField] private EffectDefinition[] m_effects;
 
         [Header("Tags")]
@@ -46,25 +49,22 @@ namespace MiniChess.Combat.Skills
         [Tooltip("Base weight for AI candidate scoring (higher = more likely to pick)")]
         [SerializeField] private float m_aiBaseWeight = 10f;
 
+        // ── Public properties ──────────────────────────────────────
+
         public string Id => m_id ?? string.Empty;
         public string DisplayName => m_displayName ?? string.Empty;
         public string Description => m_description ?? string.Empty;
-        public int ApCost => m_apCost;
-        public int Cooldown => m_cooldown;
-        public float Range => m_range;
         public ESkillTargetType TargetType => m_targetType;
-        public SkillAbility Ability
-        {
-            get
-            {
-                if (m_ability != null)
-                    return m_ability;
+        public float Range => m_range;
+        public bool RequiresLineOfSight => m_requiresLineOfSight;
+        public bool EndsTurnAfterCast => m_endsTurnAfterCast;
 
-                // TODO(CR-0002 / Docs/05_SKILL_SPEC.md §5.1): assign the concrete ability asset
-                // on basic_move once scene/prefab asset migration is handled through Unity Editor.
-                return m_targetType == ESkillTargetType.GroundPoint ? GroundMoveAbility.DefaultInstance : null;
-            }
-        }
+        /// <summary>
+        /// The ability configured on this skill. Must be explicitly assigned.
+        /// No fallback — returns null if not configured.
+        /// </summary>
+        public SkillAbility Ability => m_ability;
+
         public EffectDefinition[] Effects => m_effects ?? System.Array.Empty<EffectDefinition>();
         public GameplayTag[] SkillTags => m_skillTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] AiTags => m_aiTags ?? System.Array.Empty<GameplayTag>();
@@ -90,5 +90,3 @@ namespace MiniChess.Combat.Skills
         }
     }
 }
-
-

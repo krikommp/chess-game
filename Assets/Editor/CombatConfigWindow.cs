@@ -438,14 +438,14 @@ namespace MiniChess.EditorTools
                         {
                             AddError($"basic_attack.effects[{i}] is null.", baPath);
                         }
-                        else if (effects[i] is DamageEffectDefinition)
+                        else if (effects[i] != null && effects[i].Function == EEffectFunction.ModifyAttribute)
                         {
                             hasDamage = true;
                         }
                     }
                     if (!hasDamage)
                     {
-                        AddWarning("basic_attack does not reference a DamageEffectDefinition. It may not deal damage.", baPath);
+                        AddWarning("basic_attack may not deal damage (no ModifyAttribute effect assigned).", baPath);
                     }
                 }
             }
