@@ -26,12 +26,15 @@ namespace MiniChess.Combat.Skills
             return SkillEffectResult.Success(m_amount);
         }
 
-        public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
+        public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
             var targetAttr = context.Target?.GetComponent<AttributeSet>();
-            if (targetAttr == null) return;
+            if (targetAttr == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.TargetInvalid, "Target has no AttributeSet.");
 
-            if (string.IsNullOrEmpty(m_attributeTag.Value)) return;
+            if (string.IsNullOrEmpty(m_attributeTag.Value))
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed,
+                    "RestoreAttribute: no attribute tag configured.");
 
             switch (m_mode)
             {
@@ -47,6 +50,8 @@ namespace MiniChess.Combat.Skills
                         targetAttr.Modify(m_attributeTag, max * m_amount);
                     break;
             }
+
+            return SkillEffectResult.Success(m_amount);
         }
     }
 }

@@ -9,10 +9,10 @@ namespace MiniChess.Combat.Skills
     public struct SkillPlan
     {
         /// <summary>Movement skill to approach the target (e.g. basic_move). Null if already in range.</summary>
-        public SkillAbility MovementSkill;
+        public AbilitySpec MovementSkill;
 
         /// <summary>The primary skill to execute after movement (e.g. basic_attack).</summary>
-        public SkillAbility PrimarySkill;
+        public AbilitySpec PrimarySkill;
 
         /// <summary>Target of the primary skill.</summary>
         public GameObject PrimaryTarget;
@@ -50,7 +50,7 @@ namespace MiniChess.Combat.Skills
             var moveDesc = IsAlreadyInRange ? "in range" :
                 IsMovementOnly ? $"move only ({MoveApCost} AP)" :
                 $"move {MoveApCost}+{PrimaryApCost}={TotalApCost} AP";
-            return $"{PrimarySkill.Id} → {PrimaryTarget?.name} ({moveDesc})";
+            return $"{PrimarySkill.Id} -> {PrimaryTarget?.name} ({moveDesc})";
         }
     }
 }

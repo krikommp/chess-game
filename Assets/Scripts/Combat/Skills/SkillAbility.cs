@@ -1,5 +1,6 @@
 using MiniChess.GameplayTags;
 using UnityEngine;
+using MiniChess.Combat;
 
 namespace MiniChess.Combat.Skills
 {
@@ -32,30 +33,30 @@ namespace MiniChess.Combat.Skills
         [Tooltip("Tags that block the target from being affected by this skill.")]
         [SerializeField] private GameplayTag[] m_blockedTargetTags;
 
-        // ── Public properties — Identity ──────────────────────────────
+        // Public properties: Identity
 
         public string Id => m_id ?? string.Empty;
         public string DisplayName => m_displayName ?? string.Empty;
         public string Description => m_description ?? string.Empty;
 
-        // ── Public properties — Execution slots ───────────────────────
+        // Public properties: Execution slots
 
         public SkillEffect[] Costs => m_costs ?? System.Array.Empty<SkillEffect>();
         public SkillEffect[] Cooldowns => m_cooldowns ?? System.Array.Empty<SkillEffect>();
         public SkillEffect[] Effects => m_effects ?? System.Array.Empty<SkillEffect>();
 
-        // ── Public properties — Tag conditions ────────────────────────
+        // Public properties: Tag conditions
 
         public GameplayTag[] RequiredCasterTags => m_requiredCasterTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] BlockedCasterTags => m_blockedCasterTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] RequiredTargetTags => m_requiredTargetTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] BlockedTargetTags => m_blockedTargetTags ?? System.Array.Empty<GameplayTag>();
 
-        // ── Abstract ──────────────────────────────────────────────────
+        // Abstract
 
         public abstract SkillCastResult Execute(SkillExecutionContext context);
 
-        // ── Helpers (子类显式调用) ────────────────────────────────────
+        // Helpers (子类显式调用)
 
         protected SkillEffectResult[] ComputeCosts(SkillExecutionContext context)
         {
@@ -66,7 +67,7 @@ namespace MiniChess.Combat.Skills
             for (int i = 0; i < m_costs.Length; i++)
             {
                 if (m_costs[i] == null) continue;
-                var ctx = BuildEffectContext(context, context.Target);
+                var ctx = BuildEffectContext(context, m_costs[i], ESkillEffectTarget.Caster);
                 results[i] = m_costs[i].Compute(ctx);
                 if (!results[i].IsSuccess)
                     return results;
@@ -74,17 +75,23 @@ namespace MiniChess.Combat.Skills
             return results;
         }
 
-        protected void ApplyCosts(SkillExecutionContext context, SkillEffectResult[] results)
+        protected SkillEffectResult ApplyCosts(SkillExecutionContext context, SkillEffectResult[] results)
         {
-            if (m_costs == null || results == null) return;
+            if (m_costs == null || results == null)
+                return SkillEffectResult.Success();
+
             int count = System.Math.Min(m_costs.Length, results.Length);
             for (int i = 0; i < count; i++)
             {
                 if (m_costs[i] == null) continue;
                 if (!results[i].IsSuccess) continue;
-                var ctx = BuildEffectContext(context, context.Target);
-                m_costs[i].Apply(ctx, results[i]);
+                var ctx = BuildEffectContext(context, m_costs[i], ESkillEffectTarget.Caster);
+                var applyResult = m_costs[i].Apply(ctx, results[i]);
+                if (!applyResult.IsSuccess)
+                    return applyResult;
             }
+
+            return SkillEffectResult.Success();
         }
 
         protected SkillEffectResult[] ComputeCooldowns(SkillExecutionContext context)
@@ -98,15 +105,17 @@ namespace MiniChess.Combat.Skills
                 var cd = m_cooldowns[i];
                 if (cd == null) continue;
 
-                // Check if caster already has any GrantedTag from this cooldown effect
-                var casterTagComp = context.Caster?.GetComponent<MiniChess.GameplayTags.GameplayTagComponent>();
-                if (casterTagComp != null)
+                var effectContext = BuildEffectContext(context, cd, ESkillEffectTarget.Caster);
+
+                // Check if the mapped cooldown owner already has any GrantedTag from this cooldown effect.
+                var targetTagComp = effectContext.Target?.GetComponent<MiniChess.GameplayTags.GameplayTagComponent>();
+                if (targetTagComp != null)
                 {
                     var grantedTags = cd.GrantedTags;
                     for (int j = 0; j < grantedTags.Length; j++)
                     {
                         if (string.IsNullOrEmpty(grantedTags[j].Value)) continue;
-                        if (casterTagComp.HasTag(grantedTags[j], MiniChess.GameplayTags.ETagMatchMode.Exact))
+                        if (targetTagComp.HasTag(grantedTags[j], MiniChess.GameplayTags.ETagMatchMode.Exact))
                         {
                             results[i] = SkillEffectResult.Fail(ESkillCastFailure.OnCooldown,
                                 $"Skill is on cooldown (tag: {grantedTags[j].Value})");
@@ -114,25 +123,35 @@ namespace MiniChess.Combat.Skills
                         }
                     }
                 }
-                results[i] = SkillEffectResult.Success();
+
+                results[i] = cd.Compute(effectContext);
+                if (!results[i].IsSuccess)
+                    return results;
             }
             return results;
         }
 
-        protected void ApplyCooldowns(SkillExecutionContext context, SkillEffectResult[] results)
+        protected SkillEffectResult ApplyCooldowns(SkillExecutionContext context, SkillEffectResult[] results)
         {
-            if (m_cooldowns == null || results == null) return;
-            var asc = context.CasterExecutor;
-            if (asc == null) return;
+            if (m_cooldowns == null || results == null)
+                return SkillEffectResult.Success();
 
             int count = System.Math.Min(m_cooldowns.Length, results.Length);
             for (int i = 0; i < count; i++)
             {
                 if (m_cooldowns[i] == null) continue;
                 if (!results[i].IsSuccess) continue;
-                // Add as persistent effect on caster — this grants Cooldown tags + auto-expires via DurationRounds
-                asc.ApplyEffect(m_cooldowns[i], context.Caster);
+                var effectContext = BuildEffectContext(context, m_cooldowns[i], ESkillEffectTarget.Caster);
+                var targetExecutor = effectContext.TargetExecutor;
+                if (targetExecutor == null)
+                    return SkillEffectResult.Fail(ESkillCastFailure.CasterDead, "Cooldown target has no AbilitySystemComponent.");
+
+                var applyResult = targetExecutor.ApplyEffect(m_cooldowns[i], effectContext, results[i]);
+                if (!applyResult.IsSuccess)
+                    return applyResult;
             }
+
+            return SkillEffectResult.Success();
         }
 
         protected void ApplyEffects(SkillExecutionContext context, SkillEffect[] effects)
@@ -141,23 +160,64 @@ namespace MiniChess.Combat.Skills
             for (int i = 0; i < effects.Length; i++)
             {
                 if (effects[i] == null) continue;
-                var ctx = BuildEffectContext(context, context.Target);
+                var ctx = BuildEffectContext(context, effects[i], ESkillEffectTarget.Target);
                 var result = effects[i].Compute(ctx);
                 if (result.IsSuccess)
-                    effects[i].Apply(ctx, result);
+                {
+                    if (ctx.TargetExecutor != null)
+                    {
+                        ctx.TargetExecutor.ApplyEffect(effects[i], ctx, result);
+                    }
+                    else if (!effects[i].IsPersistent)
+                    {
+                        effects[i].Apply(ctx, result);
+                    }
+                }
             }
         }
 
-        private static SkillEffectContext BuildEffectContext(SkillExecutionContext context, GameObject target)
+        protected static SkillEffectContext BuildEffectContext(
+            SkillExecutionContext context,
+            SkillEffect effect,
+            ESkillEffectTarget defaultTarget)
         {
+            var resolvedTarget = ResolveEffectTarget(context, effect, defaultTarget);
+
             return new SkillEffectContext
             {
                 Caster = context.Caster,
-                Target = target ?? context.Target,
+                Target = resolvedTarget,
+                Source = context.Caster,
                 CasterExecutor = context.CasterExecutor,
-                TargetExecutor = target != null ? target.GetComponent<AbilitySystemComponent>() : null,
+                TargetExecutor = resolvedTarget != null ? resolvedTarget.GetComponent<AbilitySystemComponent>() : null,
                 TargetPosition = context.TargetPosition,
+                PathLength = context.Path != null ? NavMeshService.PathLength(context.Path.corners) : (float?)null,
             };
+        }
+
+        private static GameObject ResolveEffectTarget(
+            SkillExecutionContext context,
+            SkillEffect effect,
+            ESkillEffectTarget defaultTarget)
+        {
+            var mapping = effect != null && effect.TargetMapping != ESkillEffectTarget.Default
+                ? effect.TargetMapping
+                : defaultTarget;
+
+            switch (mapping)
+            {
+                case ESkillEffectTarget.Caster:
+                case ESkillEffectTarget.Self:
+                    return context.Caster;
+                case ESkillEffectTarget.Target:
+                    return context.Target;
+                case ESkillEffectTarget.Source:
+                    return context.Caster;
+                case ESkillEffectTarget.GroundPoint:
+                    return null;
+                default:
+                    return context.Target;
+            }
         }
     }
 }

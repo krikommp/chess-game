@@ -15,17 +15,21 @@ MonoBehaviour:
   m_entries:
   - Tag:
       m_value: Attribute.HP
+      m_id: -2032563773
     BaseValue: 100
     MaxValue: 100
   - Tag:
       m_value: Attribute.AP
+      m_id: -1866214606
     BaseValue: 6
     MaxValue: 6
   - Tag:
       m_value: Attribute.Initiative
+      m_id: -499614411
     BaseValue: 10
     MaxValue: 0
   - Tag:
       m_value: Attribute.MoveSpeed
+      m_id: -2022193923
     BaseValue: 2
     MaxValue: 0

@@ -19,6 +19,9 @@ namespace MiniChess.Combat.Skills
         [Header("Function")]
         [SerializeField] private SkillEffectFunction m_function;
 
+        [Header("Targeting")]
+        [SerializeField] private ESkillEffectTarget m_targetMapping = ESkillEffectTarget.Default;
+
         [Header("Duration")]
         [SerializeField] private ESkillEffectDuration m_duration = ESkillEffectDuration.Instant;
         [SerializeField] private int m_durationRounds;
@@ -34,7 +37,7 @@ namespace MiniChess.Combat.Skills
         [SerializeField] private GameplayTag[] m_removeTags;
 
         [Header("Granted Abilities")]
-        [SerializeField] private SkillAbility[] m_grantedAbilities;
+        [SerializeField] private SkillDefinition[] m_grantedAbilities;
 
         [Header("Stat Modifiers")]
         [SerializeField] private StatModifier[] m_statModifiers;
@@ -45,6 +48,7 @@ namespace MiniChess.Combat.Skills
         // ── Public properties ──────────────────────────────────────
 
         public SkillEffectFunction Function => m_function;
+        public ESkillEffectTarget TargetMapping => m_targetMapping;
         public ESkillEffectDuration Duration => m_duration;
         public int DurationRounds => m_durationRounds;
         public bool TickPerRound => m_tickPerRound;
@@ -55,7 +59,7 @@ namespace MiniChess.Combat.Skills
         public GameplayTag[] BlockedTags => m_blockedTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] GrantedTags => m_grantedTags ?? System.Array.Empty<GameplayTag>();
         public GameplayTag[] RemoveTags => m_removeTags ?? System.Array.Empty<GameplayTag>();
-        public SkillAbility[] GrantedAbilities => m_grantedAbilities ?? System.Array.Empty<SkillAbility>();
+        public SkillDefinition[] GrantedAbilities => m_grantedAbilities ?? System.Array.Empty<SkillDefinition>();
         public StatModifier[] StatModifiers => m_statModifiers ?? System.Array.Empty<StatModifier>();
 
         // ── Compute / Apply ────────────────────────────────────────
@@ -72,11 +76,15 @@ namespace MiniChess.Combat.Skills
             return m_function.Compute(context, this);
         }
 
-        public void Apply(SkillEffectContext context, SkillEffectResult computed)
+        public SkillEffectResult Apply(SkillEffectContext context, SkillEffectResult computed)
         {
-            if (m_function == null) return;
-            if (!computed.IsSuccess) return;
-            m_function.Apply(context, this, computed);
+            if (m_function == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Effect has no Function assigned.");
+
+            if (!computed.IsSuccess)
+                return computed;
+
+            return m_function.Apply(context, this, computed);
         }
 
         // ── Helpers ────────────────────────────────────────────────

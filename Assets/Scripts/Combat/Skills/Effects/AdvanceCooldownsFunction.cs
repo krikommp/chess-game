@@ -10,10 +10,11 @@ namespace MiniChess.Combat.Skills
             return SkillEffectResult.Success();
         }
 
-        public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
+        public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
             // Cooldowns are now managed as persistent SkillEffects with DurationRounds.
             // Expiry is handled by DecrementStatusDurationFunction / ASC.OnRoundStart.
+            return SkillEffectResult.Success();
         }
     }
 }

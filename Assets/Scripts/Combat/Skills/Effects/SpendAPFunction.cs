@@ -19,7 +19,12 @@ namespace MiniChess.Combat.Skills
             float currentAP = casterAttr.Get(WellKnownAttributeTags.AP);
             float amount;
 
-            if (context.TargetPosition.HasValue)
+            if (context.PathLength.HasValue)
+            {
+                float speed = casterAttr.Get(WellKnownAttributeTags.MoveSpeed);
+                amount = NavMeshService.EstimateMoveApCost(context.PathLength.Value, speed, Mathf.FloorToInt(currentAP));
+            }
+            else if (context.TargetPosition.HasValue)
             {
                 var casterPos = context.Caster.transform.position;
                 var nav = NavMeshService.Instance;
@@ -49,15 +54,21 @@ namespace MiniChess.Combat.Skills
             return SkillEffectResult.Success(amount);
         }
 
-        public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
+        public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
             var casterAttr = context.Caster?.GetComponent<AttributeSet>();
-            if (casterAttr == null) return;
+            if (casterAttr == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.CasterDead, "Caster has no AttributeSet.");
 
             float amount = computed.ComputedValue > 0f ? computed.ComputedValue : m_fallbackAmount;
-            if (amount <= 0f) return;
+            if (amount <= 0f)
+                return SkillEffectResult.Success(0f);
 
-            casterAttr.TrySpend(WellKnownAttributeTags.AP, amount);
+            if (!casterAttr.TrySpend(WellKnownAttributeTags.AP, amount))
+                return SkillEffectResult.Fail(ESkillCastFailure.InsufficientAp,
+                    $"Failed to spend {amount} AP.");
+
+            return SkillEffectResult.Success(amount);
         }
     }
 }

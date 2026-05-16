@@ -11,10 +11,11 @@ namespace MiniChess.Combat.Skills
             return SkillEffectResult.Success();
         }
 
-        public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
+        public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
             var executor = context.Target?.GetComponent<AbilitySystemComponent>();
-            if (executor == null) return;
+            if (executor == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.TargetInvalid, "Target has no AbilitySystemComponent.");
 
             var activeEffects = executor.ActiveEffects;
             for (int i = activeEffects.Count - 1; i >= 0; i--)
@@ -26,12 +27,15 @@ namespace MiniChess.Combat.Skills
                     {
                         Caster = active.Source,
                         Target = context.Target,
+                        Source = active.Source,
                         CasterExecutor = active.Source?.GetComponent<AbilitySystemComponent>(),
                         TargetExecutor = context.TargetExecutor,
                     };
                     active.Definition.Apply(tickCtx, SkillEffectResult.Success());
                 }
             }
+
+            return SkillEffectResult.Success();
         }
     }
 }

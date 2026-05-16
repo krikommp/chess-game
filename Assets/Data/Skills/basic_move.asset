@@ -9,25 +9,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 28b39adf99b6add49847d63e84e1ac0e, type: 3}
+  m_Script: {fileID: 11500000, guid: 14da2c334915c054ea286782124dbfe1, type: 3}
   m_Name: basic_move
   m_EditorClassIdentifier: 
   m_id: basic_move
   m_displayName: Basic Move
   m_description: Move to a target position.
-  m_apCost: 0
-  m_cooldown: 0
-  m_range: 0
   m_targetType: 3
-  m_ability: {fileID: 11400000, guid: 8f2bb460bab5db249bd37431384922db, type: 2}
-  m_effects: []
-  m_skillTags:
-  - m_value: Action.Move
-  - m_value: Movement.Ground
-  m_aiTags:
-  - m_value: AI.Skill.Mobility
+  m_range: 0
+  m_areaShape: 0
+  m_areaRadius: 0
+  m_areaAngle: 0
+  m_areaWidth: 0
+  m_areaLength: 0
+  m_requiresLineOfSight: 0
+  m_endsTurnAfterCast: 0
+  m_skillTags: []
+  m_aiTags: []
   m_requiredCasterTags: []
   m_blockedCasterTags: []
   m_requiredTargetTags: []
   m_blockedTargetTags: []
-  m_aiBaseWeight: 10
+  m_aiBaseWeight: 1
+  m_animation: {fileID: 0}
+  m_vfx: {fileID: 0}
+  m_ability: {fileID: 11400000, guid: 8f2bb460bab5db249bd37431384922db, type: 2}

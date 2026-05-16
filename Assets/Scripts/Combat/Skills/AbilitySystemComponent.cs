@@ -6,11 +6,11 @@ using UnityEngine;
 
 namespace MiniChess.Combat.Skills
 {
-    [System.Serializable]
+    [Serializable]
     public struct PassiveAbilityTrigger
     {
-        [Tooltip("Ability to execute when the trigger tag is added.")]
-        public SkillAbility Ability;
+        [Tooltip("Skill definition to execute when the trigger tag is added.")]
+        public SkillDefinition Definition;
         [Tooltip("Tag that activates this passive ability.")]
         public GameplayTag TriggerTag;
     }
@@ -18,35 +18,38 @@ namespace MiniChess.Combat.Skills
     public class AbilitySystemComponent : MonoBehaviour
     {
         [Header("Skills")]
-        [SerializeField] private SkillAbility[] m_availableSkills;
+        [SerializeField] private SkillDefinition[] m_availableSkills;
 
         [Header("Passive Abilities")]
-        [Tooltip("Abilities that trigger automatically when specific tags are added.")]
+        [Tooltip("Skills that trigger automatically when specific tags are added.")]
         [SerializeField] private PassiveAbilityTrigger[] m_passiveAbilities;
 
         private AttributeSet m_attributes;
         private MovementController m_movement;
         private GameplayTagComponent m_tagComp;
         private readonly List<ActiveSkillEffect> m_activeEffects = new List<ActiveSkillEffect>();
-        private readonly List<SkillAbility> m_grantedSkills = new List<SkillAbility>();
-        private SkillAbility m_activeSkill;
+        private readonly List<AbilitySpec> m_availableSpecs = new List<AbilitySpec>();
+        private readonly List<AbilitySpec> m_grantedSpecs = new List<AbilitySpec>();
+        private AbilitySpec m_activeSpec;
+        private bool m_specsDirty = true;
 
-        public SkillAbility[] AvailableSkills
+        public IReadOnlyList<AbilitySpec> AvailableAbilities
         {
             get
             {
-                if (m_grantedSkills.Count == 0)
-                    return m_availableSkills ?? Array.Empty<SkillAbility>();
+                RebuildAvailableSpecsIfNeeded();
+                if (m_grantedSpecs.Count == 0)
+                    return m_availableSpecs;
 
-                var all = new List<SkillAbility>();
-                if (m_availableSkills != null) all.AddRange(m_availableSkills);
-                all.AddRange(m_grantedSkills);
-                return all.ToArray();
+                var all = new List<AbilitySpec>(m_availableSpecs.Count + m_grantedSpecs.Count);
+                all.AddRange(m_availableSpecs);
+                all.AddRange(m_grantedSpecs);
+                return all;
             }
         }
 
         public IReadOnlyList<ActiveSkillEffect> ActiveEffects => m_activeEffects;
-        public SkillAbility ActiveSkill => m_activeSkill;
+        public AbilitySpec ActiveAbility => m_activeSpec;
         public MovementController Movement => m_movement;
 
         public AttributeSet Attributes
@@ -77,85 +80,84 @@ namespace MiniChess.Combat.Skills
                 m_tagComp.OnTagAdded -= OnTagAddedForPassive;
         }
 
+        private void OnValidate()
+        {
+            m_specsDirty = true;
+        }
+
         private void OnTagAddedForPassive(GameplayTag tag)
         {
             if (m_passiveAbilities == null) return;
             for (int i = 0; i < m_passiveAbilities.Length; i++)
             {
                 var entry = m_passiveAbilities[i];
-                if (entry.Ability == null) continue;
+                if (entry.Definition == null) continue;
                 if (entry.TriggerTag == tag)
                 {
-                    var ctx = SkillExecutionContext.ForTarget(this, entry.Ability, gameObject);
-                    Execute(ctx);
+                    var spec = AbilitySpec.FromDefinition(entry.Definition, gameObject, this);
+                    Execute(SkillExecutionContext.ForTarget(this, spec, gameObject));
                 }
             }
         }
 
-        // ── Skill access ────────────────────────────────────────────
-
-        public SkillCastResult CanCast(SkillAbility skill, GameObject target)
+        public AbilitySpec FindAbility(string id)
         {
-            return CanExecute(SkillExecutionContext.ForTarget(this, skill, target));
-        }
-
-        public SkillAbility FindSkill(string id)
-        {
-            var skills = AvailableSkills;
-            for (int i = 0; i < skills.Length; i++)
+            var abilities = AvailableAbilities;
+            for (int i = 0; i < abilities.Count; i++)
             {
-                if (skills[i] != null && skills[i].Id == id)
-                    return skills[i];
+                if (abilities[i] != null && abilities[i].Id == id)
+                    return abilities[i];
             }
             return null;
         }
 
-        public bool ActivateSkill(SkillAbility skill)
+        public bool ActivateAbility(AbilitySpec spec)
         {
-            if (skill == null || !HasSkill(skill))
+            if (spec == null || !HasAbility(spec))
             {
-                m_activeSkill = null;
+                m_activeSpec = null;
                 return false;
             }
 
-            m_activeSkill = skill;
+            m_activeSpec = spec;
             return true;
         }
 
-        public void ClearActiveSkill()
+        public void ClearActiveAbility()
         {
-            m_activeSkill = null;
+            m_activeSpec = null;
         }
 
-        public void SetSkills(SkillAbility[] skills)
+        public void SetSkillDefinitions(SkillDefinition[] definitions)
         {
-            m_availableSkills = skills;
+            m_availableSkills = definitions;
+            m_specsDirty = true;
         }
 
-        private bool HasSkill(SkillAbility skill)
+        public SkillCastResult CanExecute(AbilitySpec spec, GameObject target)
         {
-            var skills = AvailableSkills;
-            for (int i = 0; i < skills.Length; i++)
-            {
-                if (skills[i] == skill) return true;
-                if (skills[i] != null && skill != null && skills[i].Id == skill.Id) return true;
-            }
-            return false;
+            return CanExecute(SkillExecutionContext.ForTarget(this, spec, target));
         }
-
-        // ── Validation ──────────────────────────────────────────────
 
         public SkillCastResult CanExecute(SkillExecutionContext context)
         {
-            var skill = context.Skill;
+            var spec = context.Spec;
+            if (spec == null)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "AbilitySpec is null.");
+
+            var definition = spec.Definition;
+            if (definition == null)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "SkillDefinition is null.");
+
+            var skill = spec.Ability;
             if (skill == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "SkillDefinition has no Ability.");
 
             var casterAttr = Attributes;
             if (casterAttr == null || !casterAttr.IsAlive)
                 return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is dead or missing AttributeSet.");
 
-            var tagResult = EvaluateSkillTagConditions(skill, context.Target);
+            var tagResult = EvaluateSkillTagConditions(definition, context.Target);
             if (!tagResult.IsSuccess)
                 return tagResult;
 
@@ -173,11 +175,9 @@ namespace MiniChess.Combat.Skills
             return SkillCastResult.Success();
         }
 
-        // ── Execution ────────────────────────────────────────────────
-
-        public SkillCastResult Execute(SkillAbility skill, GameObject target)
+        public SkillCastResult Execute(AbilitySpec spec, GameObject target)
         {
-            return Execute(SkillExecutionContext.ForTarget(this, skill, target));
+            return Execute(SkillExecutionContext.ForTarget(this, spec, target));
         }
 
         public SkillCastResult Execute(SkillExecutionContext context)
@@ -189,97 +189,60 @@ namespace MiniChess.Combat.Skills
             var skill = context.Skill;
             if (skill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
-                    "Skill is null.");
+                    "SkillDefinition has no Ability.");
 
             return skill.Execute(context);
         }
 
-        public SkillCastResult ExecuteAfterMove(SkillAbility skill, GameObject target)
+        public SkillEffectResult ApplyEffect(SkillEffect effect, GameObject source)
         {
-            if (skill == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Skill is null.");
-
-            if (target == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Target lost during approach.");
-
-            var targetAttr = target.GetComponent<AttributeSet>();
-            if (targetAttr != null && !targetAttr.IsAlive)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target died during approach.");
-
-            return Execute(skill, target);
-        }
-
-        public SkillCastResult HandleInputLegacy(SkillInputRequest request, SkillAbility activeSkill)
-        {
-            if (activeSkill == null)
-                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "No active skill.");
-
-            return SkillCastResult.Success();
-        }
-
-        // ── Effect management ───────────────────────────────────────
-
-        public void ApplyEffect(SkillEffect effect, GameObject source)
-        {
-            if (effect == null) return;
+            if (effect == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Effect is null.");
 
             var ctx = new SkillEffectContext
             {
                 Caster = source ?? gameObject,
                 Target = gameObject,
+                Source = source,
                 CasterExecutor = source != null ? source.GetComponent<AbilitySystemComponent>() : null,
                 TargetExecutor = this,
             };
 
-            effect.Apply(ctx, SkillEffectResult.Success());
+            var computed = effect.Compute(ctx);
+            if (!computed.IsSuccess)
+                return computed;
 
-            if (!effect.IsPersistent) return;
+            return ApplyEffect(effect, ctx, computed);
+        }
 
-            var active = new ActiveSkillEffect(effect, source, effect.DurationRounds);
+        public SkillEffectResult ApplyEffect(
+            SkillEffect effect,
+            SkillEffectContext context,
+            SkillEffectResult computed)
+        {
+            if (effect == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Effect is null.");
+
+            if (!computed.IsSuccess)
+                return computed;
+
+            var applied = effect.Apply(context, computed);
+            if (!applied.IsSuccess)
+                return applied;
+
+            ApplyRemoveTags(effect);
+
+            if (!effect.IsPersistent)
+                return applied;
+
+            var active = new ActiveSkillEffect(effect, context.Source ?? context.Caster, this, effect.DurationRounds);
             m_activeEffects.Add(active);
 
-            // Apply granted tags
-            var grantedTags = effect.GrantedTags;
-            if (grantedTags.Length > 0)
-            {
-                var tc = TagComp;
-                for (int i = 0; i < grantedTags.Length; i++)
-                    if (!string.IsNullOrEmpty(grantedTags[i].Value))
-                        tc.AddTag(grantedTags[i], $"Effect.{effect.name}");
-            }
+            ApplyGrantedTags(effect, active);
+            ApplyGrantedAbilities(effect, active);
+            ApplyStatModifiers(effect, active);
 
-            // Apply remove tags
-            var removeTags = effect.RemoveTags;
-            if (removeTags.Length > 0)
-            {
-                var tc = TagComp;
-                for (int i = 0; i < removeTags.Length; i++)
-                    if (!string.IsNullOrEmpty(removeTags[i].Value))
-                        tc.RemoveTag(removeTags[i], $"Effect.{effect.name}");
-            }
-
-            // Apply granted abilities
-            var abilities = effect.GrantedAbilities;
-            for (int i = 0; i < abilities.Length; i++)
-                if (abilities[i] != null)
-                    m_grantedSkills.Add(abilities[i]);
-
-            // Apply stat modifiers
-            var mods = effect.StatModifiers;
-            if (mods.Length > 0)
-            {
-                var attr = Attributes;
-                if (attr != null)
-                {
-                    for (int i = 0; i < mods.Length; i++)
-                    {
-                        float value = mods[i].Type == EModifierType.Additive
-                            ? mods[i].Value
-                            : attr.GetMax(mods[i].Attribute) * mods[i].Value;
-                        attr.Modify(mods[i].Attribute, value);
-                    }
-                }
-            }
+            return applied;
         }
 
         internal void RemoveActiveEffect(ActiveSkillEffect active)
@@ -287,45 +250,33 @@ namespace MiniChess.Combat.Skills
             var effect = active.Definition;
             if (effect == null) return;
 
-            // Remove granted abilities
-            var abilities = effect.GrantedAbilities;
-            for (int i = 0; i < abilities.Length; i++)
-                m_grantedSkills.Remove(abilities[i]);
+            for (int i = m_grantedSpecs.Count - 1; i >= 0; i--)
+            {
+                if (m_grantedSpecs[i] != null && ReferenceEquals(m_grantedSpecs[i].GrantSource, active))
+                    m_grantedSpecs.RemoveAt(i);
+            }
 
-            // Remove granted tags
             var grantedTags = effect.GrantedTags;
             if (grantedTags.Length > 0)
             {
                 var tc = TagComp;
                 for (int i = 0; i < grantedTags.Length; i++)
-                    tc.RemoveTag(grantedTags[i], $"Effect.{effect.name}");
+                    tc.RemoveTag(grantedTags[i], active);
             }
 
-            // Reverse stat modifiers
-            var mods = effect.StatModifiers;
-            if (mods.Length > 0)
+            var appliedModifiers = active.AppliedModifiers;
+            if (appliedModifiers.Count > 0)
             {
                 var attr = Attributes;
                 if (attr != null)
                 {
-                    for (int i = 0; i < mods.Length; i++)
+                    for (int i = 0; i < appliedModifiers.Count; i++)
                     {
-                        float value = mods[i].Type == EModifierType.Additive
-                            ? mods[i].Value
-                            : attr.GetMax(mods[i].Attribute) * mods[i].Value;
-                        attr.Modify(mods[i].Attribute, -value);
+                        var modifier = appliedModifiers[i];
+                        attr.Modify(modifier.Attribute, -modifier.Value);
                     }
                 }
             }
-
-            var ctx = new SkillEffectContext
-            {
-                Caster = active.Source,
-                Target = gameObject,
-                CasterExecutor = active.Source != null ? active.Source.GetComponent<AbilitySystemComponent>() : null,
-                TargetExecutor = this,
-            };
-            effect.Apply(ctx, SkillEffectResult.Success());
 
             m_activeEffects.Remove(active);
         }
@@ -342,6 +293,7 @@ namespace MiniChess.Combat.Skills
                     {
                         Caster = active.Source,
                         Target = gameObject,
+                        Source = active.Source,
                         CasterExecutor = active.Source != null ? active.Source.GetComponent<AbilitySystemComponent>() : null,
                         TargetExecutor = this,
                     };
@@ -357,13 +309,93 @@ namespace MiniChess.Combat.Skills
             }
         }
 
-        // ── Internals ───────────────────────────────────────────────
+        private bool HasAbility(AbilitySpec spec)
+        {
+            if (spec == null) return false;
 
-        private SkillCastResult EvaluateSkillTagConditions(SkillAbility skill, GameObject target)
+            var abilities = AvailableAbilities;
+            for (int i = 0; i < abilities.Count; i++)
+            {
+                var candidate = abilities[i];
+                if (candidate == spec) return true;
+                if (candidate != null && candidate.Id == spec.Id) return true;
+            }
+            return false;
+        }
+
+        private void RebuildAvailableSpecsIfNeeded()
+        {
+            if (!m_specsDirty)
+                return;
+
+            m_availableSpecs.Clear();
+            if (m_availableSkills != null)
+            {
+                for (int i = 0; i < m_availableSkills.Length; i++)
+                {
+                    if (m_availableSkills[i] != null)
+                        m_availableSpecs.Add(AbilitySpec.FromDefinition(m_availableSkills[i], gameObject, this));
+                }
+            }
+
+            m_specsDirty = false;
+        }
+
+        private void ApplyRemoveTags(SkillEffect effect)
+        {
+            var removeTags = effect.RemoveTags;
+            if (removeTags.Length == 0) return;
+
+            var tc = TagComp;
+            for (int i = 0; i < removeTags.Length; i++)
+                if (!string.IsNullOrEmpty(removeTags[i].Value))
+                    tc.RemoveTag(removeTags[i]);
+        }
+
+        private void ApplyGrantedTags(SkillEffect effect, ActiveSkillEffect active)
+        {
+            var grantedTags = effect.GrantedTags;
+            if (grantedTags.Length == 0) return;
+
+            var tc = TagComp;
+            for (int i = 0; i < grantedTags.Length; i++)
+                if (!string.IsNullOrEmpty(grantedTags[i].Value))
+                    tc.AddTag(grantedTags[i], active);
+        }
+
+        private void ApplyGrantedAbilities(SkillEffect effect, ActiveSkillEffect active)
+        {
+            var definitions = effect.GrantedAbilities;
+            for (int i = 0; i < definitions.Length; i++)
+            {
+                if (definitions[i] == null) continue;
+                m_grantedSpecs.Add(AbilitySpec.FromDefinition(definitions[i], gameObject, active));
+            }
+        }
+
+        private void ApplyStatModifiers(SkillEffect effect, ActiveSkillEffect active)
+        {
+            var mods = effect.StatModifiers;
+            if (mods.Length == 0) return;
+
+            var attr = Attributes;
+            if (attr == null) return;
+
+            for (int i = 0; i < mods.Length; i++)
+            {
+                float value = mods[i].Type == EModifierType.Additive
+                    ? mods[i].Value
+                    : attr.GetMax(mods[i].Attribute) * mods[i].Value;
+                attr.Modify(mods[i].Attribute, value);
+                active.RecordAppliedModifier(mods[i].Attribute, value);
+            }
+        }
+
+        private SkillCastResult EvaluateSkillTagConditions(SkillDefinition definition, GameObject target)
         {
             var casterTags = CollectTagsFrom(gameObject);
 
-            var requiredCaster = skill.RequiredCasterTags;
+            var requiredCaster = definition.RequiredCasterTags;
             for (int i = 0; i < requiredCaster.Length; i++)
             {
                 if (string.IsNullOrEmpty(requiredCaster[i].Value)) continue;
@@ -372,7 +404,7 @@ namespace MiniChess.Combat.Skills
                         $"Caster lacks required tag '{requiredCaster[i].Value}'.");
             }
 
-            var blockedCaster = skill.BlockedCasterTags;
+            var blockedCaster = definition.BlockedCasterTags;
             for (int i = 0; i < blockedCaster.Length; i++)
             {
                 if (string.IsNullOrEmpty(blockedCaster[i].Value)) continue;
@@ -385,7 +417,7 @@ namespace MiniChess.Combat.Skills
 
             var targetTags = CollectTagsFrom(target);
 
-            var requiredTarget = skill.RequiredTargetTags;
+            var requiredTarget = definition.RequiredTargetTags;
             for (int i = 0; i < requiredTarget.Length; i++)
             {
                 if (string.IsNullOrEmpty(requiredTarget[i].Value)) continue;
@@ -394,7 +426,7 @@ namespace MiniChess.Combat.Skills
                         $"Target lacks required tag '{requiredTarget[i].Value}'.");
             }
 
-            var blockedTarget = skill.BlockedTargetTags;
+            var blockedTarget = definition.BlockedTargetTags;
             for (int i = 0; i < blockedTarget.Length; i++)
             {
                 if (string.IsNullOrEmpty(blockedTarget[i].Value)) continue;
@@ -421,14 +453,6 @@ namespace MiniChess.Combat.Skills
             return tags;
         }
 
-        private ActiveSkillEffect FindActiveEffect(SkillEffect def)
-        {
-            for (int i = 0; i < m_activeEffects.Count; i++)
-                if (m_activeEffects[i].Definition == def)
-                    return m_activeEffects[i];
-            return null;
-        }
-
         private GameplayTagComponent TagComp
         {
             get
@@ -442,18 +466,41 @@ namespace MiniChess.Combat.Skills
         }
     }
 
-    [System.Serializable]
+    [Serializable]
     public class ActiveSkillEffect
     {
         public SkillEffect Definition;
         public GameObject Source;
+        public AbilitySystemComponent Owner;
         public int RemainingRounds;
+        public int StackCount = 1;
+        private readonly List<AppliedStatModifier> m_appliedModifiers = new List<AppliedStatModifier>();
 
-        public ActiveSkillEffect(SkillEffect def, GameObject source, int remainingRounds)
+        public IReadOnlyList<AppliedStatModifier> AppliedModifiers => m_appliedModifiers;
+
+        public ActiveSkillEffect(SkillEffect def, GameObject source, AbilitySystemComponent owner, int remainingRounds)
         {
             Definition = def;
             Source = source;
+            Owner = owner;
             RemainingRounds = remainingRounds;
+        }
+
+        public void RecordAppliedModifier(GameplayTag attribute, float value)
+        {
+            m_appliedModifiers.Add(new AppliedStatModifier(attribute, value));
+        }
+    }
+
+    public readonly struct AppliedStatModifier
+    {
+        public readonly GameplayTag Attribute;
+        public readonly float Value;
+
+        public AppliedStatModifier(GameplayTag attribute, float value)
+        {
+            Attribute = attribute;
+            Value = value;
         }
     }
 }

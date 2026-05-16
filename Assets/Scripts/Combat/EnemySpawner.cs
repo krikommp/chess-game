@@ -20,7 +20,7 @@ namespace MiniChess.Combat
 
         [Header("Skills")]
         [Tooltip("Skills assigned to the spawned enemy unit. MVP test scenes should assign basic_move here.")]
-        [SerializeField] private SkillAbility[] m_defaultSkills;
+        [SerializeField] private SkillDefinition[] m_defaultSkills;
 
         private void Awake()
         {
@@ -59,7 +59,7 @@ namespace MiniChess.Combat
             go.AddComponent<MovementController>();
 
             AbilitySystemComponent skillExecutor = go.AddComponent<AbilitySystemComponent>();
-            skillExecutor.SetSkills(m_defaultSkills);
+            skillExecutor.SetSkillDefinitions(m_defaultSkills);
         }
     }
 }

@@ -22,6 +22,7 @@ namespace MiniChess.Combat
         [SerializeField] private KeyCode m_endTurnKey = KeyCode.Space;
 
         private GameObject m_selectedUnit;
+        public GameObject SelectedUnit => m_selectedUnit;
 
         private void Awake()
         {
@@ -37,22 +38,7 @@ namespace MiniChess.Combat
                 go.AddComponent<NavMeshService>();
             }
 
-            if (m_roundManager == null)
-            {
-                // Bypass round controller: auto-select first human-controlled unit
-                foreach (var cu in FindObjectsOfType<CombatUnit>())
-                {
-                    if (!cu.gameObject.activeInHierarchy) continue;
-                    var tagComp = cu.GetComponent<GameplayTagComponent>();
-                    if (tagComp == null) continue;
-                    if (!tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact)) continue;
-                    var attr = cu.GetComponent<AttributeSet>();
-                    if (attr == null || !attr.IsAlive) continue;
-
-                    SelectUnit(cu.gameObject);
-                    break;
-                }
-            }
+            TrySelectDefaultPlayerUnit();
         }
 
         private void OnEnable()
@@ -102,6 +88,31 @@ namespace MiniChess.Combat
             TrySelectUnit(unit);
         }
 
+        public bool TrySelectDefaultPlayerUnit()
+        {
+            if (m_selectedUnit != null)
+                return true;
+
+            if (m_roundManager != null && m_roundManager.ControllableUnits.Count > 0)
+                return TrySelectUnit(m_roundManager.ControllableUnits[0]);
+
+            foreach (var cu in FindObjectsOfType<CombatUnit>())
+            {
+                if (IsSelectableHumanUnit(cu != null ? cu.gameObject : null))
+                {
+                    SelectUnit(cu.gameObject);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void HandleInputRequest(SkillInputRequest request)
+        {
+            OnInputReceived(request);
+        }
+
         private bool TrySelectUnit(GameObject unit)
         {
             if (unit == null) return false;
@@ -113,11 +124,7 @@ namespace MiniChess.Combat
             }
             else
             {
-                var tagComp = unit.GetComponent<GameplayTagComponent>();
-                if (tagComp == null || !tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
-                    return false;
-                var attr = unit.GetComponent<AttributeSet>();
-                if (attr == null || !attr.IsAlive) return false;
+                if (!IsSelectableHumanUnit(unit)) return false;
             }
 
             SelectUnit(unit);
@@ -134,9 +141,21 @@ namespace MiniChess.Combat
 
             // Activate basic_move
             var executor = unit.GetComponent<AbilitySystemComponent>();
-            var moveSkill = executor != null ? executor.FindSkill("basic_move") : null;
+            var moveSkill = executor != null ? executor.FindAbility("basic_move") : null;
             if (moveSkill != null)
-                executor.ActivateSkill(moveSkill);
+                executor.ActivateAbility(moveSkill);
+        }
+
+        private static bool IsSelectableHumanUnit(GameObject unit)
+        {
+            if (unit == null || !unit.activeInHierarchy) return false;
+
+            var tagComp = unit.GetComponent<GameplayTagComponent>();
+            if (tagComp == null || !tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                return false;
+
+            var attr = unit.GetComponent<AttributeSet>();
+            return attr != null && attr.IsAlive;
         }
 
         // ── Input handling (moved from GroundMoveAbility.HandleInput) ──
@@ -166,19 +185,16 @@ namespace MiniChess.Combat
 
             // Route ground-point input to movement handling
             var executor = m_selectedUnit.GetComponent<AbilitySystemComponent>();
-            var activeSkill = executor?.ActiveSkill;
+            var activeSkill = executor?.ActiveAbility;
 
-            if (activeSkill != null && activeSkill is GroundMoveAbility)
+            if (activeSkill != null && activeSkill.Ability is GroundMoveAbility)
             {
                 HandleMoveInput(executor, activeSkill, request);
                 return;
             }
-
-            // Fallback: route to executor for other skill types
-            executor?.HandleInputLegacy(request, activeSkill);
         }
 
-        private void HandleMoveInput(AbilitySystemComponent executor, SkillAbility moveSkill, SkillInputRequest request)
+        private void HandleMoveInput(AbilitySystemComponent executor, AbilitySpec moveSkill, SkillInputRequest request)
         {
             if (!request.IsTarget(SkillInputTag.k_TargetGround) || !request.HasWorldPosition)
             {

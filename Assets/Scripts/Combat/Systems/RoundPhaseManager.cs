@@ -17,13 +17,13 @@ namespace MiniChess.Combat
     {
         [Header("System Skills")]
         [Tooltip("Executed on each alive unit when a new round starts.")]
-        [SerializeField] private SkillAbility m_sysRoundStart;
+        [SerializeField] private SkillDefinition m_sysRoundStart;
 
         [Tooltip("Executed on a unit when its turn ends.")]
-        [SerializeField] private SkillAbility m_sysTurnEnd;
+        [SerializeField] private SkillDefinition m_sysTurnEnd;
 
         [Tooltip("Executed on a unit when it dies (HP <= 0).")]
-        [SerializeField] private SkillAbility m_sysOnDeath;
+        [SerializeField] private SkillDefinition m_sysOnDeath;
 
         [Header("Refs")]
         [SerializeField] private CombatRoundManager m_roundManager;
@@ -76,7 +76,7 @@ namespace MiniChess.Combat
             ExecuteSystemSkill(unit, m_sysOnDeath, "sys_on_death");
         }
 
-        private void ExecuteSystemSkill(GameObject unit, SkillAbility skill, string logLabel)
+        private void ExecuteSystemSkill(GameObject unit, SkillDefinition skill, string logLabel)
         {
             if (unit == null || skill == null) return;
 
@@ -87,7 +87,8 @@ namespace MiniChess.Combat
             if (executor == null) return;
 
             // System skills are self-targeted
-            var result = executor.Execute(skill, unit);
+            var spec = AbilitySpec.FromDefinition(skill, unit, this);
+            var result = executor.Execute(spec, unit);
             if (!result.IsSuccess)
             {
                 Debug.Log($"[RoundPhase] {unit.name}: {logLabel} partially blocked — {result.FailureMessage}");

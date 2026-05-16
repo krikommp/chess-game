@@ -23,15 +23,19 @@ namespace MiniChess.Combat.Skills
             return SkillEffectResult.Success(m_amount);
         }
 
-        public override void Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
+        public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
             var targetAttr = context.Target?.GetComponent<AttributeSet>();
-            if (targetAttr == null || !targetAttr.IsAlive) return;
+            if (targetAttr == null || !targetAttr.IsAlive)
+                return SkillEffectResult.Fail(ESkillCastFailure.TargetInvalid, "Target has no living AttributeSet.");
 
-            if (string.IsNullOrEmpty(m_attributeTag.Value)) return;
+            if (string.IsNullOrEmpty(m_attributeTag.Value))
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed,
+                    "ModifyAttribute: no attribute tag configured.");
 
             float delta = computed.ComputedValue;
             targetAttr.Modify(m_attributeTag, delta);
+            return SkillEffectResult.Success(delta);
         }
     }
 }

@@ -12,3 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0967e0d0e56fa094fa2e1038541da08d, type: 3}
   m_Name: GroundMoveAbility
   m_EditorClassIdentifier: 
+  m_id: 
+  m_displayName: 
+  m_description: 
+  m_costs:
+  - {fileID: 11400000, guid: 7d42c9930ed72144786cae966400f4df, type: 2}
+  m_cooldowns: []
+  m_effects: []
+  m_requiredCasterTags: []
+  m_blockedCasterTags: []
+  m_requiredTargetTags: []
+  m_blockedTargetTags: []
