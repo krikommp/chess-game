@@ -126,10 +126,10 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - 轮到敌方单位时，`CombatRoundManager` 使用与玩家选择相同的 `CameraController` 聚焦逻辑将相机聚焦到该敌方单位。
 - 一轮开始时，所有存活单位 `CurrentAP = MaxAP`，并清除本轮结束标记。
 - 玩家可用数字键快捷选择可控块内角色，也可点击角色在本块内切换；当前数字键支持数量是输入方案限制，不代表队伍人数上限。
-- 选中玩家角色后，系统自动激活该角色自身 `SkillExecutor` 上配置的 `basic_move` 技能作为当前默认行为。若该角色没有配置 `basic_move`，该角色不能执行地面移动，并输出明确警告。
+- 选中玩家角色后，系统自动激活该角色自身 `AbilitySystemComponent` 上配置的 `basic_move` 技能作为当前默认行为。若该角色没有配置 `basic_move`，该角色不能执行地面移动，并输出明确警告。
 - `InputController` 是纯输入接收器，只把鼠标 hover / 主键点击翻译成 `SkillInputRequest`，其中包含输入信号 Tag、目标语义 Tag、命中对象和世界坐标参数。
-- 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 `SkillExecutor` 统一执行。输入层不能直接调用 `Player1Controller.TryMove` 绕过技能系统。
-- 角色必须通过自身 `SkillExecutor.availableSkills` 配置可用技能资产。`CombatRoundManager` 只做缺失技能的警告，不再启动时向角色自动注入 `basic_move` 或其他默认技能；运行时生成敌人由 `EnemySpawner.m_defaultSkills` 写入生成对象的 `SkillExecutor`。
+- 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；`UnitTurnHandler` 只把请求路由给当前单位的 `AbilitySystemComponent`。当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 `AbilitySystemComponent` 统一执行。输入层和玩家回合处理器不能直接调用 `Player1Controller.TryMove` 或特判移动技能绕过 ASC。
+- 角色必须通过自身 `AbilitySystemComponent.availableSkills` 配置可用技能资产。`CombatRoundManager` 只做缺失技能的警告，不再启动时向角色自动注入 `basic_move` 或其他默认技能；运行时生成敌人由 `EnemySpawner.m_defaultSkills` 写入生成对象的 `AbilitySystemComponent`。
 - 移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
 - 移动 AP 不在下达指令时预扣，而是在角色实际移动距离累计达到 `MoveSpeedMetersPerAp` 时扣除；未满 1 AP 的累计距离会保留到本轮后续移动。
 - 当前玩家输入只要求支持点击地面移动。主动攻击技能如何释放（点击敌人、技能栏选择、快捷键等）待 AI 框架大体跑通后继续设计。

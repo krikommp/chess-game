@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using MiniChess.GameplayTags;
 using UnityEditor;
@@ -9,23 +8,13 @@ namespace MiniChess.EditorTools
     [CustomPropertyDrawer(typeof(GameplayTag))]
     public class GameplayTagDrawer : PropertyDrawer
     {
-        private const string k_RegistryPath = "Assets/Data/Tags/GameplayTagRegistry.asset";
-
-        private static TagRegistry s_registry;
-        private static List<string> s_registeredTagValues = new List<string>();
-        private static double s_lastLoadAttemptTime;
-        private static int s_loadFailCount;
-
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            EnsureRegistryLoaded();
-
             var valueProp = property.FindPropertyRelative("m_value");
             var idProp = property.FindPropertyRelative("m_id");
 
             EditorGUI.BeginProperty(position, label, property);
 
-            // Layout: label | text field | dropdown button | validation icon
             Rect labelRect = EditorGUI.PrefixLabel(position, label);
             float btnWidth = 20f;
             float iconWidth = 20f;
@@ -37,7 +26,6 @@ namespace MiniChess.EditorTools
 
             string currentValue = valueProp.stringValue;
 
-            // Text field
             EditorGUI.BeginChangeCheck();
             string newValue = EditorGUI.TextField(fieldRect, currentValue);
             if (EditorGUI.EndChangeCheck())
@@ -47,13 +35,11 @@ namespace MiniChess.EditorTools
                 valueProp.serializedObject.ApplyModifiedProperties();
             }
 
-            // Dropdown button
-            if (GUI.Button(btnRect, "▼", EditorStyles.miniButton))
+            if (GUI.Button(btnRect, "v", EditorStyles.miniButton))
             {
                 ShowTagMenu(valueProp, idProp);
             }
 
-            // Validation indicator
             DrawValidationIndicator(iconRect, currentValue);
 
             EditorGUI.EndProperty();
@@ -68,9 +54,10 @@ namespace MiniChess.EditorTools
         {
             if (string.IsNullOrEmpty(value))
             {
-                // Empty is technically invalid but common as default — no indicator
+                return;
             }
-            else if (!GameplayTag.IsValid(value))
+
+            if (!GameplayTag.IsValid(value))
             {
                 GUIContent errorIcon = EditorGUIUtility.IconContent("console.erroricon");
                 if (errorIcon != null && errorIcon.image != null)
@@ -78,12 +65,12 @@ namespace MiniChess.EditorTools
                     GUI.Label(rect, new GUIContent(errorIcon.image, $"Invalid tag: '{value}'"));
                 }
             }
-            else if (!IsRegistered(value))
+            else if (!GameplayTagEditorSources.IsKnown(value))
             {
                 GUIContent warnIcon = EditorGUIUtility.IconContent("console.warnicon");
                 if (warnIcon != null && warnIcon.image != null)
                 {
-                    GUI.Label(rect, new GUIContent(warnIcon.image, $"Unregistered tag: '{value}'"));
+                    GUI.Label(rect, new GUIContent(warnIcon.image, $"Unknown tag: '{value}'"));
                 }
             }
         }
@@ -91,15 +78,15 @@ namespace MiniChess.EditorTools
         private void ShowTagMenu(SerializedProperty valueProp, SerializedProperty idProp)
         {
             var menu = new GenericMenu();
+            var tagValues = GameplayTagEditorSources.KnownTagValues;
 
-            if (s_registeredTagValues.Count == 0)
+            if (tagValues.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("(No registered tags in TagRegistry)"));
+                menu.AddDisabledItem(new GUIContent("(No tags in TagRegistry)"));
             }
             else
             {
-                // Group by root segment
-                var groups = s_registeredTagValues
+                var groups = tagValues
                     .GroupBy(v =>
                     {
                         int dotIdx = v.IndexOf('.');
@@ -113,7 +100,10 @@ namespace MiniChess.EditorTools
                     {
                         string captured = tagValue;
                         int capturedHash = GameplayTag.ComputeTagHash(captured);
-                        bool isCurrent = string.Equals(valueProp.stringValue, tagValue, System.StringComparison.OrdinalIgnoreCase);
+                        bool isCurrent = string.Equals(
+                            valueProp.stringValue,
+                            tagValue,
+                            System.StringComparison.OrdinalIgnoreCase);
 
                         string menuPath = tagValue.Replace('.', '/');
                         menu.AddItem(
@@ -124,67 +114,23 @@ namespace MiniChess.EditorTools
                                 valueProp.stringValue = captured;
                                 idProp.intValue = capturedHash;
                                 valueProp.serializedObject.ApplyModifiedProperties();
-                            }
-                        );
+                            });
                     }
                 }
             }
 
-            // Add "Clear" option
-            menu.AddSeparator("");
-            menu.AddItem(new GUIContent("Clear"), false, () =>
-            {
-                valueProp.stringValue = string.Empty;
-                idProp.intValue = 0;
-                valueProp.serializedObject.ApplyModifiedProperties();
-            });
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(
+                new GUIContent("Clear"),
+                false,
+                () =>
+                {
+                    valueProp.stringValue = string.Empty;
+                    idProp.intValue = 0;
+                    valueProp.serializedObject.ApplyModifiedProperties();
+                });
 
             menu.ShowAsContext();
-        }
-
-        private void EnsureRegistryLoaded()
-        {
-            double now = EditorApplication.timeSinceStartup;
-
-            // Determine retry interval: immediate on first attempt, then exponential backoff
-            double retryInterval = s_loadFailCount == 0 ? 0.0
-                : s_loadFailCount == 1 ? 0.1
-                : s_loadFailCount == 2 ? 0.5
-                : s_loadFailCount == 3 ? 2.0
-                : 5.0;
-
-            bool needsLoad = s_registry == null || (now - s_lastLoadAttemptTime) >= retryInterval;
-
-            if (!needsLoad)
-                return;
-
-            s_lastLoadAttemptTime = now;
-            s_registry = AssetDatabase.LoadAssetAtPath<TagRegistry>(k_RegistryPath);
-
-            if (s_registry != null)
-            {
-                s_loadFailCount = 0;
-                s_registeredTagValues = s_registry.Entries
-                    .Select(e =>
-                    {
-                        try { return e.Tag.Value; }
-                        catch { return null; }
-                    })
-                    .Where(v => !string.IsNullOrEmpty(v))
-                    .Distinct(System.StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(v => v, System.StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            else
-            {
-                s_loadFailCount++;
-                s_registeredTagValues.Clear();
-            }
-        }
-
-        private bool IsRegistered(string value)
-        {
-            return s_registeredTagValues.Contains(value, System.StringComparer.OrdinalIgnoreCase);
         }
     }
 }

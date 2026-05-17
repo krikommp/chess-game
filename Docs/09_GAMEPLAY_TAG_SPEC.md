@@ -174,6 +174,24 @@ public struct GameplayTagRef {
 
 第一阶段允许底层序列化仍使用字符串，但必须通过 `GameplayTagRef` / `TagRegistry` / 集中校验入口访问，不允许配置界面直接散落裸字符串。
 
+### 5.3 代码生成常量
+
+代码侧 Tag 采用 Registry-first 数据驱动模式：
+
+```csharp
+GameplayTagConstants.Control.Human
+GameplayTagConstants.Attribute.AP
+```
+
+规则：
+
+- `TagRegistry.asset` 是唯一正式命名源。
+- 业务代码不得散落 `new GameplayTag("...")`；需要代码引用的 Tag 必须先添加到 `TagRegistry.asset`。
+- `TagRegistry.asset` 变更后由 `AssetPostprocessor` 自动生成 `GameplayTagConstants.g.cs`。
+- 代码侧只引用 `GameplayTagConstants`，不再维护手写 Native Tag 常量。
+- 编辑器 Drawer、Combat Config 与 Validation 都读取 `TagRegistry.asset`，保证编辑器与代码生成来源一致。
+- 扫描旧代码中的硬编码 Tag 只用于迁移诊断，不作为正式 Tag 来源。
+
 ## 6. 编辑器工具
 
 第一阶段 Combat Config 编辑器就应包含 Tag 管理页。Tag 是后续技能、AI、Effect 和事件设计的前置系统，不能长期依赖手写字符串。

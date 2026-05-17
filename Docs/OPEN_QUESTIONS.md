@@ -181,9 +181,9 @@
 ### Q-0026 GameplayTag 命名空间与校验来源
 - 来源：2026-05-10 用户需求 / `05_SKILL_SPEC.md` §4.5 / `09_GAMEPLAY_TAG_SPEC.md`
 - 问题：GameplayTag 是先采用自由字符串 + 集中匹配工具，还是马上建立全局 TagRegistry / TagDatabase 来统一命名空间、自动补全和非法 Tag 校验？
-- 当前临时假设：**第一阶段就建立 `GameplayTagRegistry.asset` 与 Combat Config 的 Tags / Validation 入口**；底层序列化可以暂时使用字符串，但配置必须通过 TagRegistry 和集中校验访问。
-- 决议：**Tag 系统优先完成，并包含编辑器第一版**。先实现运行时 Tag 闭环，再实现 TagRegistry 与 Combat Config 的 Tags / Validation 页，之后再进入 SkillDefinition / Effect / SkillExecutor。
-- 影响：`GameplayTag` / `GameplayTagSet` / `SkillDefinition` / `EffectDefinition` / `Status` / `AIProfile` / Combat Config 编辑器
+- 当前临时假设：**采用 Registry-first 数据驱动模式**：`TagRegistry.asset` 是唯一正式命名源，变更后由 `AssetPostprocessor` 生成 `GameplayTagConstants.g.cs`，代码侧直接引用生成常量。
+- 决议：**TagRegistry.asset 是唯一正式来源**。业务代码唯一正式入口是 `GameplayTagConstants`；不再维护手写 Native Tag 常量；业务代码不得散落 `new GameplayTag("...")`。旧硬编码扫描只用于迁移诊断，不作为正式来源。
+- 影响：`GameplayTag` / `GameplayTagSet` / `GameplayTagConstants.g.cs` / `GameplayTagDrawer` / `SkillDefinition` / `EffectDefinition` / `Status` / `AIProfile` / Combat Config 编辑器
 
 ### Q-0027 GameplayTag 运行时注册规则
 - 来源：2026-05-10 用户需求 / `09_GAMEPLAY_TAG_SPEC.md`
@@ -267,7 +267,7 @@
 | AP 消耗迁移到 Costs: Effect[]，不设独立 `GetApCost`，并删除 `SkillDefinition.apCost` | ✅ 已确认（2026-05-12） |
 | 冷却 = Persistent Status + `Cooldown.{id}` Tag + BlockedTags 检查 | ✅ 已确认 |
 | `SkillDefinition.cooldown` 旧字段是否保留 | ✅ 不保留，删除旧字段（2026-05-12） |
-| HandleInput 从 Ability 移出，输入解析由 UnitTurnHandler 负责 | ✅ 已确认 |
+| HandleInput 从 SkillAbility 基类移出；UnitTurnHandler 只负责玩家输入路由；具体技能输入解释由当前 Ability 的 `ISkillInputHandler` 或后续 Ability Targeting 层负责 | ✅ 已确认（2026-05-17 修正边界） |
 | MovementController 删除 AP 扣除，变为纯移动工具 | ✅ 已确认 |
 | GroundMoveAbility 复用 CombatMovementResolver | ✅ 已确认；主动移动由 Ability 直接调用 MovementController，不再需要 MoveEffect（2026-05-12） |
 | SkillDefinition 层 Tag 条件字段是否保留 | ✅ 保留，用于技能级全局判断（2026-05-12） |
@@ -289,7 +289,7 @@
 1. **Effect 是纯数据配置**。Effect 不驱动流程，也不通过用户继承子类扩展行为；它只保存静态 EffectFunction 引用、参数、数值、Tag、条件、目标映射等配置。
 2. **Ability 是可扩展流程类**。Ability 开放给用户编写具体技能流程；基类只提供通用 Tag / Cost / Cooldown / Effect 检查与应用 helper。
 3. **MovementController 是纯移动工具**。不负责 AP 扣除、校验等业务逻辑。
-4. **HandleInput 从 Ability 移出**。输入解析由 UnitTurnHandler 负责。
+4. **HandleInput 从 SkillAbility 基类移出**。UnitTurnHandler 只负责玩家输入路由；具体技能输入解释由当前 Ability 的 `ISkillInputHandler` 或后续 Ability Targeting 层负责。
 
 ### Ability 结构
 

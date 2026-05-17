@@ -20,7 +20,7 @@
              │ 选择单位、转发输入       │ 选技能、移动、攻击
              ▼                         ▼
      ┌─────────────────────────────────────────┐
-     │            SkillExecutor                │  ← 每个单位一个
+     │       AbilitySystemComponent            │  ← 每个单位一个
      │  校验 → 扣AP → 移动 → 执行Effect → 冷却 │
      └────────────────┬────────────────────────┘
                       │ 读取/写入
@@ -39,8 +39,8 @@
 | 组件 | 作用 |
 |------|------|
 | **CombatRoundManager** | 回合状态机。`FindObjectsOfType<CombatUnit>()` 收集单位 → 按先攻排序 → 维护可控块 → 广播 `RoundStarted` / `UnitTurnStarted` / `UnitTurnEnded` / `CombatEnded`。自身不含任何游戏逻辑（AP/技能/冷却/移动/AI/输入/相机都不在它内部） |
-| **UnitTurnHandler** | 玩家回合调度。订阅 `UnitTurnStarted`，通过 `GameplayTagComponent.HasTag(Control.Human)` 筛选 → 选中单位 → 相机聚焦 → 激活 basic_move → 转发点击输入给 SkillExecutor。Update 中处理数字键(1-4)切换单位、Space 结束回合 |
-| **EnemyTurnRunner** | 敌方 AI 回合调度。订阅 `UnitTurnStarted`，通过 `GameplayTagComponent.HasTag(Control.AI)` 筛选 → 启动 AI 评估 → 通过 SkillExecutor 执行最优候选。当前为硬编码 MVP 逻辑（找最近玩家 → 移动 → 攻击），未使用 AIProfile |
+| **UnitTurnHandler** | 玩家回合调度。订阅 `UnitTurnStarted`，通过 `GameplayTagComponent.HasTag(Control.Human)` 筛选 → 选中单位 → 相机聚焦 → 激活 basic_move → 转发点击输入给 `AbilitySystemComponent`。不特判具体 Ability，也不构造移动路径。Update 中处理数字键(1-4)切换单位、Space 结束回合 |
+| **EnemyTurnRunner** | 敌方 AI 回合调度。订阅 `UnitTurnStarted`，通过 `GameplayTagComponent.HasTag(Control.AI)` 筛选 → 启动 AI 评估 → 通过 `AbilitySystemComponent` 执行最优候选。当前为硬编码 MVP 逻辑（找最近玩家 → 移动 → 攻击），未使用 AIProfile |
 | **InputController** | 纯输入层。鼠标 Raycast → 读点击对象的 `GameplayTagComponent`（Control.Human → k_TargetHuman, Control.AI → k_TargetAI, 地面 → k_TargetGround）→ 发出 `SkillInputRequest` |
 | **CameraController** | 通常挂在 `Main Camera` 上。45° 固定角相机，支持 WASD/中键拖拽平移、滚轮缩放、`FocusOn(Transform)` 平滑跟随 |
 
@@ -55,7 +55,7 @@
 | **CombatUnit** | MonoBehaviour（空） | 纯标记。让 `FindObjectsOfType<CombatUnit>()` 发现参战单位，解耦具体控制器类型 |
 | **AttributeSet** | MonoBehaviour | 运行时属性容器。`Get(HP)` / `Modify(HP, -20)` / `TrySpend(AP, 1)` / `Faction` / `IsAlive`。通过 `AttributeSetDef` SO 初始化。`Awake()` 中自动同步 Faction Tag 到 GameplayTagComponent |
 | **MovementController** | MonoBehaviour `[RequireComponent(NavMeshAgent, AttributeSet)]` | NavMeshAgent 包装器。`TryStartMove(path)` → 每帧按实际移动距离扣 AP。`IsMoving` / `ResetUnpaidDistance()` / `RemainingMoveDistance` |
-| **SkillExecutor** | MonoBehaviour | 技能执行统一入口。`CanExecute(ctx)` → `Execute(ctx)` → Tag 条件校验 → 调 SkillAbility.Execute() → 由 Ability 内部处理 Costs/Cooldowns/Effects。管理 `AvailableSkills`、冷却追踪、持续 Effect 每回合 tick |
+| **AbilitySystemComponent** | MonoBehaviour | 技能执行统一入口。`CanExecute(ctx)` → `Execute(ctx)` → Tag 条件校验 → 调 SkillAbility.Execute() → 由 Ability 内部处理 Costs/Cooldowns/Effects。`HandleInput(request)` 将输入交给当前激活技能的 `ISkillInputHandler`。管理 `AvailableSkills`、冷却追踪、持续 Effect 每回合 tick |
 | **GameplayTagComponent** | MonoBehaviour | 运行时 Tag 容器。`AddTag(tag, source)` / `HasTag(tag, mode)` / `RemoveAllTagsFromSource(source)`。技能条件、AI 决策、Effect 都查它 |
 
 ### 控制权标识（通过 Tag，非组件）
@@ -78,7 +78,7 @@
   GameplayTagComponent  (Control.Human / Control.AI + Faction.Player / Faction.Enemy 等)
   AttributeSet          (挂 AttributeSetDef SO)
   MovementController    (自动添加 NavMeshAgent)
-  SkillExecutor         (挂 basic_move 等 SkillAbility)
+  AbilitySystemComponent (挂 basic_move 等 SkillAbility)
   (后续) UnitVisualController  (纯视觉：颜色切换、闪红、死亡 VFX)
   (后续) AIUnitConfig          (仅 AI 单位：挂 AIProfile 引用)
 ```
@@ -87,8 +87,8 @@
 
 | 组件 | 删除日期 | 替代方案 |
 |------|---------|---------|
-| **Player1Controller** | 2026-05-12 | Tag `Control.Human` + SkillExecutor。视觉状态（颜色切换）→ `UnitVisualController`(待实现)；PartySlot → UnitTurnHandler 管理 |
-| **EnemyController** | 2026-05-12 | Tag `Control.AI` + SkillExecutor。死亡处理 → `sys_on_death` 系统技能；FlashTurn → `UnitVisualController`(待实现)；AIProfile → `AIUnitConfig`(待实现) |
+| **Player1Controller** | 2026-05-12 | Tag `Control.Human` + `AbilitySystemComponent`。视觉状态（颜色切换）→ `UnitVisualController`(待实现)；PartySlot → UnitTurnHandler 管理 |
+| **EnemyController** | 2026-05-12 | Tag `Control.AI` + `AbilitySystemComponent`。死亡处理 → `sys_on_death` 系统技能；FlashTurn → `UnitVisualController`(待实现)；AIProfile → `AIUnitConfig`(待实现) |
 
 ---
 
@@ -96,7 +96,7 @@
 
 | 资产 | 路径 | 用途 |
 |------|------|------|
-| **SkillAbility** (抽象) | `Assets/Data/Skills/` | 技能资产基类，合并了原 SkillDefinition 和 SkillAbility。一个 ScriptableObject = 一个技能。属性分三组：**Identity** (id/displayName/description)、**Execution Slots** (costs[]/cooldowns[]/effects[])、**Tag Conditions** (requiredCasterTags[]/blockedCasterTags[]/requiredTargetTags[]/blockedTargetTags[])。子类实现 `abstract Execute(context)`。当前具体类：`GroundMoveAbility`（地面移动）、`SimpleTargetAbility`（单目标技能） |
+| **SkillAbility** (抽象) | `Assets/Data/Skills/` | 技能资产基类，合并了原 SkillDefinition 和 SkillAbility。一个 ScriptableObject = 一个技能。属性分三组：**Identity** (id/displayName/description)、**Execution Slots** (costs[]/cooldowns[]/effects[])、**Tag Conditions** (requiredCasterTags[]/blockedCasterTags[]/requiredTargetTags[]/blockedTargetTags[])。子类实现 `abstract Execute(context)`。需要解释输入的技能额外实现 `ISkillInputHandler`。当前具体类：`GroundMoveAbility`（地面移动）、`SimpleTargetAbility`（单目标技能） |
 | **EffectDefinition** (sealed) | `Assets/Data/Effects/` | 效果数据。**Function** (EEffectFunction 枚举决定行为)、**参数** (amount/attributeTag/cooldownSkillId 等)、**Duration** (Instant/Persistent + StackRule + TickPerRound)、**Tag 互作** (tags[]/grantedTags[]/removeTags[]/requiredTags[]/blockedTags[])、**Stat Modifiers**、**Granted Abilities**。接口：`Compute(ctx)→EffectResult` / `Apply(ctx, result)` |
 | **AttributeSetDef** | `Assets/Data/` | 属性模板：定义单位有哪些属性(HP/AP/Initiative/MoveSpeed)，初始值和最大值 |
 | **AIProfile** | `Assets/Data/` | AI 行为档案：Role(Aggressive/Support/Healer)、healHpThreshold、skillTagWeights、targetTagWeights、statusTagWeights（数据结构完整，但 EnemyTurnRunner 尚未使用） |

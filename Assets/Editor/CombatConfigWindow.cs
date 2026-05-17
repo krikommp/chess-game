@@ -93,7 +93,7 @@ namespace MiniChess.EditorTools
 
         private void DrawTagsTab()
         {
-            EditorGUILayout.LabelField("Tag Registry", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Gameplay Tags", EditorStyles.boldLabel);
             EditorGUILayout.LabelField("Path", k_RegistryAssetPath);
             EditorGUILayout.Space(4);
 
@@ -129,7 +129,6 @@ namespace MiniChess.EditorTools
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
 
-            // Tag list
             var filtered = string.IsNullOrWhiteSpace(m_tagSearch)
                 ? m_registry.Entries.ToList()
                 : m_registry.Entries
@@ -230,6 +229,7 @@ namespace MiniChess.EditorTools
             EditorUtility.SetDirty(m_registry);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            GameplayTagEditorSources.Reload();
 
             m_newTagValue = string.Empty;
             m_newTagDisplayName = string.Empty;
@@ -255,6 +255,7 @@ namespace MiniChess.EditorTools
             EditorUtility.SetDirty(m_registry);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            GameplayTagEditorSources.Reload();
         }
 
         // ── Stub ETab ───────────────────────────────────────────
@@ -544,7 +545,7 @@ namespace MiniChess.EditorTools
                 AddError($"Invalid tag format in {context}: '{tag.Value}'", assetPath);
                 return;
             }
-            if (m_registry != null && !m_registry.IsRegistered(tag))
+            if (!GameplayTagEditorSources.IsKnown(tag.Value))
             {
                 AddWarning($"Unregistered tag in {context}: '{tag.Value}'", assetPath);
             }

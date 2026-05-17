@@ -1,5 +1,6 @@
 using System.Collections;
 using MiniChess.Combat.Skills;
+using MiniChess.GameplayTags.Generated;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -43,7 +44,8 @@ namespace MiniChess.Combat
 
             // Check Control.AI tag instead of EnemyController component
             var tagComp = unit.GetComponent<GameplayTags.GameplayTagComponent>();
-            if (tagComp == null || !tagComp.HasTag(new GameplayTags.GameplayTag("Control.AI"),
+            if (tagComp == null || !tagComp.HasTag(
+                    GameplayTagConstants.Control.AI,
                     GameplayTags.ETagMatchMode.Exact))
                 return;
 

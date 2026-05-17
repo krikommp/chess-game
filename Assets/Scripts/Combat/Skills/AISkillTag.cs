@@ -1,15 +1,16 @@
 using MiniChess.GameplayTags;
+using MiniChess.GameplayTags.Generated;
 
 namespace MiniChess.Combat.Skills
 {
     public static class AISkillTag
     {
-        public static readonly GameplayTag k_Damage = new GameplayTag("AI.Skill.Damage");
-        public static readonly GameplayTag k_Heal = new GameplayTag("AI.Skill.Heal");
-        public static readonly GameplayTag k_Buff = new GameplayTag("AI.Skill.Buff");
-        public static readonly GameplayTag k_Debuff = new GameplayTag("AI.Skill.Debuff");
-        public static readonly GameplayTag k_Mobility = new GameplayTag("AI.Skill.Mobility");
-        public static readonly GameplayTag k_Control = new GameplayTag("AI.Skill.Control");
-        public static readonly GameplayTag k_Protect = new GameplayTag("AI.Skill.Protect");
+        public static readonly GameplayTag k_Damage = GameplayTagConstants.AI.Skill.Damage;
+        public static readonly GameplayTag k_Heal = GameplayTagConstants.AI.Skill.Heal;
+        public static readonly GameplayTag k_Buff = GameplayTagConstants.AI.Skill.Buff;
+        public static readonly GameplayTag k_Debuff = GameplayTagConstants.AI.Skill.Debuff;
+        public static readonly GameplayTag k_Mobility = GameplayTagConstants.AI.Skill.Mobility;
+        public static readonly GameplayTag k_Control = GameplayTagConstants.AI.Skill.Control;
+        public static readonly GameplayTag k_Protect = GameplayTagConstants.AI.Skill.Protect;
     }
 }

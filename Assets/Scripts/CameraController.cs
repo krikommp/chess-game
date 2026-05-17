@@ -1,5 +1,6 @@
 ﻿using MiniChess.Combat;
 using MiniChess.GameplayTags;
+using MiniChess.GameplayTags.Generated;
 using UnityEngine;
 
 public class CameraController : MonoBehaviour
@@ -122,7 +123,7 @@ public class CameraController : MonoBehaviour
             {
                 if (!cu.gameObject.activeInHierarchy) continue;
                 var tagComp = cu.GetComponent<GameplayTagComponent>();
-                if (tagComp != null && tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                if (tagComp != null && tagComp.HasTag(GameplayTagConstants.Control.Human, ETagMatchMode.Exact))
                 {
                     var attr = cu.GetComponent<AttributeSet>();
                     if (attr != null && attr.IsAlive)

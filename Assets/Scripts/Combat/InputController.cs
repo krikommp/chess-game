@@ -1,5 +1,6 @@
 using System;
 using MiniChess.GameplayTags;
+using MiniChess.GameplayTags.Generated;
 using UnityEngine;
 
 namespace MiniChess.Combat
@@ -71,12 +72,12 @@ namespace MiniChess.Combat
                 var tagComp = hitCombatUnit.GetComponent<GameplayTagComponent>();
                 if (tagComp != null)
                 {
-                    if (tagComp.HasTag(new GameplayTag("Control.Human"), ETagMatchMode.Exact))
+                    if (tagComp.HasTag(GameplayTagConstants.Control.Human, ETagMatchMode.Exact))
                     {
                         semanticTarget = hitCombatUnit.gameObject;
                         return SkillInputTag.k_TargetPlayer;
                     }
-                    if (tagComp.HasTag(new GameplayTag("Control.AI"), ETagMatchMode.Exact))
+                    if (tagComp.HasTag(GameplayTagConstants.Control.AI, ETagMatchMode.Exact))
                     {
                         semanticTarget = hitCombatUnit.gameObject;
                         return SkillInputTag.k_TargetEnemy;

@@ -209,12 +209,17 @@ namespace MiniChess.Combat.Skills
             return Execute(skill, target);
         }
 
-        public SkillCastResult HandleInputLegacy(SkillInputRequest request, SkillAbility activeSkill)
+        public SkillCastResult HandleInput(SkillInputRequest request)
         {
-            if (activeSkill == null)
+            if (m_activeSkill == null)
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "No active skill.");
 
-            return SkillCastResult.Success();
+            if (!(m_activeSkill is ISkillInputHandler inputHandler))
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
+                    $"Active skill '{m_activeSkill.Id}' does not handle input.");
+
+            var context = SkillExecutionContext.ForInput(this, m_activeSkill, request);
+            return inputHandler.HandleInput(context);
         }
 
         // ── Effect management ───────────────────────────────────────

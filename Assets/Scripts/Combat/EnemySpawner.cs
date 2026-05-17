@@ -1,4 +1,5 @@
 using MiniChess.GameplayTags;
+using MiniChess.GameplayTags.Generated;
 using MiniChess.Combat.Skills;
 using UnityEngine;
 
@@ -45,8 +46,8 @@ namespace MiniChess.Combat
             // Component stack: CombatUnit → AttributeSet → MovementController → AbilitySystemComponent
             go.AddComponent<CombatUnit>();
             var tagComp = go.AddComponent<GameplayTagComponent>();
-            tagComp.AddTag(new GameplayTags.GameplayTag("Control.AI"), "Auto-assigned by EnemySpawner");
-            tagComp.AddTag(new GameplayTags.GameplayTag("Faction.Enemy"), "Auto-assigned by EnemySpawner");
+            tagComp.AddTag(GameplayTagConstants.Control.AI, "Auto-assigned by EnemySpawner");
+            tagComp.AddTag(GameplayTagConstants.Faction.Enemy, "Auto-assigned by EnemySpawner");
 
             var attr = go.AddComponent<AttributeSet>();
             attr.Testing_AddAttribute(WellKnownAttributeTags.HP, m_hp, m_hp);
