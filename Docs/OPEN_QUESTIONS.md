@@ -238,7 +238,7 @@
 - 来源：2026-05-11 代码审查 / IS-0004
 - 问题：修复 IS-0004 后是否要求所有 `basic_move` 资产必须通过 Unity Editor 显式挂载 Ability？
 - 当前临时假设：**要求显式配置**。移除 `DefaultInstance` fallback；Config Validation 检查 GroundPoint 技能是否配置了 Ability。
-- 决议：(空)
+- 决议：**要求显式配置**。`SkillDefinition.Ability` 不提供 `GroundMoveAbility.DefaultInstance` fallback；默认资产创建工具必须创建 `SkillDefinition` 并显式引用 `GroundMoveAbility` 资产。
 - 影响：`SkillDefinition.Ability` getter、`GroundMoveAbility.DefaultInstance`、Config Validation
 
 ### Q-0035~Q-0039: Ability-Effect 模型重设计 — 已决议

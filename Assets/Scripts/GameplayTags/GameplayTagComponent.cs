@@ -18,6 +18,11 @@ namespace MiniChess.GameplayTags
 
         private void Awake()
         {
+            if (m_initialTags == null)
+            {
+                return;
+            }
+
             foreach (var tag in m_initialTags)
             {
                 if (!string.IsNullOrEmpty(tag.Value))
@@ -57,5 +62,4 @@ namespace MiniChess.GameplayTags
             $"[{name}] {TagSet}";
     }
 }
-
 

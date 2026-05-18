@@ -224,7 +224,6 @@ namespace MiniChess.Tests.EditMode
         private static SimpleTargetAbility CreateSingleTargetAbility(SkillEffect cost, SkillEffect effect)
         {
             var ability = ScriptableObject.CreateInstance<SimpleTargetAbility>();
-            SetField(ability, "m_id", "test_ability");
             if (cost != null)
                 SetField(ability, "m_costs", new[] { cost });
             if (effect != null)

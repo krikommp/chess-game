@@ -563,7 +563,7 @@ private void OnAttributeDepleted(GameplayTags.GameplayTag tag) { }
 | IS-0001 | Status 系统完全缺失 | P0 | 待处理 |
 | IS-0002 | AI Action Candidate 框架未实现 | P0 | 待处理 |
 | IS-0003 | CombatRoundManager 职责过重 | P0 | ✅ 已解决（2026-05-12: 355→175行，纯事件广播器，UnitTurnHandler/AITurnRunner 拆分） |
-| IS-0004 | SkillDefinition.Ability DefaultInstance 运行时构造 | P0 | 待处理 |
+| IS-0004 | SkillDefinition.Ability DefaultInstance 运行时构造 | P0 | ✅ 已解决（2026-05-18: 删除兼容入口；basic_move 通过 SkillDefinition 显式引用 GroundMoveAbility 资产） |
 | IS-0005 | EnemyTurnRunner 新旧 API 桥接冗余 | P1 | ✅ 已解决（2026-05-12: 重写为事件驱动，直接使用 AttributeSet/MovementController） |
 | IS-0006 | CombatRoundManager 编辑器代码在运行时路径 | P1 | ✅ 已解决（2026-05-12: ResolveBasicMoveSkill + #if UNITY_EDITOR 已删除） |
 | IS-0007 | SkillExecutor.CollectTags 手动 Faction 同步重复 | P1 | 待处理 |

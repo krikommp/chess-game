@@ -6,11 +6,6 @@ namespace MiniChess.Combat.Skills
 {
     public abstract class SkillAbility : ScriptableObject
     {
-        [Header("Identity")]
-        [SerializeField] private string m_id;
-        [SerializeField] private string m_displayName;
-        [SerializeField, TextArea(1, 4)] private string m_description;
-
         [Header("Costs")]
         [Tooltip("Resource costs (e.g. SpendAP). Compute failure blocks the entire skill.")]
         [SerializeField] private SkillEffect[] m_costs;
@@ -32,12 +27,6 @@ namespace MiniChess.Combat.Skills
         [SerializeField] private GameplayTag[] m_requiredTargetTags;
         [Tooltip("Tags that block the target from being affected by this skill.")]
         [SerializeField] private GameplayTag[] m_blockedTargetTags;
-
-        // Public properties: Identity
-
-        public string Id => m_id ?? string.Empty;
-        public string DisplayName => m_displayName ?? string.Empty;
-        public string Description => m_description ?? string.Empty;
 
         // Public properties: Execution slots
 

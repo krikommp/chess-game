@@ -166,7 +166,7 @@ public sealed class AbilitySpec
 | IS-0001 | Status 系统完全缺失（AddStatusEffectDefinition 只有占位 Apply） | P0 |
 | IS-0002 | AI Action Candidate 框架未实现（旧 EnemyTurnRunner 已删除，敌方暂不自动行动） | P0 |
 | IS-0003 | CombatRoundManager 虽已精简但仍包含 CollectUnits/BuildTurnOrder/CheckVictory 等可拆逻辑 | P0 |
-| IS-0004 | GroundMoveAbility.DefaultInstance 运行时 CreateInstance（破坏 SO 资产约定） | P0 |
+| IS-0004 | ~~GroundMoveAbility.DefaultInstance 运行时 CreateInstance（破坏 SO 资产约定）~~ → ✅ 已删除；basic_move 必须通过 SkillDefinition 显式引用 GroundMoveAbility 资产 | ~~P0~~ 已解决 |
 | IS-0005 | ~~Player1Controller/EnemyController pass-through~~ → ✅ 已删除 (2026-05-12) | ~~P1~~ 已解决 |
 | IS-0007 | ASC CollectTags 重复 Faction 同步（AttributeSet.Awake 已同步一次） | P1 |
 | IS-0008 | EnemySpawner 使用 Testing_ API（Build 后无效），且缺 CombatUnit/GameplayTagComponent | P1 |
