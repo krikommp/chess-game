@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MiniChess.GameplayTags;
+using MiniChess.GameplayTags.Generated;
 using UnityEngine;
 
 namespace MiniChess.Combat
@@ -214,7 +215,9 @@ namespace MiniChess.Combat
             var tagComp = GetComponent<GameplayTagComponent>();
             if (tagComp == null) return;
 
-            var tag = new GameplayTag(m_faction == EFaction.Player ? "Faction.Player" : "Faction.Enemy");
+            var tag = m_faction == EFaction.Player
+                ? GameplayTagConstants.Faction.Player
+                : GameplayTagConstants.Faction.Enemy;
             if (!tagComp.HasTag(tag, ETagMatchMode.Exact))
                 tagComp.AddTag(tag, "AttributeSet.FactionAutoSync");
         }
@@ -232,9 +235,9 @@ namespace MiniChess.Combat
     /// <summary>Well-known attribute tag constants to avoid string literals.</summary>
     public static class WellKnownAttributeTags
     {
-        public static readonly GameplayTags.GameplayTag HP = "Attribute.HP";
-        public static readonly GameplayTags.GameplayTag AP = "Attribute.AP";
-        public static readonly GameplayTags.GameplayTag Initiative = "Attribute.Initiative";
-        public static readonly GameplayTags.GameplayTag MoveSpeed = "Attribute.MoveSpeed";
+        public static readonly GameplayTags.GameplayTag HP = GameplayTagConstants.Attribute.HP;
+        public static readonly GameplayTags.GameplayTag AP = GameplayTagConstants.Attribute.AP;
+        public static readonly GameplayTags.GameplayTag Initiative = GameplayTagConstants.Attribute.Initiative;
+        public static readonly GameplayTags.GameplayTag MoveSpeed = GameplayTagConstants.Attribute.MoveSpeed;
     }
 }

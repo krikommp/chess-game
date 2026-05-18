@@ -32,6 +32,11 @@ namespace MiniChess.GameplayTags.Generated
             public static readonly GameplayTag Initiative = new GameplayTag(-499614411, "Attribute.Initiative");
             public static readonly GameplayTag MoveSpeed = new GameplayTag(-2022193923, "Attribute.MoveSpeed");
         }
+        public static class Control
+        {
+            public static readonly GameplayTag AI = new GameplayTag(-1949263298, "Control.AI");
+            public static readonly GameplayTag Human = new GameplayTag(256362393, "Control.Human");
+        }
         public static class Effect
         {
             public static class Damage

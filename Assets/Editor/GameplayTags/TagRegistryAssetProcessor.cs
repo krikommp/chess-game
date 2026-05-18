@@ -45,6 +45,7 @@ namespace MiniChess.EditorTools
 
             if (registryChanged)
             {
+                GameplayTagEditorSources.Reload();
                 EditorApplication.delayCall += TagCodeGenerator.Generate;
             }
         }

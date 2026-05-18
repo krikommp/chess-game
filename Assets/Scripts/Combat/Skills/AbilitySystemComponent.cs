@@ -194,6 +194,35 @@ namespace MiniChess.Combat.Skills
             return skill.Execute(context);
         }
 
+        public SkillCastResult ExecuteAfterMove(AbilitySpec spec, GameObject target)
+        {
+            if (spec == null)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "AbilitySpec is null.");
+
+            if (target == null)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "Target lost during approach.");
+
+            var targetAttr = target.GetComponent<AttributeSet>();
+            if (targetAttr != null && !targetAttr.IsAlive)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetDead, "Target died during approach.");
+
+            return Execute(spec, target);
+        }
+
+        public SkillCastResult HandleInput(SkillInputRequest request)
+        {
+            if (m_activeSpec == null)
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid, "No active ability.");
+
+            var skill = m_activeSpec.Ability;
+            if (!(skill is ISkillInputHandler inputHandler))
+                return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
+                    $"Active ability '{m_activeSpec.Id}' does not handle input.");
+
+            var context = SkillExecutionContext.ForInput(this, m_activeSpec, request);
+            return inputHandler.HandleInput(context);
+        }
+
         public SkillEffectResult ApplyEffect(SkillEffect effect, GameObject source)
         {
             if (effect == null)
