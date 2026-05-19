@@ -59,8 +59,6 @@ namespace MiniChess.Combat
         {
             if (!m_isMoving) return;
 
-            AccountMovementDistance();
-
             if (!m_agent.pathPending
                 && (!m_agent.hasPath || m_agent.remainingDistance <= m_agent.stoppingDistance + 0.1f))
             {
@@ -102,45 +100,49 @@ namespace MiniChess.Combat
             m_lastPosition = transform.position;
         }
 
-        private void AccountMovementDistance()
+        public bool TrySpendMoveDistance(float distance, out int spentAmount)
         {
-            Vector3 currentPosition = transform.position;
-            float deltaDistance = Vector3.Distance(m_lastPosition, currentPosition);
-            m_lastPosition = currentPosition;
+            spentAmount = 0;
+            if (distance <= 0.0001f) return true;
 
-            if (deltaDistance <= 0.0001f) return;
-
-            m_unpaidMoveDistance += deltaDistance;
-            SpendApForAccumulatedDistance();
+            m_unpaidMoveDistance += distance;
+            return SpendApForAccumulatedDistance(out spentAmount);
         }
 
-        private void SpendApForAccumulatedDistance()
+        private bool SpendApForAccumulatedDistance(out int spentAmount)
         {
+            spentAmount = 0;
             float moveSpeed = m_attributes.Get(WellKnownAttributeTags.MoveSpeed);
-            if (moveSpeed <= 0.0001f) return;
+            if (moveSpeed <= 0.0001f) return true;
 
             int apToSpend = Mathf.FloorToInt((m_unpaidMoveDistance + 0.0001f) / moveSpeed);
-            if (apToSpend <= 0) return;
+            if (apToSpend <= 0) return true;
 
             int availableAp = Mathf.FloorToInt(m_attributes.Get(WellKnownAttributeTags.AP));
             int spendAmount = Mathf.Min(apToSpend, availableAp);
             if (spendAmount <= 0)
             {
                 StopBecauseBudgetDepleted();
-                return;
+                return false;
             }
 
             if (!m_attributes.TrySpend(WellKnownAttributeTags.AP, spendAmount))
             {
                 StopBecauseBudgetDepleted();
-                return;
+                return false;
             }
 
             m_unpaidMoveDistance = Mathf.Max(0f, m_unpaidMoveDistance - spendAmount * moveSpeed);
+            spentAmount = spendAmount;
             ApDeducted?.Invoke(spendAmount);
 
             if (spendAmount < apToSpend)
+            {
                 StopBecauseBudgetDepleted();
+                return false;
+            }
+
+            return true;
         }
 
         private void StopBecauseBudgetDepleted()

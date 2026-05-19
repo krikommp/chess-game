@@ -1,30 +1,30 @@
 namespace MiniChess.Combat.Skills
 {
-    public struct SkillEffectResult
+    public struct SkillCostPreviewResult
     {
         public bool IsSuccess;
         public ESkillCastFailure Failure;
         public string FailureMessage;
-        public float ComputedValue;
+        public float MaxPathLength;
 
-        public static SkillEffectResult Success(float value = 0f)
+        public static SkillCostPreviewResult Success(float maxPathLength)
         {
-            return new SkillEffectResult
+            return new SkillCostPreviewResult
             {
                 IsSuccess = true,
-                ComputedValue = value,
+                MaxPathLength = maxPathLength,
             };
         }
 
-        public static SkillEffectResult Fail(ESkillCastFailure reason, string message)
+        public static SkillCostPreviewResult Fail(ESkillCastFailure reason, string message)
         {
-            return new SkillEffectResult
+            return new SkillCostPreviewResult
             {
                 IsSuccess = false,
                 Failure = reason,
                 FailureMessage = message ?? string.Empty,
+                MaxPathLength = 0f,
             };
         }
     }
-
 }

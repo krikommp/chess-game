@@ -87,6 +87,34 @@ namespace MiniChess.Combat.Skills
             return m_function.Apply(context, this, computed);
         }
 
+        public SkillEffectResult Update(SkillEffectContext context, SkillEffectResult computed, float deltaTime)
+        {
+            if (m_function == null)
+                return SkillEffectResult.Fail(ESkillCastFailure.EffectApplicationFailed, "Effect has no Function assigned.");
+
+            if (!computed.IsSuccess)
+                return computed;
+
+            return m_function.Update(context, this, computed, deltaTime);
+        }
+
+        public SkillCostPreviewResult PreviewMaxPathLength(
+            SkillEffectContext context,
+            float currentMaxPathLength)
+        {
+            if (m_function == null)
+            {
+                return SkillCostPreviewResult.Fail(ESkillCastFailure.EffectApplicationFailed,
+                    "Effect has no Function assigned.");
+            }
+
+            var tagResult = EvaluateEffectTags(context);
+            if (!tagResult.IsSuccess)
+                return SkillCostPreviewResult.Fail(tagResult.Failure, tagResult.FailureMessage);
+
+            return m_function.PreviewMaxPathLength(context, this, currentMaxPathLength);
+        }
+
         // ── Helpers ────────────────────────────────────────────────
 
         public bool IsPersistent =>

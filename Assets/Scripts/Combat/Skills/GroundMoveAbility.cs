@@ -5,11 +5,11 @@ using UnityEngine.AI;
 namespace MiniChess.Combat.Skills
 {
     /// <summary>
-    /// 主动移动 Ability。BlockedTags 控制移动流程权限；Costs 控制 AP 消耗。
+    /// 主动移动 Ability。BlockedTags 控制移动流程权限；Costs 可通过 Function 持续扣除移动消耗。
     /// 直接调用 NavMeshService + MovementController，不通过 MoveEffect。
     /// </summary>
     [CreateAssetMenu(fileName = "GroundMoveAbility", menuName = "MiniChess/Skill Abilities/Ground Move", order = 20)]
-    public class GroundMoveAbility : SkillAbility, ISkillInputHandler
+    public class GroundMoveAbility : SkillAbility, ISkillInputHandler, ISkillUpdate
     {
         public SkillCastResult HandleInput(SkillExecutionContext context)
         {
@@ -25,14 +25,14 @@ namespace MiniChess.Combat.Skills
 
             if (request.IsSignal(SkillInputTag.k_PointerHover))
             {
-                ShowMovePreview(context.CasterExecutor, request.WorldPosition);
+                ShowMovePreview(context, request.WorldPosition);
                 return SkillCastResult.Success();
             }
 
             if (!request.IsSignal(SkillInputTag.k_PrimaryPressed))
                 return SkillCastResult.Success();
 
-            if (!TryBuildMovePath(context.CasterExecutor, request.WorldPosition,
+            if (!TryBuildMovePath(context, request.WorldPosition,
                     out Vector3 destination, out NavMeshPath path))
             {
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
@@ -52,6 +52,10 @@ namespace MiniChess.Combat.Skills
 
         public override SkillCastResult Execute(SkillExecutionContext context)
         {
+            var tagResult = CheckAbilityTags(context);
+            if (!tagResult.IsSuccess)
+                return tagResult;
+
             var caster = context.Caster;
             if (caster == null)
                 return SkillCastResult.Fail(ESkillCastFailure.CasterDead, "Caster is null.");
@@ -66,18 +70,56 @@ namespace MiniChess.Combat.Skills
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     "NavMesh path is invalid or incomplete.");
 
+            var costResults = ComputeCosts(context);
+            for (int i = 0; i < costResults.Length; i++)
+            {
+                if (!costResults[i].IsSuccess)
+                    return SkillCastResult.Fail(costResults[i].Failure, costResults[i].FailureMessage);
+            }
+
+            var costApplyResult = ApplyCosts(context, costResults);
+            if (!costApplyResult.IsSuccess)
+                return SkillCastResult.Fail(costApplyResult.Failure, costApplyResult.FailureMessage);
+
             if (!movement.TryStartMove(path))
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
                     "Failed to start movement via MovementController.");
 
+            context.CasterExecutor.BeginSkillUpdate(new SkillExecutionState(context, costResults, caster.transform.position));
             return SkillCastResult.Success();
         }
 
-        private static void ShowMovePreview(AbilitySystemComponent executor, Vector3 worldPosition)
+        public SkillCastResult SkillUpdate(SkillExecutionState state, float deltaTime)
+        {
+            var movement = state.Context.CasterMovement;
+            var caster = state.Context.Caster;
+            if (movement == null || caster == null || !movement.IsMoving)
+            {
+                state.Complete();
+                return SkillCastResult.Success();
+            }
+
+            state.RecordCasterPosition(caster.transform.position);
+
+            var costResult = UpdateCosts(state, deltaTime);
+            if (!costResult.IsSuccess)
+            {
+                state.Complete();
+                return SkillCastResult.Fail(costResult.Failure, costResult.FailureMessage);
+            }
+
+            if (!movement.IsMoving)
+                state.Complete();
+
+            return SkillCastResult.Success();
+        }
+
+        private void ShowMovePreview(SkillExecutionContext context, Vector3 worldPosition)
         {
             var preview = PathPreview.Instance;
             if (preview == null) return;
 
+            var executor = context.CasterExecutor;
             var movement = executor.Movement;
             if (movement == null || !TryGetOrigin(executor, out Vector3 origin))
             {
@@ -106,26 +148,34 @@ namespace MiniChess.Combat.Skills
             }
 
             float length = NavMeshService.PathLength(path.corners);
-            if (length <= movement.RemainingMoveDistance)
+            var moveContext = SkillExecutionContext.ForGroundPoint(executor, context.Spec, nav.position, path);
+            var costPreview = PreviewCosts(moveContext, length);
+            if (!costPreview.IsSuccess || costPreview.MaxPathLength <= 0.001f)
+            {
+                preview.Show(System.Array.Empty<Vector3>(), path.corners);
+                return;
+            }
+
+            if (length <= costPreview.MaxPathLength)
             {
                 preview.Show(path.corners, System.Array.Empty<Vector3>());
                 return;
             }
 
-            NavMeshService.ClipPath(path.corners, movement.RemainingMoveDistance,
+            NavMeshService.ClipPath(path.corners, costPreview.MaxPathLength,
                 out Vector3[] head, out Vector3[] tail);
             preview.Show(head, tail);
         }
 
-        private static bool TryBuildMovePath(AbilitySystemComponent executor, Vector3 worldPosition,
+        private bool TryBuildMovePath(SkillExecutionContext context, Vector3 worldPosition,
             out Vector3 destination, out NavMeshPath path)
         {
             destination = default;
             path = null;
 
+            var executor = context.CasterExecutor;
             var move = executor.Movement;
-            if (move == null || move.RemainingMoveDistance <= 0f) return false;
-            float remainingDist = move.RemainingMoveDistance;
+            if (move == null) return false;
             if (!TryGetOrigin(executor, out Vector3 origin)) return false;
 
             if (!NavMesh.SamplePosition(worldPosition, out NavMeshHit nav,
@@ -141,10 +191,14 @@ namespace MiniChess.Combat.Skills
 
             float length = NavMeshService.PathLength(fullPath.corners);
             destination = nav.position;
+            var moveContext = SkillExecutionContext.ForGroundPoint(executor, context.Spec, nav.position, fullPath);
+            var costPreview = PreviewCosts(moveContext, length);
+            if (!costPreview.IsSuccess || costPreview.MaxPathLength <= 0.001f)
+                return false;
 
-            if (length > remainingDist + 0.001f)
+            if (length > costPreview.MaxPathLength + 0.001f)
             {
-                NavMeshService.ClipPath(fullPath.corners, remainingDist,
+                NavMeshService.ClipPath(fullPath.corners, costPreview.MaxPathLength,
                     out Vector3[] head, out _);
                 if (head == null || head.Length < 2) return false;
                 destination = head[head.Length - 1];

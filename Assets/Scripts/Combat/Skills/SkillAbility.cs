@@ -47,6 +47,18 @@ namespace MiniChess.Combat.Skills
 
         // Helpers (子类显式调用)
 
+        protected SkillCastResult CheckAbilityTags(SkillExecutionContext context)
+        {
+            var casterResult = EvaluateTags(context.Caster, RequiredCasterTags, BlockedCasterTags, "Caster");
+            if (!casterResult.IsSuccess)
+                return casterResult;
+
+            if (context.Target == null)
+                return SkillCastResult.Success();
+
+            return EvaluateTags(context.Target, RequiredTargetTags, BlockedTargetTags, "Target");
+        }
+
         protected SkillEffectResult[] ComputeCosts(SkillExecutionContext context)
         {
             if (m_costs == null || m_costs.Length == 0)
@@ -81,6 +93,66 @@ namespace MiniChess.Combat.Skills
             }
 
             return SkillEffectResult.Success();
+        }
+
+        protected SkillEffectResult UpdateCosts(SkillExecutionState state, float deltaTime)
+        {
+            if (state == null || m_costs == null || m_costs.Length == 0)
+                return SkillEffectResult.Success();
+
+            int count = System.Math.Min(m_costs.Length, state.CostResults.Length);
+            for (int i = 0; i < count; i++)
+            {
+                var cost = m_costs[i];
+                if (cost == null) continue;
+                if (!state.CostResults[i].IsSuccess) continue;
+
+                var ctx = BuildEffectContext(state.Context, cost, ESkillEffectTarget.Caster);
+                ctx.DeltaDistance = state.DeltaDistance;
+                ctx.TotalDistance = state.TotalDistance;
+
+                var result = cost.Update(ctx, state.CostResults[i], deltaTime);
+                if (!result.IsSuccess)
+                    return result;
+            }
+
+            return SkillEffectResult.Success();
+        }
+
+        protected SkillCostPreviewResult PreviewCosts(
+            SkillExecutionContext context,
+            float maxPathLength)
+        {
+            var tagResult = CheckAbilityTags(context);
+            if (!tagResult.IsSuccess)
+                return SkillCostPreviewResult.Fail(tagResult.Failure, tagResult.FailureMessage);
+
+            if (m_costs == null || m_costs.Length == 0)
+                return SkillCostPreviewResult.Success(maxPathLength);
+
+            var costResults = ComputeCosts(context);
+            float allowedPathLength = maxPathLength;
+            for (int i = 0; i < m_costs.Length; i++)
+            {
+                var cost = m_costs[i];
+                if (cost == null) continue;
+
+                if (i < costResults.Length && !costResults[i].IsSuccess)
+                {
+                    return SkillCostPreviewResult.Fail(
+                        costResults[i].Failure,
+                        costResults[i].FailureMessage);
+                }
+
+                var ctx = BuildEffectContext(context, cost, ESkillEffectTarget.Caster);
+                var previewResult = cost.PreviewMaxPathLength(ctx, allowedPathLength);
+                if (!previewResult.IsSuccess)
+                    return previewResult;
+
+                allowedPathLength = Mathf.Min(allowedPathLength, previewResult.MaxPathLength);
+            }
+
+            return SkillCostPreviewResult.Success(Mathf.Max(0f, allowedPathLength));
         }
 
         protected SkillEffectResult[] ComputeCooldowns(SkillExecutionContext context)
@@ -207,6 +279,34 @@ namespace MiniChess.Combat.Skills
                 default:
                     return context.Target;
             }
+        }
+
+        private static SkillCastResult EvaluateTags(
+            GameObject obj,
+            GameplayTag[] requiredTags,
+            GameplayTag[] blockedTags,
+            string label)
+        {
+            var tagComp = obj != null ? obj.GetComponent<MiniChess.GameplayTags.GameplayTagComponent>() : null;
+            var tagSet = tagComp?.TagSet;
+
+            for (int i = 0; i < requiredTags.Length; i++)
+            {
+                if (string.IsNullOrEmpty(requiredTags[i].Value)) continue;
+                if (tagSet == null || !tagSet.Has(requiredTags[i], MiniChess.GameplayTags.ETagMatchMode.Exact))
+                    return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
+                        $"{label} lacks required ability tag '{requiredTags[i].Value}'.");
+            }
+
+            for (int i = 0; i < blockedTags.Length; i++)
+            {
+                if (string.IsNullOrEmpty(blockedTags[i].Value)) continue;
+                if (tagSet != null && tagSet.Has(blockedTags[i], MiniChess.GameplayTags.ETagMatchMode.Exact))
+                    return SkillCastResult.Fail(ESkillCastFailure.TagConditionFailed,
+                        $"{label} is blocked by ability tag '{blockedTags[i].Value}'.");
+            }
+
+            return SkillCastResult.Success();
         }
     }
 }

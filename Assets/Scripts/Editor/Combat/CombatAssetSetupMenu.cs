@@ -11,6 +11,8 @@ namespace MiniChess.Editor.Combat
         private const string k_EffectFunctionsFolder = "Assets/Data/EffectFunctions";
         private const string k_EffectsFolder = "Assets/Data/Effects";
         private const string k_SkillsFolder = "Assets/Data/Skills";
+        private const string k_SpendApFunctionPath = k_EffectFunctionsFolder + "/spend_ap.asset";
+        private const string k_MoveCostPath = k_EffectsFolder + "/basic_move_cost.asset";
         private const string k_MoveAbilityPath = k_SkillsFolder + "/GroundMoveAbility.asset";
         private const string k_MoveDefinitionPath = k_SkillsFolder + "/basic_move.asset";
         private const string k_PlayerAttributesPath = "Assets/Data/Attributes/player_attribute_set.asset";
@@ -24,6 +26,8 @@ namespace MiniChess.Editor.Combat
             EnsureFolder(k_SkillsFolder);
 
             var moveAbility = EnsureAsset<GroundMoveAbility>(k_MoveAbilityPath);
+            var spendApFunction = EnsureAsset<SpendAPFunction>(k_SpendApFunctionPath);
+            var moveCost = EnsureAsset<SkillEffect>(k_MoveCostPath);
             var moveDefinition = EnsureAsset<SkillDefinition>(k_MoveDefinitionPath);
             DeleteIfExists(k_SkillsFolder + "/basic_move_definition.asset");
 
@@ -33,7 +37,9 @@ namespace MiniChess.Editor.Combat
             SetEnumField(moveDefinition, "m_targetType", ESkillTargetType.GroundPoint);
             SetObjectField(moveDefinition, "m_ability", moveAbility);
 
-            SetObjectArrayField(moveAbility, "m_costs", System.Array.Empty<Object>());
+            SetObjectField(moveCost, "m_function", spendApFunction);
+            SetEnumField(moveCost, "m_targetMapping", ESkillEffectTarget.Caster);
+            SetObjectArrayField(moveAbility, "m_costs", new Object[] { moveCost });
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();

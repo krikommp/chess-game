@@ -31,6 +31,7 @@ namespace MiniChess.Combat.Skills
         private readonly List<AbilitySpec> m_availableSpecs = new List<AbilitySpec>();
         private readonly List<AbilitySpec> m_grantedSpecs = new List<AbilitySpec>();
         private AbilitySpec m_activeSpec;
+        private SkillExecutionState m_activeExecution;
         private bool m_specsDirty = true;
 
         public IReadOnlyList<AbilitySpec> AvailableAbilities
@@ -83,6 +84,29 @@ namespace MiniChess.Combat.Skills
         private void OnValidate()
         {
             m_specsDirty = true;
+        }
+
+        private void Update()
+        {
+            if (m_activeExecution == null)
+                return;
+
+            if (!(m_activeExecution.Context.Skill is ISkillUpdate updater))
+            {
+                m_activeExecution = null;
+                return;
+            }
+
+            var result = updater.SkillUpdate(m_activeExecution, Time.deltaTime);
+            if (!result.IsSuccess)
+            {
+                m_activeExecution.Context.CasterMovement?.StopMovement();
+                Debug.LogWarning($"[AbilitySystemComponent] Active skill update failed: {result.FailureMessage}", this);
+                m_activeExecution.Complete();
+            }
+
+            if (m_activeExecution.IsComplete)
+                m_activeExecution = null;
         }
 
         private void OnTagAddedForPassive(GameplayTag tag)
@@ -206,6 +230,11 @@ namespace MiniChess.Combat.Skills
 
             var context = SkillExecutionContext.ForInput(this, m_activeSpec, request);
             return inputHandler.HandleInput(context);
+        }
+
+        public void BeginSkillUpdate(SkillExecutionState state)
+        {
+            m_activeExecution = state;
         }
 
         public SkillEffectResult ApplyEffect(SkillEffect effect, GameObject source)

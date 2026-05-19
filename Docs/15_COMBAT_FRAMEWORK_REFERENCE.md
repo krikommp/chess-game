@@ -54,7 +54,7 @@
 |------|------|------|
 | **CombatUnit** | MonoBehaviour（空） | 纯标记。让 `FindObjectsOfType<CombatUnit>()` 发现参战单位，解耦具体控制器类型 |
 | **AttributeSet** | MonoBehaviour | 运行时属性容器。`Get(HP)` / `Modify(HP, -20)` / `TrySpend(AP, 1)` / `Faction` / `IsAlive`。通过 `AttributeSetDef` SO 初始化。`Awake()` 中自动同步 Faction Tag 到 GameplayTagComponent |
-| **MovementController** | MonoBehaviour `[RequireComponent(NavMeshAgent, AttributeSet)]` | NavMeshAgent 包装器。`TryStartMove(path)` / `StopMovement()` / `IsMoving`。战局移动 AP 由它按累计实际移动距离统一扣除 |
+| **MovementController** | MonoBehaviour `[RequireComponent(NavMeshAgent, AttributeSet)]` | NavMeshAgent 包装器。`TryStartMove(path)` / `StopMovement()` / `IsMoving`。保留未支付移动距离预算；战局移动 AP 扣除由 `GroundMoveAbility` 的 `ISkillUpdate` 驱动 Cost Function 调用 |
 | **AbilitySystemComponent** | MonoBehaviour | 技能执行统一入口。持有 `AbilitySpec` 列表、当前激活技能、授予技能、持续 `ActiveSkillEffect`、冷却 Tag、被动 Ability 触发。`CanExecute(ctx)` → `Execute(ctx)` → 调 `SkillAbility.Execute()` |
 | **GameplayTagComponent** | MonoBehaviour | 运行时 Tag 容器。`AddTag(tag, source)` / `HasTag(tag, mode)` / `RemoveAllTagsFromSource(source)`。技能条件、AI 决策、Effect 都查它 |
 
@@ -97,7 +97,7 @@
 | 资产 | 路径 | 用途 |
 |------|------|------|
 | **SkillDefinition / SkillMetadata** | `Assets/Data/Skills/` | 技能静态配置：id/displayName/description、targetType、range、areaShape、requiresLineOfSight、endsTurnAfterCast、skillTags、aiTags、aiBaseWeight、表现引用、`SkillAbility` 引用。给 UI、AI、预览和配置校验读取，不保存运行时状态 |
-| **SkillAbility** (抽象) | `Assets/Data/SkillAbilities/` | 技能流程资产。实现 `abstract Execute(context)`，编排 Costs/Cooldowns/Effects、移动或特殊逻辑。必须按无状态共享 SO 设计，不能保存当前施法者、目标、冷却或释放结果 |
+| **SkillAbility** (抽象) | `Assets/Data/SkillAbilities/` | 技能流程资产。实现 `abstract Execute(context)`，编排 Costs/Cooldowns/Effects、移动或特殊逻辑。需要持续更新的 Ability 可实现 `ISkillUpdate`，运行时状态由 ASC 持有的 `SkillExecutionState` 保存。必须按无状态共享 SO 设计，不能保存当前施法者、目标、冷却或释放结果 |
 | **SkillEffect** (sealed) | `Assets/Data/Effects/` | 效果数据。**Function** (SkillEffectFunction SO)、目标映射、Duration、StackRule、Tick 设置、Tag 互作、Stat Modifiers、Granted Abilities。接口：`Compute(ctx)→SkillEffectResult`，生命周期由 ASC 分成 OnApply/OnTick/OnRemove |
 | **AttributeSetDef** | `Assets/Data/` | 属性模板：定义单位有哪些属性(HP/AP/Initiative/MoveSpeed)，初始值和最大值 |
 | **AIProfile** | `Assets/Data/` | AI 行为档案：Role(Aggressive/Support/Healer)、healHpThreshold、skillTagWeights、targetTagWeights、statusTagWeights（数据结构已有，AI 执行系统暂未实现） |
@@ -139,6 +139,7 @@ public sealed class AbilitySpec
 | **SkillExecutionContext** | struct | 打包一次技能释放的上下文：Caster/Target/Skill/Path/InputRequest。工厂方法：`ForTarget()` / `ForGroundPoint()` / `ForInput()` |
 | **SkillCastResult** | struct | 技能执行结果：`IsSuccess` / `Failure`(ESkillCastFailure) / `FailureMessage` |
 | **SkillEffectContext** | struct | Effect 上下文：Caster/Target/CasterExecutor/TargetExecutor/TargetPosition。构建时必须应用 `ESkillEffectTarget` 目标映射 |
+| **SkillCostPreviewResult** | struct | Cost 预览结果：失败原因 + Cost Function 允许的最大路径长度。`GroundMoveAbility` 用它统一 hover 预览和点击裁剪 |
 | **SkillPlan** | struct | 移动+技能组合计划：MovementSkill/PrimarySkill/PrimaryTarget/MovePath/MoveApCost/PrimaryApCost/TotalApCost/CanExecutePrimaryThisTurn/IsMovementOnly。已定义但基本未用 |
 | **ActiveSkillEffect** | class `[Serializable]` | 运行时持续效果实例：Definition/Source/Owner/RemainingRounds/StackCount/已应用属性修正快照。该实例本身作为 GameplayTag source handle |
 | **SkillInputRequest** | readonly struct | Tag 化输入事件：SignalTag/TargetTag/TargetObject/WorldPosition。`IsSignal(tag)` / `IsTarget(tag)` |

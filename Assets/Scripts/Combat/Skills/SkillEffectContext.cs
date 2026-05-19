@@ -11,5 +11,7 @@ namespace MiniChess.Combat.Skills
         public AbilitySystemComponent TargetExecutor;
         public Vector3? TargetPosition;
         public float? PathLength;
+        public float DeltaDistance;
+        public float TotalDistance;
     }
 }

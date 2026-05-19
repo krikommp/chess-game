@@ -10,11 +10,14 @@ namespace MiniChess.EditorTools
     {
         private const string BasicMoveDefinitionPath = "Assets/Data/Skills/basic_move.asset";
         private const string BasicMoveAbilityPath = "Assets/Data/SkillAbilities/basic_move_ability.asset";
+        private const string SpendApFunctionPath = "Assets/Data/EffectFunctions/spend_ap.asset";
+        private const string BasicMoveCostPath = "Assets/Data/Effects/basic_move_cost.asset";
 
         [MenuItem("MiniChess/Create basic_move Skill")]
         public static void CreateBasicMove()
         {
             var ability = GetOrCreateBasicMoveAbility();
+            ConfigureBasicMoveAbility(ability);
             var definition = GetOrCreateBasicMoveDefinition(ability);
 
             AssetDatabase.SaveAssets();
@@ -27,6 +30,7 @@ namespace MiniChess.EditorTools
         public static void ConfigureCurrentSceneMoveSkills()
         {
             var ability = GetOrCreateBasicMoveAbility();
+            ConfigureBasicMoveAbility(ability);
             var definition = GetOrCreateBasicMoveDefinition(ability);
 
             int configuredCount = 0;
@@ -56,6 +60,42 @@ namespace MiniChess.EditorTools
 
             EditorUtility.SetDirty(ability);
             return ability;
+        }
+
+        private static void ConfigureBasicMoveAbility(GroundMoveAbility ability)
+        {
+            var spendApFunction = AssetDatabase.LoadAssetAtPath<SpendAPFunction>(SpendApFunctionPath);
+            if (spendApFunction == null)
+            {
+                spendApFunction = ScriptableObject.CreateInstance<SpendAPFunction>();
+                spendApFunction.name = "spend_ap";
+                EnsureDirectoryExists(SpendApFunctionPath);
+                AssetDatabase.CreateAsset(spendApFunction, SpendApFunctionPath);
+            }
+
+            var moveCost = AssetDatabase.LoadAssetAtPath<SkillEffect>(BasicMoveCostPath);
+            if (moveCost == null)
+            {
+                moveCost = ScriptableObject.CreateInstance<SkillEffect>();
+                moveCost.name = "basic_move_cost";
+                EnsureDirectoryExists(BasicMoveCostPath);
+                AssetDatabase.CreateAsset(moveCost, BasicMoveCostPath);
+            }
+
+            var costObject = new SerializedObject(moveCost);
+            costObject.FindProperty("m_function").objectReferenceValue = spendApFunction;
+            costObject.FindProperty("m_targetMapping").enumValueIndex = (int)ESkillEffectTarget.Caster;
+            costObject.ApplyModifiedProperties();
+
+            var abilityObject = new SerializedObject(ability);
+            var costs = abilityObject.FindProperty("m_costs");
+            costs.arraySize = 1;
+            costs.GetArrayElementAtIndex(0).objectReferenceValue = moveCost;
+            abilityObject.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(spendApFunction);
+            EditorUtility.SetDirty(moveCost);
+            EditorUtility.SetDirty(ability);
         }
 
         private static SkillDefinition GetOrCreateBasicMoveDefinition(GroundMoveAbility ability)
