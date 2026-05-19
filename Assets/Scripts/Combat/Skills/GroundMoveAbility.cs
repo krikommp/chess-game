@@ -66,26 +66,9 @@ namespace MiniChess.Combat.Skills
                 return SkillCastResult.Fail(ESkillCastFailure.TargetInvalid,
                     "NavMesh path is invalid or incomplete.");
 
-            // 1. Compute costs (e.g. SpendAP): failure blocks.
-            var costResults = ComputeCosts(context);
-            for (int i = 0; i < costResults.Length; i++)
-            {
-                if (!costResults[i].IsSuccess)
-                    return SkillCastResult.Fail(costResults[i].Failure, costResults[i].FailureMessage);
-            }
-
-            // 2. Execute movement
             if (!movement.TryStartMove(path))
                 return SkillCastResult.Fail(ESkillCastFailure.EffectApplicationFailed,
                     "Failed to start movement via MovementController.");
-
-            // 3. Apply costs after movement starts
-            var costApplyResult = ApplyCosts(context, costResults);
-            if (!costApplyResult.IsSuccess)
-            {
-                movement.StopMovement();
-                return SkillCastResult.Fail(costApplyResult.Failure, costApplyResult.FailureMessage);
-            }
 
             return SkillCastResult.Success();
         }

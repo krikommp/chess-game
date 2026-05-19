@@ -54,7 +54,7 @@
 |------|------|------|
 | **CombatUnit** | MonoBehaviour（空） | 纯标记。让 `FindObjectsOfType<CombatUnit>()` 发现参战单位，解耦具体控制器类型 |
 | **AttributeSet** | MonoBehaviour | 运行时属性容器。`Get(HP)` / `Modify(HP, -20)` / `TrySpend(AP, 1)` / `Faction` / `IsAlive`。通过 `AttributeSetDef` SO 初始化。`Awake()` 中自动同步 Faction Tag 到 GameplayTagComponent |
-| **MovementController** | MonoBehaviour `[RequireComponent(NavMeshAgent, AttributeSet)]` | NavMeshAgent 包装器。`TryStartMove(path)` / `StopMovement()` / `IsMoving`。移动 AP 由技能 Cost 结算，MovementController 保持纯移动职责 |
+| **MovementController** | MonoBehaviour `[RequireComponent(NavMeshAgent, AttributeSet)]` | NavMeshAgent 包装器。`TryStartMove(path)` / `StopMovement()` / `IsMoving`。战局移动 AP 由它按累计实际移动距离统一扣除 |
 | **AbilitySystemComponent** | MonoBehaviour | 技能执行统一入口。持有 `AbilitySpec` 列表、当前激活技能、授予技能、持续 `ActiveSkillEffect`、冷却 Tag、被动 Ability 触发。`CanExecute(ctx)` → `Execute(ctx)` → 调 `SkillAbility.Execute()` |
 | **GameplayTagComponent** | MonoBehaviour | 运行时 Tag 容器。`AddTag(tag, source)` / `HasTag(tag, mode)` / `RemoveAllTagsFromSource(source)`。技能条件、AI 决策、Effect 都查它 |
 

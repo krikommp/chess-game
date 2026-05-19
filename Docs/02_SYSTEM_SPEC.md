@@ -45,7 +45,7 @@ Exploration ──(进入战斗触发)──▶ CombatStart
 
 公式：
 - **移动**：`canWalkDistance = CurrentAP × MoveSpeed`（实际走的距离按 NavMesh 路径长度算，不按直线）。
-- 移动 AP 通过当前激活的 `basic_move` Ability 的 `Costs` 槽位扣除。点击确认后，`SpendAPEffect` 按本次 NavMesh 路径长度和 `MoveSpeed` 估算 AP 成本并一次性支付。
+- 移动 AP 由 `MovementController` 按本回合累计实际移动距离扣除。每累计走满 `MoveSpeed` 米扣 1 AP；未满 1 AP 的余量保留到本回合后续移动，回合重置时由 `ResetMovement` 清空。
 - **攻击/技能**：AP 消耗由技能配置决定，详见 `05_SKILL_SPEC.md`。当前基础攻击会迁移为 `basic_attack` 技能资产，其 AP 消耗来自 Ability 的 `Costs` 槽位，例如 `SpendAPEffect(amount=1)`。
 - **结束回合**：玩家可主动结束（剩余 AP 不保留 / 是否保留 → OPEN_QUESTIONS）。
 
@@ -106,7 +106,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 > 控制权通过 Control.Human / Control.AI Tag。见 Docs/15 §控制权标识。
 - [x] `APSystem`（MVP：`Player1Controller` 内维护 CurrentAP/MaxAP）
 > ⚠️ 同上迁移决议。AP 现在由 AttributeSet 通过 GameplayTag("Attribute.AP") 管理，
-> MovementController 只负责执行 NavMeshAgent 移动；AP 消耗由 `basic_move` 的 Cost Effect 负责。
+> MovementController 负责执行 NavMeshAgent 移动，并统一按累计实际移动距离扣除移动 AP；攻击和其他技能 AP 消耗仍由技能 Cost Effect 负责。
 - [x] `InitiativeSystem`（MVP：`Player1Controller.Initiative`，进入模拟时排序）
 > ⚠️ 同上迁移决议。Initiative 现在由 AttributeSet.Get(WellKnownAttributeTags.Initiative) 读取。
 - [ ] `GameplayTagSystem`（Tag First 基础设施：`GameplayTag` + `GameplayTagSet` + 匹配 + 来源追踪，见 `09_GAMEPLAY_TAG_SPEC.md`）
@@ -131,7 +131,7 @@ GameplayTag 是跨系统的第一层语义表达，完整规格见 `09_GAMEPLAY_
 - 点击地面本质上是 `Input.Target.Ground` + `Input.Pointer.PrimaryPressed` 输入请求；当前激活的 `basic_move` 由 `GroundMoveAbility` 解释该请求、计算 NavMesh 路径、更新预览并通过 ASC 统一执行。输入层不能直接调用移动组件绕过技能系统。
 - 角色必须通过自身 ASC 的 `SkillDefinition[]` 配置可用技能资产。`CombatRoundManager` 只做缺失技能的警告，不再启动时向角色自动注入 `basic_move` 或其他默认技能；运行时生成敌人由 `EnemySpawner.m_defaultSkills` 写入生成对象的 ASC。
 - 移动中继续刷新鼠标 hover 路径，移动中再次点击会从当前位置改道到新目标。
-- 移动 AP 在确认地面点击后由 `basic_move` 的 `SpendAPEffect` 按确认路径一次性扣除；`MovementController` 不包含 AP 业务逻辑。
+- 移动 AP 不再由 `basic_move` 的 `SpendAPEffect` 一次性预扣；`MovementController` 在移动过程中按实际累计距离扣除 AP，并在 AP 不足时停止移动。
 - 当前玩家输入只要求支持点击地面移动。主动攻击技能如何释放（点击敌人、技能栏选择、快捷键等）待 AI 框架大体跑通后继续设计。
 - 按 `Space` 标记当前角色本轮不再行动，并将当前 AP 清零。
 - 敌方单位回合暂不执行硬编码 AI。后续由 `EnemyAISystem` 枚举 AIActionCandidate，读取 `SkillDefinition` / `AIProfile` / GameplayTag / AP / 距离，再统一通过 ASC 执行。

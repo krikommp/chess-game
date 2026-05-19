@@ -6,7 +6,7 @@ namespace MiniChess.Combat
 {
     /// <summary>
     /// Per-unit movement execution component. Attach to any GameObject that can move.
-    /// Pure movement — no game logic (AP, cost, validation) lives here.
+    /// Battle movement spends AP from actual accumulated travel distance.
     ///
     /// Extension point: future abilities (flight, teleport, etc.) override movement behavior
     /// by extending this component or adding sibling components that interact with it.
@@ -20,13 +20,18 @@ namespace MiniChess.Combat
 
         public event Action MovementStarted;
         public event Action MovementStopped;
+        public event Action<float> ApDeducted;
+        public event Action MoveBudgetDepleted;
 
         private NavMeshAgent m_agent;
         private AttributeSet m_attributes;
         private bool m_isMoving;
+        private float m_unpaidMoveDistance;
+        private Vector3 m_lastPosition;
 
         public NavMeshAgent Agent => m_agent;
         public bool IsMoving => m_isMoving;
+        public float UnpaidMoveDistance => m_unpaidMoveDistance;
 
         /// <summary>How many meters this unit can still move this turn.</summary>
         public float RemainingMoveDistance
@@ -35,7 +40,7 @@ namespace MiniChess.Combat
             {
                 float ap = m_attributes.Get(WellKnownAttributeTags.AP);
                 float speed = m_attributes.Get(WellKnownAttributeTags.MoveSpeed);
-                return ap * speed;
+                return Mathf.Max(0f, ap * speed - m_unpaidMoveDistance);
             }
         }
 
@@ -54,6 +59,8 @@ namespace MiniChess.Combat
         {
             if (!m_isMoving) return;
 
+            AccountMovementDistance();
+
             if (!m_agent.pathPending
                 && (!m_agent.hasPath || m_agent.remainingDistance <= m_agent.stoppingDistance + 0.1f))
             {
@@ -71,6 +78,7 @@ namespace MiniChess.Combat
 
             m_agent.SetPath(path);
             m_isMoving = true;
+            m_lastPosition = transform.position;
             MovementStarted?.Invoke();
             return true;
         }
@@ -86,6 +94,59 @@ namespace MiniChess.Combat
             m_isMoving = false;
             if (wasMoving)
                 MovementStopped?.Invoke();
+        }
+
+        public void ResetMovementBudget()
+        {
+            m_unpaidMoveDistance = 0f;
+            m_lastPosition = transform.position;
+        }
+
+        private void AccountMovementDistance()
+        {
+            Vector3 currentPosition = transform.position;
+            float deltaDistance = Vector3.Distance(m_lastPosition, currentPosition);
+            m_lastPosition = currentPosition;
+
+            if (deltaDistance <= 0.0001f) return;
+
+            m_unpaidMoveDistance += deltaDistance;
+            SpendApForAccumulatedDistance();
+        }
+
+        private void SpendApForAccumulatedDistance()
+        {
+            float moveSpeed = m_attributes.Get(WellKnownAttributeTags.MoveSpeed);
+            if (moveSpeed <= 0.0001f) return;
+
+            int apToSpend = Mathf.FloorToInt((m_unpaidMoveDistance + 0.0001f) / moveSpeed);
+            if (apToSpend <= 0) return;
+
+            int availableAp = Mathf.FloorToInt(m_attributes.Get(WellKnownAttributeTags.AP));
+            int spendAmount = Mathf.Min(apToSpend, availableAp);
+            if (spendAmount <= 0)
+            {
+                StopBecauseBudgetDepleted();
+                return;
+            }
+
+            if (!m_attributes.TrySpend(WellKnownAttributeTags.AP, spendAmount))
+            {
+                StopBecauseBudgetDepleted();
+                return;
+            }
+
+            m_unpaidMoveDistance = Mathf.Max(0f, m_unpaidMoveDistance - spendAmount * moveSpeed);
+            ApDeducted?.Invoke(spendAmount);
+
+            if (spendAmount < apToSpend)
+                StopBecauseBudgetDepleted();
+        }
+
+        private void StopBecauseBudgetDepleted()
+        {
+            StopMovement();
+            MoveBudgetDepleted?.Invoke();
         }
     }
 }

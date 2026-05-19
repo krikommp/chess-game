@@ -268,7 +268,7 @@
 | 冷却 = Persistent Status + `Cooldown.{id}` Tag + BlockedTags 检查 | ✅ 已确认 |
 | `SkillDefinition.cooldown` 旧字段是否保留 | ✅ 不保留，删除旧字段（2026-05-12） |
 | HandleInput 从 SkillAbility 基类移出；UnitTurnHandler 只负责玩家输入路由；具体技能输入解释由当前 Ability 的 `ISkillInputHandler` 或后续 Ability Targeting 层负责 | ✅ 已确认（2026-05-17 修正边界） |
-| MovementController 删除 AP 扣除，变为纯移动工具 | ✅ 已确认 |
+| MovementController 删除 AP 扣除，变为纯移动工具 | ⚠️ 已被 2026-05-19 修订取代：MovementController 统一负责战局移动累计距离扣 AP |
 | GroundMoveAbility 复用 CombatMovementResolver | ✅ 已确认；主动移动由 Ability 直接调用 MovementController，不再需要 MoveEffect（2026-05-12） |
 | SkillDefinition 层 Tag 条件字段是否保留 | ✅ 保留，用于技能级全局判断（2026-05-12） |
 | Ability 与 CostEffect 条件边界 | ✅ Ability 管流程权限，CostEffect 管资源支付规则；重复 Tag 警告，冲突 Tag 报错（2026-05-12） |
@@ -288,7 +288,7 @@
 
 1. **Effect 是纯数据配置**。Effect 不驱动流程，也不通过用户继承子类扩展行为；它只保存静态 EffectFunction 引用、参数、数值、Tag、条件、目标映射等配置。
 2. **Ability 是可扩展流程类**。Ability 开放给用户编写具体技能流程；基类只提供通用 Tag / Cost / Cooldown / Effect 检查与应用 helper。
-3. **MovementController 是纯移动工具**。不负责 AP 扣除、校验等业务逻辑。
+3. **MovementController 是战局移动预算执行点**。负责 NavMesh 移动执行、累计实际移动距离、按 `MoveSpeed` 阈值扣移动 AP；攻击和普通技能 AP 仍由 Cost Effect 处理。
 4. **HandleInput 从 SkillAbility 基类移出**。UnitTurnHandler 只负责玩家输入路由；具体技能输入解释由当前 Ability 的 `ISkillInputHandler` 或后续 Ability Targeting 层负责。
 
 ### Ability 结构
@@ -398,18 +398,18 @@ SkillExecutor.CanExecute:
 basic_move:
   Ability: GroundMoveAbility
     ├── BlockedTags: [State.Rooted]
-    ├── Costs: [SpendAPEffect]
+    ├── Costs: []
     ├── Cooldowns: []
     └── Effects: []
 
   执行流程:
   1. Compute 阶段（hover预览 / AI评估）:
      GroundMoveAbility: 计算 NavMesh 路径 → 得出 pathLength
-     SpendAPEffect.Compute: pathLength/speed → 预计AP消耗, 检查AP是否够
+     MovementController.RemainingMoveDistance: 检查当前累计预算是否够
   
   2. Execute 阶段（确认）:
      GroundMoveAbility: MovementController.TryStartMove(path) ← 主动移动流程
-     SpendAPEffect.Apply: AttributeSet.TrySpend(AP, computed.cost)
+     MovementController.Update: 根据实际累计移动距离扣 AP
 ```
 
 主动移动是 `GroundMoveAbility` 的核心行为，不再额外建 `MoveEffect`。强制位移、拉拽、击退、传送等“技能对目标施加的位移”仍可作为普通 EffectFunction，例如 `ForcedMove` / `PullTarget`。
@@ -440,7 +440,7 @@ basic_attack:
 | `EffectDefinition.cs` | 改为统一 data-only ScriptableObject；新增 EffectFunction、参数、`EEffectDuration` |
 | 静态 EffectFunction 类 | 新增预定义函数类；每个函数类同时提供 Compute / Apply，由 Effect 配置选择，Ability 直接调用 |
 | `GroundMoveAbility.cs` | 重写：内部调用 CombatMovementResolver 与 MovementController；主动移动不通过 MoveEffect |
-| `MovementController.cs` | 删除 AP 扣除逻辑，变为纯移动工具 |
+| `MovementController.cs` | 2026-05-19 修订：内建累计移动预算，按实际移动距离扣 AP |
 | `CombatMovementResolver.cs` | GroundMoveAbility 直接复用，消除功能重叠 |
 | `SkillDefinition.cs` | 删除 `m_apCost` / `m_cooldown`；当前仍处设计阶段，资产依赖少，不保留旧字段兼容层，避免后续重构出现双轨逻辑 |
 
@@ -473,13 +473,14 @@ RequiredTags/BlockedTags 当前在 `SkillDefinition` 层（`RequiredCasterTags`/
 - 决议：(空)
 - 影响：`EffectDefinition.cs`、`EffectFunctionDispatcher.cs`、所有 EffectFunction 实现
 
-### Q-0041 MovementController AP 扣除何时迁移到 Ability 事件模式
+### Q-0041 MovementController AP 扣除职责
+- 2026-05-19 修订决议：**MovementController 内建累计移动预算**。战局内所有 NavMesh 移动都按实际累计移动距离扣 AP：每累计走满 `MoveSpeed` 米扣 1 AP，未满 1 AP 的 `m_unpaidMoveDistance` 在本回合保留；`ResetMovementFunction` 在回合重置时调用 `ResetMovementBudget()` 清空。`GroundMoveAbility` 不再通过 `SpendAPEffect` 一次性预扣移动 AP，只负责输入解释、路径计算和 `MovementController.TryStartMove(path)`；`SpendAPFunction` 保留给攻击和普通技能固定 AP 消耗。影响：`MovementController.cs`、`GroundMoveAbility.cs`、`ResetMovementFunction.cs`、`CombatAssetSetupMenu.cs`、`Docs/02_SYSTEM_SPEC.md`、`Docs/05_SKILL_SPEC.md`。
 - 来源：2026-05-12 技能框架重写
 - 问题：当前 MovementController.AccountMovementDistance 仍保留增量 AP 扣除逻辑（标记 TODO）。设计目标是 AP 扣除由 Ability.Costs（SpendAPFunction）完成，但增量移动 AP 与 NavMeshAgent Update 循环耦合。是否需要引入 MovementBudget 组件或事件驱动的 AP 扣除？
-- 决议：**2026-05-12 — MovementController 去消耗化 + NavMeshService 拆分**。
+- 历史决议（已被 2026-05-19 修订取代）：**2026-05-12 — MovementController 去消耗化 + NavMeshService 拆分**。
   1. **NavMeshService**（单例 MB）：合并原 CombatMovementResolver + PathCostCalculator + NavMeshManager，提供纯 NavMesh API（路径计算、采样、距离、占位、AP 估算）。Skill 可直接通过 `NavMeshService.Instance` 调用。
   2. **MovementController**（单位组件）：移除所有消耗逻辑（`AccountMovementDistance`、`m_unpaidMoveDistance`、`ResetUnpaidDistance`、`ApDeducted`、`CanMoveAlong`、`PreviewMovementApCost`）。变为纯移动执行器（`TryMove`/`StopMovement`/`IsMoving`），`RemainingMoveDistance` 变为 `AP×Speed` 纯计算，无 unpaid 残留。
-  3. **AP 扣除职责**：迁移到 Skill 层。`GroundMoveAbility` 的 `Costs` 槽位（`SpendAPFunction`）在移动启动前一次算出预估消耗并扣除，不再逐帧增量扣除。
+  3. **历史 AP 扣除职责**：曾迁移到 Skill 层，由 `GroundMoveAbility` 的 `Costs` 槽位（`SpendAPFunction`）预估并扣除；该规则已被 2026-05-19 累计移动预算取代。
   4. **扩展性**：未来飞行能力可扩展 MovementController 或加兄弟组件，通过 `GetComponent<MovementController>()` 统一访问。
 - 影响：`NavMeshService.cs`（新建）、`MovementController.cs`、`GroundMoveAbility.cs`、`UnitTurnHandler.cs`、`EnemyTurnRunner.cs`、`Player1Controller.cs`、`EnemyController.cs`、`PathPreview.cs`、`SystemEffectFunctions.cs`。删除 `CombatMovementResolver.cs`、`PathCostCalculator.cs`、`NavMeshManager.cs`。
 

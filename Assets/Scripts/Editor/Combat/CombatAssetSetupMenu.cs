@@ -11,8 +11,6 @@ namespace MiniChess.Editor.Combat
         private const string k_EffectFunctionsFolder = "Assets/Data/EffectFunctions";
         private const string k_EffectsFolder = "Assets/Data/Effects";
         private const string k_SkillsFolder = "Assets/Data/Skills";
-        private const string k_SpendApPath = k_EffectFunctionsFolder + "/spend_ap.asset";
-        private const string k_MoveCostPath = k_EffectsFolder + "/basic_move_cost.asset";
         private const string k_MoveAbilityPath = k_SkillsFolder + "/GroundMoveAbility.asset";
         private const string k_MoveDefinitionPath = k_SkillsFolder + "/basic_move.asset";
         private const string k_PlayerAttributesPath = "Assets/Data/Attributes/player_attribute_set.asset";
@@ -25,14 +23,9 @@ namespace MiniChess.Editor.Combat
             EnsureFolder(k_EffectsFolder);
             EnsureFolder(k_SkillsFolder);
 
-            var spendAp = EnsureAsset<SpendAPFunction>(k_SpendApPath);
-            var moveCost = EnsureAsset<SkillEffect>(k_MoveCostPath);
             var moveAbility = EnsureAsset<GroundMoveAbility>(k_MoveAbilityPath);
             var moveDefinition = EnsureAsset<SkillDefinition>(k_MoveDefinitionPath);
             DeleteIfExists(k_SkillsFolder + "/basic_move_definition.asset");
-
-            SetObjectField(moveCost, "m_function", spendAp);
-            SetEnumField(moveCost, "m_targetMapping", ESkillEffectTarget.Caster);
 
             SetStringField(moveDefinition, "m_id", "basic_move");
             SetStringField(moveDefinition, "m_displayName", "Basic Move");
@@ -40,11 +33,11 @@ namespace MiniChess.Editor.Combat
             SetEnumField(moveDefinition, "m_targetType", ESkillTargetType.GroundPoint);
             SetObjectField(moveDefinition, "m_ability", moveAbility);
 
-            SetObjectArrayField(moveAbility, "m_costs", new Object[] { moveCost });
+            SetObjectArrayField(moveAbility, "m_costs", System.Array.Empty<Object>());
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("[MiniChess] Ensured basic_move SkillDefinition, GroundMoveAbility, and SpendAP cost assets.");
+            Debug.Log("[MiniChess] Ensured basic_move SkillDefinition and GroundMoveAbility assets.");
         }
 
         [MenuItem("MiniChess/Combat Config/Ensure Sample Player Move Scene")]

@@ -1,3 +1,4 @@
+using MiniChess.Combat;
 using UnityEngine;
 
 namespace MiniChess.Combat.Skills
@@ -12,6 +13,11 @@ namespace MiniChess.Combat.Skills
 
         public override SkillEffectResult Apply(SkillEffectContext context, SkillEffect effect, SkillEffectResult computed)
         {
+            var movement = context.Target?.GetComponent<MovementController>()
+                ?? context.Caster?.GetComponent<MovementController>();
+            if (movement != null)
+                movement.ResetMovementBudget();
+
             return SkillEffectResult.Success();
         }
     }
